@@ -627,6 +627,7 @@ import { getSecurityConfig, sendVerificationCode, register, resetPassword, login
 import Turnstile from '@/components/Turnstile/index.vue'
 import storage from 'store'
 import { ACCESS_TOKEN, USER_INFO, USER_ROLES } from '@/store/mutation-types'
+import { promptChangeInitialPassword } from '@/utils/initialPasswordReminder'
 
 export default {
   name: 'Login',
@@ -835,6 +836,7 @@ export default {
               message: 'Welcome',
               description: `${timeFix()}, welcome back.`
             })
+            this.$nextTick(() => promptChangeInitialPassword())
           })
           .catch(err => {
             const response = err.response || {}
