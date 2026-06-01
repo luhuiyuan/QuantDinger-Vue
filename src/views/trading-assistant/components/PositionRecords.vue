@@ -1,27 +1,8 @@
 <template>
   <div class="position-records strategy-tab-pane-inner" :class="{ 'theme-dark': isDark }">
-    <a-alert
-      v-if="showReconciliationBanner"
-      :type="reconciliationAlertType"
-      show-icon
-      class="reconciliation-alert"
-      :message="reconciliationTitle"
-    >
-      <template slot="description">
-        <div>{{ reconciliationDescription }}</div>
-        <ul v-if="reconciliationNotes.length" class="reconciliation-notes">
-          <li v-for="(note, idx) in reconciliationNotes" :key="idx">{{ formatReconciliationNote(note) }}</li>
-        </ul>
-        <div v-if="sharedCredentialHint" class="shared-credential-hint">
-          {{ $t('trading-assistant.positions.sharedCredentialHint') }}
-        </div>
-      </template>
-    </a-alert>
-
     <div class="positions-section">
       <div v-if="isLiveMode" class="section-head">
         <span class="section-title">{{ $t('trading-assistant.positions.strategyLedger') }}</span>
-        <a-tag color="blue">{{ $t('trading-assistant.positions.dataSourceStrategy') }}</a-tag>
       </div>
 
       <div v-if="positions.length === 0 && !loading" class="empty-state strategy-tab-empty">
@@ -73,53 +54,11 @@
         </template>
       </a-table>
     </div>
-
-    <div v-if="isLiveMode" class="positions-section account-legs-section">
-      <div class="section-head">
-        <span class="section-title">{{ $t('trading-assistant.positions.accountMirror') }}</span>
-        <a-tag color="purple">{{ $t('trading-assistant.positions.dataSourceAccount') }}</a-tag>
-      </div>
-      <div v-if="accountLegs.length === 0 && !loading" class="empty-state strategy-tab-empty account-empty">
-        <a-empty :description="$t('trading-assistant.positions.noAccountPositions')" />
-      </div>
-      <a-table
-        v-else
-        :columns="accountColumns"
-        :data-source="accountLegs"
-        :loading="loading"
-        :pagination="false"
-        size="small"
-        :rowKey="accountRowKey"
-        :scroll="{ x: 640 }"
-      >
-        <template slot="symbol" slot-scope="text, record">
-          <strong>{{ record.symbol || text }}</strong>
-        </template>
-        <template slot="side" slot-scope="text, record">
-          <a-tag :color="(record.side || text) === 'long' ? 'green' : 'red'">
-            {{ (record.side || text) === 'long' ? $t('trading-assistant.table.long') : $t('trading-assistant.table.short') }}
-          </a-tag>
-        </template>
-        <template slot="size" slot-scope="text, record">
-          {{ parseFloat(record.size || text || 0).toFixed(4) }}
-        </template>
-        <template slot="entryPrice" slot-scope="text, record">
-          <span v-if="hasValidPrice(record.entry_price || text)">
-            ${{ parseFloat(record.entry_price || text).toFixed(4) }}
-          </span>
-          <span v-else>--</span>
-        </template>
-        <template slot="syncedAt" slot-scope="text, record">
-          {{ formatSyncedAt(record.synced_at || text) }}
-        </template>
-      </a-table>
-    </div>
   </div>
 </template>
 
 <script>
 import { getStrategyPositions } from '@/api/strategy'
-import moment from 'moment'
 
 export default {
   name: 'PositionRecords',
@@ -140,10 +79,6 @@ export default {
       type: [Number, String],
       default: 1
     },
-    credentialId: {
-      type: Number,
-      default: 0
-    },
     loading: {
       type: Boolean,
       default: false
@@ -155,44 +90,12 @@ export default {
   },
   data () {
     return {
-      positions: [],
-      accountLegs: [],
-      reconciliationStatus: { status: 'skipped', notes: [] }
+      positions: []
     }
   },
   computed: {
     isLiveMode () {
       return String(this.executionMode || '').trim().toLowerCase() === 'live'
-    },
-    reconciliationNotes () {
-      const notes = this.reconciliationStatus && this.reconciliationStatus.notes
-      return Array.isArray(notes) ? notes : []
-    },
-    showReconciliationBanner () {
-      if (!this.isLiveMode) return false
-      const status = String((this.reconciliationStatus && this.reconciliationStatus.status) || 'skipped')
-      return status !== 'skipped' && status !== 'ok'
-    },
-    reconciliationAlertType () {
-      const status = String((this.reconciliationStatus && this.reconciliationStatus.status) || '')
-      if (status === 'mismatch' || status === 'strategy_only') return 'warning'
-      if (status === 'account_only') return 'info'
-      return 'success'
-    },
-    reconciliationTitle () {
-      const status = String((this.reconciliationStatus && this.reconciliationStatus.status) || 'ok')
-      const key = `trading-assistant.positions.reconciliation.${status}.title`
-      const translated = this.$t(key)
-      return translated !== key ? translated : this.$t('trading-assistant.positions.reconciliation.mismatch.title')
-    },
-    reconciliationDescription () {
-      const status = String((this.reconciliationStatus && this.reconciliationStatus.status) || 'ok')
-      const key = `trading-assistant.positions.reconciliation.${status}.desc`
-      const translated = this.$t(key)
-      return translated !== key ? translated : ''
-    },
-    sharedCredentialHint () {
-      return this.isLiveMode && Number(this.credentialId || 0) > 0
     },
     columns () {
       return [
@@ -253,45 +156,6 @@ export default {
           scopedSlots: { customRender: 'pnlPercent' }
         }
       ]
-    },
-    accountColumns () {
-      return [
-        {
-          title: this.$t('trading-assistant.table.symbol'),
-          dataIndex: 'symbol',
-          key: 'symbol',
-          width: 120,
-          scopedSlots: { customRender: 'symbol' }
-        },
-        {
-          title: this.$t('trading-assistant.table.side'),
-          dataIndex: 'side',
-          key: 'side',
-          width: 80,
-          scopedSlots: { customRender: 'side' }
-        },
-        {
-          title: this.$t('trading-assistant.table.size'),
-          dataIndex: 'size',
-          key: 'size',
-          width: 120,
-          scopedSlots: { customRender: 'size' }
-        },
-        {
-          title: this.$t('trading-assistant.table.entryPrice'),
-          dataIndex: 'entry_price',
-          key: 'entry_price',
-          width: 120,
-          scopedSlots: { customRender: 'entryPrice' }
-        },
-        {
-          title: this.$t('trading-assistant.positions.syncedAt'),
-          dataIndex: 'synced_at',
-          key: 'synced_at',
-          width: 160,
-          scopedSlots: { customRender: 'syncedAt' }
-        }
-      ]
     }
   },
   watch: {
@@ -311,9 +175,6 @@ export default {
     this.stopPolling()
   },
   methods: {
-    accountRowKey (record, index) {
-      return record.id || `${record.inst_id || record.symbol}-${record.side}-${index}`
-    },
     async loadPositions () {
       if (!this.strategyId) return
 
@@ -321,8 +182,6 @@ export default {
         const res = await getStrategyPositions(this.strategyId)
         if (res.code === 1) {
           const rawPositions = res.data.positions || res.data.items || []
-          this.accountLegs = res.data.account_legs || []
-          this.reconciliationStatus = res.data.reconciliation_status || { status: 'skipped', notes: [] }
 
           this.positions = rawPositions.map((position, index) => {
             const mt = String(this.marketType || 'swap').toLowerCase()
@@ -355,36 +214,10 @@ export default {
           })
         } else {
           this.positions = []
-          this.accountLegs = []
-          this.reconciliationStatus = { status: 'skipped', notes: [] }
         }
       } catch (error) {
         this.positions = []
-        this.accountLegs = []
-        this.reconciliationStatus = { status: 'skipped', notes: [] }
       }
-    },
-    formatReconciliationNote (note) {
-      const raw = String(note || '')
-      const parts = raw.split(':')
-      const kind = parts[0] || ''
-      const sym = parts[1] || ''
-      const side = parts[2] || ''
-      const sideLabel = side === 'long'
-        ? this.$t('trading-assistant.table.long')
-        : side === 'short'
-          ? this.$t('trading-assistant.table.short')
-          : side
-      const prefixKey = `trading-assistant.positions.note.${kind}`
-      const prefix = this.$t(prefixKey)
-      const prefixText = prefix !== prefixKey ? prefix : kind
-      const detail = parts.slice(3).join(':')
-      return detail ? `${prefixText} · ${sym} ${sideLabel} (${detail})` : `${prefixText} · ${sym} ${sideLabel}`
-    },
-    formatSyncedAt (raw) {
-      if (!raw) return '--'
-      const m = moment(raw)
-      return m.isValid() ? m.format('MM-DD HH:mm:ss') : String(raw)
     },
     hasValidPrice (price) {
       const value = parseFloat(price)
@@ -424,26 +257,6 @@ export default {
   min-height: 300px;
   padding: 0;
 
-  .reconciliation-alert {
-    margin-bottom: 12px;
-  }
-
-  .reconciliation-notes {
-    margin: 8px 0 0;
-    padding-left: 18px;
-    font-size: 12px;
-  }
-
-  .shared-credential-hint {
-    margin-top: 8px;
-    font-size: 12px;
-    color: rgba(0, 0, 0, 0.55);
-  }
-
-  .positions-section + .positions-section {
-    margin-top: 16px;
-  }
-
   .section-head {
     display: flex;
     align-items: center;
@@ -455,10 +268,6 @@ export default {
     font-size: 13px;
     font-weight: 600;
     color: #334155;
-  }
-
-  .account-empty {
-    min-height: 120px;
   }
 
   .empty-state {
@@ -479,10 +288,6 @@ export default {
 
   &.theme-dark .section-title {
     color: #d1d4dc;
-  }
-
-  &.theme-dark .shared-credential-hint {
-    color: rgba(255, 255, 255, 0.55);
   }
 
   ::v-deep .ant-table {

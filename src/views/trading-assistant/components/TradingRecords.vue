@@ -255,6 +255,11 @@ export default {
       if (!code) return null
       return `trading-assistant.tradeReason.${code}`
     },
+    gridPurposeI18nKey (reason) {
+      const code = String(reason || '').trim()
+      if (!code) return null
+      return `trading-bot.detail.restingPurpose.${code}`
+    },
     tradeDetailI18nKey (type) {
       const ty = String(type || '').toLowerCase().replace(/-/g, '_')
       const map = {
@@ -294,6 +299,12 @@ export default {
         if (reasonKey) {
           const rt = this.$t(reasonKey)
           if (rt !== reasonKey) return rt
+        }
+
+        const purposeKey = this.gridPurposeI18nKey(record.close_reason)
+        if (purposeKey) {
+          const pt = this.$t(purposeKey)
+          if (pt !== purposeKey) return pt
         }
 
         // Backtest-style typed exits (close_long_stop / _profit / _trailing)

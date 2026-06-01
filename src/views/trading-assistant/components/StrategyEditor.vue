@@ -121,7 +121,19 @@
                   </div>
                   <div v-if="getParamDescription(param)" class="param-item__desc">{{ getParamDescription(param) }}</div>
                   <a-input-number
-                    v-if="param.type === 'number' || param.type === 'integer' || param.type === 'percent'"
+                    v-if="param.type === 'percent'"
+                    :value="templateParamValues[param.name]"
+                    :min="param.min"
+                    :max="param.max"
+                    :step="param.step || 1"
+                    :precision="getParamPrecision(param)"
+                    :formatter="formatPercentInput"
+                    :parser="parsePercentInput"
+                    style="width: 100%"
+                    @change="handleNumericParamChange(param, $event)"
+                  />
+                  <a-input-number
+                    v-else-if="param.type === 'number' || param.type === 'integer'"
                     :value="templateParamValues[param.name]"
                     :min="param.min"
                     :max="param.max"
@@ -292,7 +304,8 @@ import {
   SCRIPT_TEMPLATE_CATALOG,
   getScriptTemplateByKey,
   buildTemplateCode,
-  buildTemplateParamValues
+  buildTemplateParamValues,
+  normalizePercentParamValue
 } from './scriptTemplateCatalog'
 
 export default {
@@ -570,6 +583,16 @@ def on_bar(ctx, bar):
       return this.$t(`trading-assistant.editor.paramType.${type}`)
     },
 
+    formatPercentInput (value) {
+      if (value === '' || value === null || value === undefined) return ''
+      return `${value}%`
+    },
+
+    parsePercentInput (value) {
+      if (value === '' || value === null || value === undefined) return ''
+      return String(value).replace(/%/g, '').trim()
+    },
+
     getOptionLabel (option) {
       if (!option) return ''
       if (option.labelKey) {
@@ -703,7 +726,7 @@ def on_bar(ctx, bar):
       if (t === 'number' || t === 'percent') {
         const n = Number(raw)
         if (!Number.isFinite(n)) return undefined
-        let v = n
+        let v = t === 'percent' ? (normalizePercentParamValue(n) ?? n) : n
         if (param.min != null) v = Math.max(param.min, v)
         if (param.max != null) v = Math.min(param.max, v)
         return v

@@ -535,7 +535,6 @@
                       :execution-mode="selectedStrategy.execution_mode || 'signal'"
                       :market-type="(selectedStrategy.trading_config && selectedStrategy.trading_config.market_type) || 'swap'"
                       :leverage="(selectedStrategy.trading_config && selectedStrategy.trading_config.leverage) || 1"
-                      :credential-id="strategyCredentialId"
                       :loading="loadingRecords"
                       :is-dark="isDarkTheme" />
                   </a-tab-pane>
@@ -1641,13 +1640,6 @@ export default {
         return this.$t('trading-assistant.createIndicatorStrategy')
       }
       return this.$t('trading-assistant.createStrategy')
-    },
-    strategyCredentialId () {
-      const st = this.selectedStrategy
-      if (!st || !st.exchange_config || typeof st.exchange_config !== 'object') return 0
-      const raw = st.exchange_config.credential_id || st.exchange_config.credentials_id
-      const n = parseInt(raw, 10)
-      return Number.isFinite(n) && n > 0 ? n : 0
     },
     assistantGuideStorageKey () {
       const userId = this.$store.getters.userInfo?.id || 'guest'

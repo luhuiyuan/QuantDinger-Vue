@@ -40,7 +40,7 @@
 
           <a-button
 
-            v-for="p in datePresets"
+            v-for="p in filteredDatePresets"
 
             :key="p.days"
 
@@ -66,7 +66,13 @@
 
           <label>{{ $t('strategyCenter.backtest.startDate') }}</label>
 
-          <a-date-picker v-model="startDate" format="YYYY-MM-DD" :allow-clear="false" />
+          <a-date-picker
+            v-model="startDate"
+            format="YYYY-MM-DD"
+            :allow-clear="false"
+            :disabled-date="disabledStartDate"
+            @change="clampDateRange"
+          />
 
         </div>
 
@@ -76,7 +82,13 @@
 
           <label>{{ $t('strategyCenter.backtest.endDate') }}</label>
 
-          <a-date-picker v-model="endDate" format="YYYY-MM-DD" :allow-clear="false" />
+          <a-date-picker
+            v-model="endDate"
+            format="YYYY-MM-DD"
+            :allow-clear="false"
+            :disabled-date="disabledEndDate"
+            @change="clampDateRange"
+          />
 
         </div>
 
@@ -384,7 +396,20 @@ import { runStrategyBacktest, getStrategyBacktestHistory, getStrategyBacktestRun
 
 import { BACKTEST_TIMEOUT } from '@/utils/request'
 
+// Align with backend strategy backtest limits (strategy.py run_strategy_backtest).
+const TF_MAX_DAYS = {
+  '1m': 30,
+  '5m': 180,
+  '15m': 365,
+  '30m': 365,
+  '1H': 730,
+  '4H': 1460,
+  '1D': 3650,
+  '1W': 7300
+}
 
+/** Script-strategy backtest is capped server-side; keep UI aligned to avoid 400 errors. */
+const SCRIPT_BACKTEST_MAX_DAYS = 30
 
 export default {
 
@@ -406,7 +431,7 @@ export default {
 
     const end = moment()
 
-    const start = moment().subtract(180, 'days')
+    const start = moment().subtract(30, 'days')
 
     return {
 
@@ -414,7 +439,7 @@ export default {
 
       endDate: end,
 
-      activePresetDays: 180,
+      activePresetDays: 30,
 
       running: false,
 
@@ -456,6 +481,14 @@ export default {
 
     },
 
+    isScriptOnlyStrategy () {
+
+      const s = this.strategy || {}
+
+      return s.strategy_mode === 'script' || s.strategy_type === 'ScriptStrategy'
+
+    },
+
     datePresets () {
 
       return [
@@ -469,6 +502,44 @@ export default {
         { days: 365, label: this.$t('strategyCenter.backtest.preset1y') }
 
       ]
+
+    },
+
+    strategyTimeframe () {
+
+      const s = this.strategy || {}
+
+      const tc = s.trading_config || {}
+
+      return String(tc.timeframe || s.timeframe || '1D').trim()
+
+    },
+
+    tfMaxDays () {
+
+      return TF_MAX_DAYS[this.strategyTimeframe] || 1095
+
+    },
+
+    effectiveMaxDays () {
+
+      if (this.isScriptOnlyStrategy) return SCRIPT_BACKTEST_MAX_DAYS
+
+      return this.tfMaxDays
+
+    },
+
+    filteredDatePresets () {
+
+      return this.datePresets.filter(p => p.days <= this.effectiveMaxDays)
+
+    },
+
+    defaultPresetDays () {
+
+      if (this.isScriptOnlyStrategy) return SCRIPT_BACKTEST_MAX_DAYS
+
+      return Math.min(180, this.tfMaxDays)
 
     },
 
@@ -564,19 +635,143 @@ export default {
 
       }
 
+    },
+
+    strategy: {
+
+      immediate: true,
+
+      deep: true,
+
+      handler () {
+
+        this.syncDateRangeToStrategy()
+
+      }
+
+    },
+
+    strategyTimeframe () {
+
+      this.syncDateRangeToStrategy()
+
     }
 
   },
 
   methods: {
 
+    clampPresetDays (days) {
+
+      const n = Number(days)
+
+      if (!Number.isFinite(n) || n <= 0) return this.defaultPresetDays
+
+      const allowed = (this.filteredDatePresets || []).map(p => p.days)
+
+      if (!allowed.length) return Math.min(n, this.effectiveMaxDays)
+
+      if (allowed.includes(n)) return n
+
+      return allowed.reduce((best, d) => (Math.abs(d - n) < Math.abs(best - n) ? d : best), allowed[0])
+
+    },
+
     applyPreset (days) {
 
-      this.activePresetDays = days
+      const clamped = this.clampPresetDays(days)
+
+      this.activePresetDays = clamped
 
       this.endDate = moment()
 
-      this.startDate = moment().subtract(days, 'days')
+      this.startDate = moment().subtract(clamped, 'days')
+
+    },
+
+    syncDateRangeToStrategy () {
+
+      if (!this.startDate || !this.endDate) {
+
+        this.applyPreset(this.defaultPresetDays)
+
+        return
+
+      }
+
+      this.clampDateRange()
+
+    },
+
+    clampDateRange () {
+
+      const maxDays = this.effectiveMaxDays
+
+      let end = this.endDate ? moment(this.endDate).startOf('day') : moment().startOf('day')
+
+      let start = this.startDate ? moment(this.startDate).startOf('day') : moment(end).subtract(maxDays, 'days')
+
+      if (!start.isValid() || !end.isValid()) {
+
+        this.applyPreset(this.defaultPresetDays)
+
+        return
+
+      }
+
+      if (end.isBefore(start)) {
+
+        start = moment(end).subtract(maxDays, 'days')
+
+      }
+
+      if (end.diff(start, 'days') > maxDays) {
+
+        start = moment(end).subtract(maxDays, 'days')
+
+      }
+
+      this.startDate = start
+
+      this.endDate = end
+
+      const span = end.diff(start, 'days')
+
+      const match = (this.filteredDatePresets || []).find(p => p.days === span)
+
+      this.activePresetDays = match ? match.days : null
+
+    },
+
+    disabledStartDate (current) {
+
+      if (!current) return false
+
+      const end = this.endDate ? moment(this.endDate).startOf('day') : moment().startOf('day')
+
+      const cur = moment(current).startOf('day')
+
+      if (cur.isAfter(end)) return true
+
+      return end.diff(cur, 'days') > this.effectiveMaxDays
+
+    },
+
+    disabledEndDate (current) {
+
+      if (!current) return false
+
+      const start = this.startDate
+
+        ? moment(this.startDate).startOf('day')
+
+        : moment().subtract(this.effectiveMaxDays, 'days').startOf('day')
+
+      const cur = moment(current).startOf('day')
+
+      if (cur.isBefore(start)) return true
+
+      return cur.diff(start, 'days') > this.effectiveMaxDays
 
     },
 
@@ -685,6 +880,8 @@ export default {
         return
 
       }
+
+      this.syncDateRangeToStrategy()
 
       if (!this.startDate || !this.endDate) {
 

@@ -391,7 +391,6 @@
             :execution-mode="(bot && bot.execution_mode) || 'live'"
             :market-type="tc.market_type || 'swap'"
             :leverage="tc.leverage || 1"
-            :credential-id="botCredentialId"
             :is-dark="isDark"
           />
         </a-tab-pane>
@@ -524,7 +523,7 @@ export default {
     restingOrderRows () {
       return (this.restingOrders || []).map(o => ({
         ...o,
-        purposeLabel: this.formatRestingPurpose(o.purpose),
+        purposeLabel: this.formatRestingPurpose(o.purpose, o),
         priceLabel: this.formatPrice(o.price),
         qtyLabel: this.formatLegSize({ size: o.quantity }),
         filledLabel: this.formatLegSize({ size: o.filled_quantity }),
@@ -532,13 +531,6 @@ export default {
       }))
     },
     tc () { return this.bot?.trading_config || {} },
-    botCredentialId () {
-      const cfg = this.bot?.exchange_config
-      if (!cfg || typeof cfg !== 'object') return 0
-      const raw = cfg.credential_id || cfg.credentials_id
-      const n = parseInt(raw, 10)
-      return Number.isFinite(n) && n > 0 ? n : 0
-    },
     botParams () { return this.tc.bot_params || {} },
     botDisplay () { return this.bot?.bot_display || {} },
     isMartingaleBot () { return (this.bot?.bot_type || this.tc.bot_type) === 'martingale' },
@@ -879,7 +871,16 @@ export default {
         this.restingLoading = false
       }
     },
-    formatRestingPurpose (purpose) {
+    formatRestingPurpose (purpose, order) {
+      const row = order && typeof order === 'object' ? order : null
+      if (row) {
+        const loc = String((this.$i18n && this.$i18n.locale) || 'zh-CN').toLowerCase()
+        const preferEn = loc.startsWith('en')
+        const label = preferEn
+          ? (row.purpose_label_en || row.purpose_label)
+          : (row.purpose_label || row.purpose_label_en)
+        if (label) return label
+      }
       const key = `trading-bot.detail.restingPurpose.${purpose}`
       const t = this.$t(key)
       return t !== key ? t : String(purpose || '-')
