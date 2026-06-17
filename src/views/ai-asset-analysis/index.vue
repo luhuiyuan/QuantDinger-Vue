@@ -656,7 +656,6 @@ export default {
   }
 }
 
-/* ========== 移动端自适应 ========== */
 @media (max-width: 768px) {
   .ai-asset-analysis-page {
     padding: 5px;

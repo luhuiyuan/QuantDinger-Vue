@@ -4,7 +4,6 @@
     <div class="main-content-full">
       <!-- Top index strip -->
       <div v-if="false" class="top-index-bar">
-        <!-- 情绪指标 - 独立加载 -->
         <template v-if="loadingSentiment">
           <div class="indicator-box skeleton-box">
             <span class="skeleton-text short"></span>
@@ -72,10 +71,8 @@
         </a-button>
       </div>
 
-      <!-- 主体三栏布局 -->
       <copilot-workbench />
       <div v-if="false" class="main-body">
-        <!-- 左侧：热力图 + 财经日历 -->
         <div class="left-panel">
           <!-- Heatmap - disabled by default -->
           <div v-if="false" class="heatmap-box">
@@ -109,7 +106,6 @@
             </div>
           </div>
 
-          <!-- 财经日历 - 独立加载 -->
           <div class="calendar-box">
             <div class="box-header">
               <span class="box-title"><a-icon type="calendar" /> {{ $t('globalMarket.calendar') }}</span>
@@ -185,7 +181,6 @@
           </div>
         </div>
 
-        <!-- 右侧：工具栏 + AI 分析 -->
         <div class="right-panel">
           <!-- Analysis toolbar -->
           <div class="analysis-toolbar">
@@ -233,7 +228,6 @@ class="analyze-button">
             </a-button>
           </div>
 
-          <!-- 分析结果区域 -->
           <div class="analysis-main">
             <div v-if="!analysisResult && !analyzing && !analysisError" class="analysis-placeholder">
               <div class="placeholder-hero">
@@ -294,7 +288,6 @@ class="analyze-button">
           </div>
         </div>
 
-        <!-- 右侧自选股面板 -->
         <div class="watchlist-panel">
           <div class="panel-header">
             <span class="panel-title"><a-icon type="star" theme="filled" /> {{ $t('dashboard.analysis.watchlist.title') }}</span>
@@ -311,7 +304,6 @@ class="analyze-button">
             </span>
           </div>
 
-          <!-- 汇总统计条 -->
           <div class="panel-summary" v-if="watchlist && watchlist.length > 0">
             <div class="summary-chip">
               <span class="sc-num">{{ watchlist.length }}</span>
@@ -331,7 +323,6 @@ class="analyze-button">
             </div>
           </div>
 
-          <!-- 批量勾选栏 -->
           <div class="batch-bar" v-if="batchMode">
             <a-checkbox :checked="batchSelectedAll" :indeterminate="batchIndeterminate" @change="onBatchSelectAll" class="batch-all-cb">
               {{ $t('aiAssetAnalysis.batch.selectAll') }}
@@ -387,7 +378,6 @@ class="analyze-button">
                     </span>
                   </div>
                 </div>
-                <!-- 持仓/盈亏行（仅有持仓时） -->
                 <div class="wl-row-pnl" v-if="positionSummaryMap[`${stock.market}:${stock.symbol}`]">
                   <span class="wl-pnl-qty">{{ formatNum(positionSummaryMap[`${stock.market}:${stock.symbol}`].quantity, 4) }} @ {{ formatPrice(positionSummaryMap[`${stock.market}:${stock.symbol}`].avgEntry || 0) }}</span>
                   <span class="wl-pnl-val" :class="positionSummaryMap[`${stock.market}:${stock.symbol}`].pnl >= 0 ? 'up' : 'down'">
@@ -395,7 +385,6 @@ class="analyze-button">
                     ({{ positionSummaryMap[`${stock.market}:${stock.symbol}`].pnlPercent >= 0 ? '+' : '' }}{{ formatNum(positionSummaryMap[`${stock.market}:${stock.symbol}`].pnlPercent || 0) }}%)
                   </span>
                 </div>
-                <!-- 任务状态（仅有任务时） -->
                 <div class="wl-row-task" v-if="getMonitorMeta(stock)">
                   <span class="wl-task-badge" :class="getMonitorMeta(stock).activeCount > 0 ? 'active' : 'paused'" @click.stop="toggleStockMonitor(stock)">
                     <a-icon :type="getMonitorMeta(stock).activeCount > 0 ? 'sync' : 'pause-circle'" :spin="getMonitorMeta(stock).activeCount > 0" />
@@ -404,7 +393,6 @@ class="analyze-button">
                   <span class="wl-task-next" v-if="getMonitorMeta(stock).nextRunAtText">{{ getMonitorMeta(stock).nextRunAtText }}</span>
                 </div>
               </div>
-              <!-- hover 浮出操作 -->
               <div class="wl-card-hover-actions">
                 <a-tooltip :title="$t('aiAssetAnalysis.position.quickAdd')"><span class="wl-hover-btn" @click.stop="openPositionModal(stock)"><a-icon type="wallet" /></span></a-tooltip>
                 <a-tooltip :title="$t('aiAssetAnalysis.monitor.quickTask')"><span class="wl-hover-btn" @click.stop="openMonitorModal(stock)"><a-icon type="clock-circle" /></span></a-tooltip>
@@ -423,7 +411,6 @@ class="analyze-button">
       </div>
     </div>
 
-    <!-- 添加股票弹窗 -->
     <a-modal
       :title="$t('dashboard.analysis.modal.addStock.title')"
       :visible="showAddStockModal"
@@ -436,7 +423,6 @@ class="analyze-button">
       :cancelText="$t('dashboard.analysis.modal.addStock.cancel')"
     >
       <div class="add-stock-modal-content">
-        <!-- Tab标签 -->
         <a-tabs v-model="selectedMarketTab" @change="handleMarketTabChange" class="market-tabs">
           <a-tab-pane
             v-for="marketType in marketTypes"
@@ -480,7 +466,6 @@ class="analyze-button">
           </div>
         </div>
 
-        <!-- 搜索结果 -->
         <div v-if="symbolSearchResults.length > 0" class="search-results-section">
           <div class="section-title">
             <a-icon type="search" style="margin-right: 4px;" />
@@ -508,7 +493,6 @@ class="analyze-button">
           </a-list>
         </div>
 
-        <!-- 热门标的 -->
         <div class="hot-symbols-section">
           <div class="section-title">
             <a-icon type="fire" style="color: #ff4d4f; margin-right: 4px;" />
@@ -614,7 +598,6 @@ class="analyze-button">
       </a-form>
     </a-modal>
 
-    <!-- 批量定时任务弹窗 -->
     <a-modal
       :visible="showBatchScheduleModal"
       :title="$t('aiAssetAnalysis.batch.scheduleTitle')"
@@ -652,7 +635,6 @@ class="analyze-button">
       <a-alert :message="$t('aiAssetAnalysis.batch.scheduleTip')" type="info" show-icon style="margin-top: 8px;" />
     </a-modal>
 
-    <!-- 任务管理抽屉 -->
     <a-drawer
       :title="$t('aiAssetAnalysis.tasks.manage')"
       :visible="showTaskDrawer"
@@ -694,7 +676,6 @@ class="analyze-button">
       </div>
     </a-drawer>
 
-    <!-- 编辑任务弹窗 -->
     <a-modal
       :visible="showEditTaskModal"
       :title="$t('aiAssetAnalysis.tasks.edit')"
@@ -727,7 +708,6 @@ class="analyze-button">
       </a-form>
     </a-modal>
 
-    <!-- 历史分析列表弹窗 -->
     <a-modal
       :title="$t('dashboard.analysis.modal.history.title')"
       :visible="showHistoryModal"
@@ -880,7 +860,6 @@ export default {
         calendar: []
       },
       calendarMeta: {},
-      // 独立加载状态 - 渐进式加载
       loadingSentiment: false,
       loadingIndices: false,
       loadingHeatmap: false,
@@ -1265,7 +1244,6 @@ export default {
     _parseInstantForDisplay (s) {
       s = String(s || '').trim()
       if (!s) return null
-      // 无时区后缀时按 UTC 解析（与当前后端 _serialize_monitor_ts 约定一致），再交给 toLocale 转到用户本地
       const hasTz = /[zZ]$/.test(s) || /[+-]\d{2}:?\d{2}$/.test(s)
       if (!hasTz) {
         const norm = s.replace(' ', 'T')
@@ -1676,7 +1654,6 @@ export default {
       }
     },
     checkAllLoaded () {
-      // 当所有数据都加载完成时，关闭总 loading 状态
       // Close the aggregate loading state once visible context is ready.
       if (!this.loadingSentiment && !this.loadingCalendar) {
         this.loadingMarket = false
@@ -1754,7 +1731,6 @@ export default {
         const tomorrow = new Date(today)
         tomorrow.setDate(tomorrow.getDate() + 1)
 
-        // 判断是否是今天或明天
         if (date.toDateString() === today.toDateString()) {
           return this.isZhLocale ? '今天' : 'Today'
         }
@@ -1762,7 +1738,6 @@ export default {
           return this.isZhLocale ? '明天' : 'Tmrw'
         }
 
-        // 显示月/日
         const month = date.getMonth() + 1
         const day = date.getDate()
         return `${month}/${day}`
@@ -1791,7 +1766,6 @@ export default {
       if (this.heatmapType === 'us_stocks') {
         return item.name || item.fullName || ''
       }
-      // sectors, commodities, forex 都需要多语言适配
       if (this.heatmapType === 'sectors' || this.heatmapType === 'commodities' || this.heatmapType === 'forex') {
         return this.isZhLocale ? (item.name_cn || item.name) : (item.name_en || item.name)
       }
@@ -1854,7 +1828,6 @@ export default {
           this.$store.commit('SET_INFO', res.data)
         }
       } catch (e) {
-        // 静默失败，积分以接口返回为准
       }
     },
     handleGenerateStrategy (result) {
@@ -1988,7 +1961,6 @@ export default {
         this.$message.info(this.$t('fastAnalysis.analysisStillProcessing') || '该任务仍在处理中，请稍后刷新历史记录')
         return
       }
-      // 如果有完整结果，直接显示
       if (item.full_result) {
         this.analysisResult = item.full_result
         this.selectedSymbol = `${item.market}:${item.symbol}`
@@ -2445,7 +2417,6 @@ export default {
     },
     async removeFromWatchlist (stock) {
       if (!this.userId) return
-      // 支持传入 stock 对象或单独的 symbol/market
       const symbol = typeof stock === 'object' ? stock.symbol : stock
       const market = typeof stock === 'object' ? stock.market : arguments[1]
       try {
@@ -2655,7 +2626,6 @@ export default {
   }
 }
 
-// 主体三栏布局
 .main-body {
   flex: 1;
   display: flex;
@@ -2665,7 +2635,6 @@ export default {
   min-height: 0;
 }
 
-// 左侧面板：热力图 + 财经日历
 .left-panel {
   width: 300px;
   flex-shrink: 0;
@@ -2898,7 +2867,6 @@ export default {
   }
 }
 
-// 中间分析面板
 .right-panel {
   flex: 1;
   display: flex;
@@ -2980,7 +2948,6 @@ export default {
   }
 }
 
-// 右侧自选股面板
 .watchlist-panel {
   width: 300px;
   flex-shrink: 0;

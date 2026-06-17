@@ -20,6 +20,7 @@ const locale = {
   'menu.dashboard.tradingAssistant': 'مساعد التداول',
   'menu.dashboard.backtestCenter': 'مركز الاختبار التاريخي',
   'menu.dashboard.indicatorIde': 'IDE المؤشرات',
+  'menu.dashboard.strategyIde': 'Strategy IDE',
   'indicatorIde.direction': 'اتجاه التداول',
   'indicatorIde.tuningLaunchTitle': 'ضبط ذكي',
   'indicatorIde.tuningLaunchDesc': 'يبحث تلقائيًا عن معاملات الاستراتيجية المثلى لتحسين عائد الاختبار الخلفي. اختر طريقة أدناه ثم انقر تشغيل.',
@@ -3571,6 +3572,7 @@ const locale = {
   'settings.field.BILLING_COST_BACKTEST': 'تكلفة الاختبار الخلفي',
   'settings.field.BILLING_COST_PORTFOLIO_MONITOR': 'تكلفة مراقبة المحفظة',
   'settings.field.BILLING_COST_AI_CODE_GEN': 'تكلفة توليد كود AI',
+  'settings.field.BILLING_COST_AI_TUNING': 'تكلفة ضبط معلمات AI',
   'settings.field.CREDITS_REGISTER_BONUS': 'مكافأة التسجيل',
   'settings.field.CREDITS_REFERRAL_BONUS': 'مكافأة الإحالة',
   'settings.field.RECHARGE_TELEGRAM_URL': 'رابط شحن Telegram',
@@ -3594,6 +3596,7 @@ const locale = {
   'settings.desc.BILLING_COST_BACKTEST': 'الرصيد المستهلك لكل اختبار خلفي',
   'settings.desc.BILLING_COST_PORTFOLIO_MONITOR': 'الرصيد المستهلك لكل عملية مراقبة محفظة AI',
   'settings.desc.BILLING_COST_AI_CODE_GEN': 'الرصيد المستهلك لكل توليد كود استراتيجية أو مؤشر بواسطة AI (استخدام رمزي أعلى)',
+  'settings.desc.BILLING_COST_AI_TUNING': 'الرصيد المستهلك لكل تشغيل لضبط المعلمات بواسطة AI (استدعاءات متعددة للنموذج مع اختبارات رجعية)',
   'settings.desc.CREDITS_REGISTER_BONUS': 'الرصيد الممنوح للمستخدمين الجدد عند التسجيل',
   'settings.desc.CREDITS_REFERRAL_BONUS': 'الرصيد الممنوح للمحيل عند تسجيل شخص جديد باستخدام رمز الإحالة الخاص به',
   'settings.desc.VERIFICATION_CODE_MAX_ATTEMPTS': 'الحد الأقصى لمحاولات التحقق من الرمز قبل القفل',
@@ -5018,3 +5021,4 @@ export default {
   ...components,
   ...locale
 }
+

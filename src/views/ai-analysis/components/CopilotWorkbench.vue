@@ -3506,7 +3506,7 @@ export default {
   color: var(--qd-accent);
 }
 
-.panel-head /deep/ .ant-btn-link {
+.panel-head ::v-deep .ant-btn-link {
   height: 28px;
   padding: 0 4px;
   color: var(--qd-accent);
@@ -3821,8 +3821,8 @@ export default {
   min-width: 0;
 }
 
-.composer-actions /deep/ .ant-btn,
-.add-watch /deep/ .ant-btn {
+.composer-actions ::v-deep .ant-btn,
+.add-watch ::v-deep .ant-btn {
   border-radius: 6px;
   font-weight: 700;
 }
@@ -3835,15 +3835,15 @@ export default {
   font-weight: 800;
 }
 
-.symbol-picker /deep/ .ant-select {
+.symbol-picker ::v-deep .ant-select {
   width: 100%;
 }
 
-.hero-symbol-picker /deep/ .ant-select-selection {
+.hero-symbol-picker ::v-deep .ant-select-selection {
   height: 32px;
 }
 
-.hero-symbol-picker /deep/ .ant-select-selection__rendered {
+.hero-symbol-picker ::v-deep .ant-select-selection__rendered {
   line-height: 30px;
 }
 
@@ -4083,57 +4083,57 @@ export default {
   background: var(--qd-accent-soft);
 }
 
-.message-content /deep/ h3,
-.message-content /deep/ h4 {
+.message-content ::v-deep h3,
+.message-content ::v-deep h4 {
   margin: 14px 0 8px;
   color: var(--qd-text);
   line-height: 1.45;
 }
 
-.message-content /deep/ h5 {
+.message-content ::v-deep h5 {
   margin: 10px 0 6px;
   color: var(--qd-text);
   font-size: 14px;
   line-height: 1.45;
 }
 
-.message-content /deep/ p {
+.message-content ::v-deep p {
   margin: 0 0 10px;
   line-height: 1.78;
 }
 
-.message-content /deep/ p:last-child {
+.message-content ::v-deep p:last-child {
   margin-bottom: 0;
 }
 
-.message-content /deep/ ul,
-.message-content /deep/ ol {
+.message-content ::v-deep ul,
+.message-content ::v-deep ol {
   margin: 8px 0 12px;
   padding-left: 22px;
 }
 
-.message-content /deep/ ul {
+.message-content ::v-deep ul {
   list-style: disc;
 }
 
-.message-content /deep/ ol {
+.message-content ::v-deep ol {
   list-style: decimal;
 }
 
-.message-content /deep/ li {
+.message-content ::v-deep li {
   margin: 5px 0;
   padding-left: 2px;
   line-height: 1.68;
 }
 
-.message-content /deep/ hr {
+.message-content ::v-deep hr {
   height: 1px;
   margin: 14px 0;
   border: 0;
   background: var(--qd-border-soft);
 }
 
-.message-content /deep/ blockquote {
+.message-content ::v-deep blockquote {
   margin: 10px 0;
   padding: 9px 11px;
   border-left: 3px solid var(--qd-accent-border);
@@ -4142,7 +4142,7 @@ export default {
   color: var(--qd-text-muted);
 }
 
-.message-content /deep/ .qd-md-table-wrap {
+.message-content ::v-deep .qd-md-table-wrap {
   max-width: 100%;
   margin: 10px 0 14px;
   overflow-x: auto;
@@ -4150,14 +4150,14 @@ export default {
   border-radius: 8px;
 }
 
-.message-content /deep/ .qd-md-table {
+.message-content ::v-deep .qd-md-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
 
-.message-content /deep/ .qd-md-table th,
-.message-content /deep/ .qd-md-table td {
+.message-content ::v-deep .qd-md-table th,
+.message-content ::v-deep .qd-md-table td {
   padding: 8px 10px;
   border-bottom: 1px solid var(--qd-border-soft);
   color: var(--qd-text);
@@ -4165,26 +4165,26 @@ export default {
   vertical-align: top;
 }
 
-.message-content /deep/ .qd-md-table th {
+.message-content ::v-deep .qd-md-table th {
   background: var(--qd-panel-strong);
   color: var(--qd-text-muted);
   font-weight: 800;
 }
 
-.message-content /deep/ .qd-md-table tr:last-child td {
+.message-content ::v-deep .qd-md-table tr:last-child td {
   border-bottom: 0;
 }
 
-.message-content /deep/ a {
+.message-content ::v-deep a {
   color: var(--qd-accent);
   text-decoration: none;
 }
 
-.message-content /deep/ a:hover {
+.message-content ::v-deep a:hover {
   text-decoration: underline;
 }
 
-.message-content /deep/ code {
+.message-content ::v-deep code {
   padding: 1px 4px;
   border-radius: 4px;
   background: var(--qd-panel-strong);
@@ -4193,7 +4193,7 @@ export default {
   font-size: 12px;
 }
 
-.message-content /deep/ .qd-code-block {
+.message-content ::v-deep .qd-code-block {
   margin: 10px 0;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.28);
@@ -4201,7 +4201,7 @@ export default {
   background: #0f172a;
 }
 
-.message-content /deep/ .qd-code-head {
+.message-content ::v-deep .qd-code-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4214,7 +4214,7 @@ export default {
   font-size: 12px;
 }
 
-.message-content /deep/ .qd-copy-code {
+.message-content ::v-deep .qd-copy-code {
   border: 1px solid rgba(203, 213, 225, 0.24);
   border-radius: 5px;
   background: rgba(255, 255, 255, 0.06);
@@ -4226,19 +4226,19 @@ export default {
   transition: border-color 0.18s, background 0.18s;
 }
 
-.message-content /deep/ .qd-copy-code:hover {
+.message-content ::v-deep .qd-copy-code:hover {
   border-color: color-mix(in srgb, var(--qd-accent) 58%, transparent);
   background: var(--qd-accent-ring);
 }
 
-.message-content /deep/ pre {
+.message-content ::v-deep pre {
   max-width: ~"min(760px, 70vw)";
   margin: 0;
   overflow: auto;
   padding: 12px;
 }
 
-.message-content /deep/ pre code {
+.message-content ::v-deep pre code {
   display: block;
   padding: 0;
   border-radius: 0;
@@ -4755,20 +4755,20 @@ export default {
   overflow-wrap: anywhere;
 }
 
-.copilot-workbench /deep/ .ant-select-selection {
+.copilot-workbench ::v-deep .ant-select-selection {
   border-color: var(--qd-border);
   border-radius: 7px;
   background: var(--qd-panel);
 }
 
-.copilot-workbench /deep/ .ant-select-selection__placeholder,
+.copilot-workbench ::v-deep .ant-select-selection__placeholder,
 .composer textarea::placeholder {
   color: var(--qd-text-subtle);
 }
 
-.copilot-workbench /deep/ .ant-select-focused .ant-select-selection,
-.copilot-workbench /deep/ .ant-select-selection:focus,
-.copilot-workbench /deep/ .ant-select-selection:active {
+.copilot-workbench ::v-deep .ant-select-focused .ant-select-selection,
+.copilot-workbench ::v-deep .ant-select-selection:focus,
+.copilot-workbench ::v-deep .ant-select-selection:active {
   border-color: color-mix(in srgb, var(--qd-accent) 58%, transparent);
   box-shadow: 0 0 0 3px var(--qd-accent-ring);
 }
@@ -5028,13 +5028,13 @@ export default {
   color: var(--qd-text-muted);
 }
 
-.hero-symbol-picker /deep/ .ant-select-selection {
+.hero-symbol-picker ::v-deep .ant-select-selection {
   height: 38px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.78);
 }
 
-.hero-symbol-picker /deep/ .ant-select-selection__rendered {
+.hero-symbol-picker ::v-deep .ant-select-selection__rendered {
   line-height: 36px;
 }
 
@@ -5129,8 +5129,8 @@ export default {
   background: rgba(247, 250, 253, 0.92);
 }
 
-.composer-actions /deep/ .ant-btn,
-.add-watch /deep/ .ant-btn {
+.composer-actions ::v-deep .ant-btn,
+.add-watch ::v-deep .ant-btn {
   height: 34px;
   border-radius: 8px;
 }
@@ -5234,11 +5234,11 @@ export default {
   font-size: 11px;
 }
 
-.copilot-workbench .hero-symbol-picker /deep/ .ant-select-selection {
+.copilot-workbench .hero-symbol-picker ::v-deep .ant-select-selection {
   height: 31px !important;
 }
 
-.copilot-workbench .hero-symbol-picker /deep/ .ant-select-selection__rendered {
+.copilot-workbench .hero-symbol-picker ::v-deep .ant-select-selection__rendered {
   line-height: 29px !important;
 }
 

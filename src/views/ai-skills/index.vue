@@ -593,76 +593,76 @@ export default {
     color: rgba(255, 255, 255, 0.9);
   }
 
-  .toolbar /deep/ .ant-checkbox-wrapper {
+  .toolbar ::v-deep .ant-checkbox-wrapper {
     color: rgba(255, 255, 255, 0.78);
   }
 
-  /deep/ .ant-tabs-bar {
+  ::v-deep .ant-tabs-bar {
     border-bottom-color: rgba(255, 255, 255, 0.1);
   }
 
-  /deep/ .ant-tabs-tab {
+  ::v-deep .ant-tabs-tab {
     color: rgba(255, 255, 255, 0.58);
   }
 
-  /deep/ .ant-tabs-tab:hover,
-  /deep/ .ant-tabs-tab-active {
+  ::v-deep .ant-tabs-tab:hover,
+  ::v-deep .ant-tabs-tab-active {
     color: var(--primary-color, #1890ff) !important;
   }
 
-  /deep/ .ant-tabs-ink-bar {
+  ::v-deep .ant-tabs-ink-bar {
     background: var(--primary-color, #1890ff);
   }
 
-  /deep/ .ant-table {
+  ::v-deep .ant-table {
     background: transparent;
     color: rgba(255, 255, 255, 0.82);
   }
 
-  /deep/ .ant-table-thead > tr > th {
+  ::v-deep .ant-table-thead > tr > th {
     background: #161616;
     border-bottom-color: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.62);
   }
 
-  /deep/ .ant-table-tbody > tr > td {
+  ::v-deep .ant-table-tbody > tr > td {
     border-bottom-color: rgba(255, 255, 255, 0.08);
   }
 
-  /deep/ .ant-table-tbody > tr:hover > td {
+  ::v-deep .ant-table-tbody > tr:hover > td {
     background: rgba(255, 255, 255, 0.05);
   }
 
-  /deep/ .ant-table-placeholder {
+  ::v-deep .ant-table-placeholder {
     background: transparent;
     border-color: rgba(255, 255, 255, 0.08);
     color: rgba(255, 255, 255, 0.45);
   }
 
-  /deep/ .ant-input,
-  /deep/ .ant-input-search .ant-input,
-  /deep/ .ant-select-selection,
+  ::v-deep .ant-input,
+  ::v-deep .ant-input-search .ant-input,
+  ::v-deep .ant-select-selection,
   .manifest-editor {
     background: #0f0f0f;
     border-color: rgba(255, 255, 255, 0.14);
     color: rgba(255, 255, 255, 0.86);
   }
 
-  /deep/ .ant-input::placeholder,
-  /deep/ .ant-select-selection__placeholder {
+  ::v-deep .ant-input::placeholder,
+  ::v-deep .ant-select-selection__placeholder {
     color: rgba(255, 255, 255, 0.36);
   }
 
-  /deep/ .ant-pagination-item,
-  /deep/ .ant-pagination-prev .ant-pagination-item-link,
-  /deep/ .ant-pagination-next .ant-pagination-item-link {
+  ::v-deep .ant-pagination-item,
+  ::v-deep .ant-pagination-prev .ant-pagination-item-link,
+  ::v-deep .ant-pagination-next .ant-pagination-item-link {
     background: #121212;
     border-color: rgba(255, 255, 255, 0.14);
   }
 
-  /deep/ .ant-pagination-item a,
-  /deep/ .ant-pagination-prev .ant-pagination-item-link,
-  /deep/ .ant-pagination-next .ant-pagination-item-link {
+  ::v-deep .ant-pagination-item a,
+  ::v-deep .ant-pagination-prev .ant-pagination-item-link,
+  ::v-deep .ant-pagination-next .ant-pagination-item-link {
     color: rgba(255, 255, 255, 0.62);
   }
 }

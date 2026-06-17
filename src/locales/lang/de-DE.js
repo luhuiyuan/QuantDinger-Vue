@@ -22,6 +22,7 @@ const locale = {
   'menu.dashboard.tradingAssistant': 'Handelsassistent',
   'menu.dashboard.backtestCenter': 'Backtest-Zentrum',
   'menu.dashboard.indicatorIde': 'Indikator-IDE',
+  'menu.dashboard.strategyIde': 'Strategie-IDE',
   'indicatorIde.direction': 'Handelsrichtung',
   'indicatorIde.tuningLaunchTitle': 'Intelligentes Tuning',
   'indicatorIde.tuningLaunchDesc': 'Sucht automatisch optimale Strategieparameter, um die Backtest-Rendite zu verbessern. Wählen Sie unten eine Methode und klicken Sie auf Ausführen.',
@@ -3585,6 +3586,7 @@ const locale = {
   'settings.field.BILLING_COST_BACKTEST': 'Backtestkosten',
   'settings.field.BILLING_COST_PORTFOLIO_MONITOR': 'Portfolio-Überwachungskosten',
   'settings.field.BILLING_COST_AI_CODE_GEN': 'AI-Codegenerierungskosten',
+  'settings.field.BILLING_COST_AI_TUNING': 'AI-Parametertuning-Kosten',
   'settings.field.CREDITS_REGISTER_BONUS': 'Registrierungsbonus',
   'settings.field.CREDITS_REFERRAL_BONUS': 'Empfehlungsbonus',
   'settings.field.RECHARGE_TELEGRAM_URL': 'Aufladen Telegram-URL',
@@ -3608,6 +3610,7 @@ const locale = {
   'settings.desc.BILLING_COST_BACKTEST': 'Credits, die pro Backtest-Durchlauf verbraucht werden',
   'settings.desc.BILLING_COST_PORTFOLIO_MONITOR': 'Credits, die pro Portfolio-AI-Überwachungslauf verbraucht werden',
   'settings.desc.BILLING_COST_AI_CODE_GEN': 'Credits, die pro AI-Strategie- oder Indikatorcode-Generierung verbraucht werden (höherer Token-Verbrauch)',
+  'settings.desc.BILLING_COST_AI_TUNING': 'Credits pro AI-Parametertuning-Lauf (mehrere Modellaufrufe plus Backtests)',
   'settings.desc.CREDITS_REGISTER_BONUS': 'Credits, die neuen Benutzern bei der Registrierung gewährt werden',
   'settings.desc.CREDITS_REFERRAL_BONUS': 'Credits, die dem Empfehler gewährt werden, wenn sich jemand mit seinem Empfehlungscode anmeldet',
   'settings.desc.VERIFICATION_CODE_MAX_ATTEMPTS': 'Maximale Versuche zur Überprüfung eines Codes vor der Sperrung',
@@ -5021,3 +5024,4 @@ export default {
   ...components,
   ...locale
 }
+

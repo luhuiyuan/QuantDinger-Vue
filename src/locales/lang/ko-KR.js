@@ -21,6 +21,7 @@ const locale = {
   'menu.dashboard.tradingAssistant': '트레이딩 어시스턴트',
   'menu.dashboard.backtestCenter': '백테스트 센터',
   'menu.dashboard.indicatorIde': '지표 IDE',
+  'menu.dashboard.strategyIde': '전략 IDE',
   'indicatorIde.direction': '거래 방향',
   'indicatorIde.tuningLaunchTitle': '스마트 튜닝',
   'indicatorIde.tuningLaunchDesc': '최적의 전략 파라미터를 자동으로 탐색하여 백테스트 수익을 개선합니다. 아래에서 방식을 선택한 뒤 실행을 클릭하세요.',
@@ -3553,6 +3554,7 @@ const locale = {
   'settings.field.BILLING_COST_BACKTEST': '백테스트 비용',
   'settings.field.BILLING_COST_PORTFOLIO_MONITOR': '포트폴리오 모니터링 비용',
   'settings.field.BILLING_COST_AI_CODE_GEN': 'AI 코드 생성 비용',
+  'settings.field.BILLING_COST_AI_TUNING': 'AI 파라미터 튜닝 비용',
   'settings.field.CREDITS_REGISTER_BONUS': '가입 보너스',
   'settings.field.CREDITS_REFERRAL_BONUS': '추천 보너스',
   'settings.field.RECHARGE_TELEGRAM_URL': '충전 Telegram 링크',
@@ -3576,6 +3578,7 @@ const locale = {
   'settings.desc.BILLING_COST_BACKTEST': '백테스트 실행당 소모되는 크레딧 수',
   'settings.desc.BILLING_COST_PORTFOLIO_MONITOR': '포트폴리오 AI 모니터링 실행당 소모되는 크레딧 수',
   'settings.desc.BILLING_COST_AI_CODE_GEN': 'AI 전략 또는 지표 코드 생성당 소모되는 크레딧 수 (토큰 사용량 높음)',
+  'settings.desc.BILLING_COST_AI_TUNING': 'AI 파라미터 튜닝 실행당 소모되는 크레딧 수 (다중 모델 호출 및 백테스트)',
   'settings.desc.CREDITS_REGISTER_BONUS': '신규 사용자 가입 시 지급되는 크레딧 보너스',
   'settings.desc.CREDITS_REFERRAL_BONUS': '사용자가 추천 코드로 가입 시 추천인에게 지급되는 크레딧 보너스',
   'settings.desc.VERIFICATION_CODE_MAX_ATTEMPTS': '인증 코드 확인 실패 최대 시도 횟수, 초과 시 잠김',
@@ -5000,3 +5003,4 @@ export default {
   ...components,
   ...locale
 }
+

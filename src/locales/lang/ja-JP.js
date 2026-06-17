@@ -22,6 +22,7 @@ const locale = {
   'menu.dashboard.tradingAssistant': '取引アシスタント',
   'menu.dashboard.backtestCenter': 'バックテストセンター',
   'menu.dashboard.indicatorIde': 'インジケータIDE',
+  'menu.dashboard.strategyIde': 'ストラテジーIDE',
   'indicatorIde.direction': '取引方向',
   'indicatorIde.tuningLaunchTitle': 'スマートチューニング',
   'indicatorIde.tuningLaunchDesc': '最適なストラテジーパラメータを自動検索し、バックテストのリターンを改善します。下の方式を選び、「実行」をクリックしてください。',
@@ -3555,6 +3556,7 @@ const locale = {
   'settings.field.BILLING_COST_BACKTEST': 'バックテストコスト',
   'settings.field.BILLING_COST_PORTFOLIO_MONITOR': 'ポートフォリオ監視コスト',
   'settings.field.BILLING_COST_AI_CODE_GEN': 'AIコード生成コスト',
+  'settings.field.BILLING_COST_AI_TUNING': 'AIパラメータ調整コスト',
   'settings.field.CREDITS_REGISTER_BONUS': '登録ボーナス',
   'settings.field.CREDITS_REFERRAL_BONUS': '招待ボーナス',
   'settings.field.RECHARGE_TELEGRAM_URL': 'チャージTelegramリンク',
@@ -3578,6 +3580,7 @@ const locale = {
   'settings.desc.BILLING_COST_BACKTEST': 'バックテスト実行ごとに消費されるクレジット数',
   'settings.desc.BILLING_COST_PORTFOLIO_MONITOR': 'ポートフォリオAI監視実行ごとに消費されるクレジット数',
   'settings.desc.BILLING_COST_AI_CODE_GEN': 'AI戦略またはインジケーターコード生成ごとに消費されるクレジット数（トークン使用量が高い）',
+  'settings.desc.BILLING_COST_AI_TUNING': 'AIパラメータ調整ごとに消費されるクレジット数（複数ラウンドのモデル呼び出しとバックテスト）',
   'settings.desc.CREDITS_REGISTER_BONUS': '新規ユーザー登録時に付与されるクレジットボーナス',
   'settings.desc.CREDITS_REFERRAL_BONUS': '招待コードで新規ユーザーが登録した際に、招待者に付与されるクレジットボーナス',
   'settings.desc.VERIFICATION_CODE_MAX_ATTEMPTS': 'コード検証失敗の最大試行回数、超過するとロックされます',
@@ -5002,3 +5005,4 @@ export default {
   ...components,
   ...locale
 }
+

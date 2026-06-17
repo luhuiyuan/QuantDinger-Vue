@@ -22,6 +22,7 @@ const locale = {
   'menu.dashboard.tradingAssistant': 'Assistante commerciale',
   'menu.dashboard.backtestCenter': 'Centre de backtest',
   'menu.dashboard.indicatorIde': 'IDE Indicateurs',
+  'menu.dashboard.strategyIde': 'IDE Stratégie',
   'indicatorIde.direction': 'Sens du trade',
   'indicatorIde.tuningLaunchTitle': 'Réglage intelligent',
   'indicatorIde.tuningLaunchDesc': 'Recherche automatiquement les paramètres de stratégie optimaux pour améliorer le rendement du backtest. Choisissez une méthode ci-dessous et cliquez sur Exécuter.',
@@ -3573,6 +3574,7 @@ const locale = {
   'settings.field.BILLING_COST_BACKTEST': 'Coût backtest',
   'settings.field.BILLING_COST_PORTFOLIO_MONITOR': 'Coût surveillance Portfolio',
   'settings.field.BILLING_COST_AI_CODE_GEN': 'Coût génération code AI',
+  'settings.field.BILLING_COST_AI_TUNING': 'Coût réglage paramètres AI',
   'settings.field.CREDITS_REGISTER_BONUS': 'Bonus inscription',
   'settings.field.CREDITS_REFERRAL_BONUS': 'Bonus parrainage',
   'settings.field.RECHARGE_TELEGRAM_URL': 'URL recharge Telegram',
@@ -3596,6 +3598,7 @@ const locale = {
   'settings.desc.BILLING_COST_BACKTEST': 'Crédits consommés par exécution de backtest.',
   'settings.desc.BILLING_COST_PORTFOLIO_MONITOR': 'Crédits consommés par exécution de surveillance AI du Portfolio.',
   'settings.desc.BILLING_COST_AI_CODE_GEN': 'Crédits consommés par génération de code de stratégie ou d\'indicateur par AI (utilisation de tokens élevée).',
+  'settings.desc.BILLING_COST_AI_TUNING': 'Crédits consommés par réglage de paramètres AI (appels modèle multi-tours plus backtests).',
   'settings.desc.CREDITS_REGISTER_BONUS': 'Crédits attribués aux nouveaux utilisateurs lors de l\'inscription.',
   'settings.desc.CREDITS_REFERRAL_BONUS': 'Crédits attribués au parrain lorsqu\'un utilisateur s\'inscrit avec son code de parrainage.',
   'settings.desc.VERIFICATION_CODE_MAX_ATTEMPTS': 'Nombre maximum de tentatives de vérification d\'un code avant blocage.',
@@ -5022,3 +5025,4 @@ export default {
   ...components,
   ...locale
 }
+

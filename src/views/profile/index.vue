@@ -49,7 +49,6 @@
       <!-- Right Column: Credits and Referral Cards -->
       <a-col :xs="24" :md="16" class="right-cards-col">
         <a-row :gutter="16" class="right-cards-row">
-          <!-- Credits Card (积分卡片) -->
           <a-col :xs="24" :md="12">
             <a-card :bordered="false" class="credits-card">
               <div class="credits-header">
@@ -89,7 +88,6 @@
             </a-card>
           </a-col>
 
-          <!-- Referral Card (邀请卡片) -->
           <a-col :xs="24" :md="12">
             <a-card :bordered="false" class="referral-card">
               <div class="referral-header">
@@ -190,9 +188,6 @@
               </a-form>
             </a-tab-pane>
 
-            <!-- Exchange Config Tab (交易所配置) — promoted to 2nd position so
-                 users see it immediately after Basic Info. The red dot badge
-                 highlights the tab when the user has not bound any exchange. -->
             <a-tab-pane key="exchange">
               <template slot="tab">
                 <span class="exchange-tab-title">
@@ -350,7 +345,6 @@
               </a-form>
             </a-tab-pane>
 
-            <!-- Credits Log Tab (消费记录) -->
             <a-tab-pane key="credits" :tab="$t('profile.creditsLog') || '消费记录'">
               <a-table
                 :columns="creditsLogColumns"
@@ -382,7 +376,6 @@
               </a-table>
             </a-tab-pane>
 
-            <!-- Notification Settings Tab (通知设置) -->
             <a-tab-pane key="notifications" :tab="$t('profile.notifications.title') || '通知设置'">
               <div class="notification-settings-form">
                 <a-alert
@@ -588,7 +581,6 @@
               </div>
             </a-tab-pane>
 
-            <!-- Referral List Tab (邀请列表) -->
             <a-tab-pane key="referrals" :tab="$t('profile.referral.listTab') || '邀请列表'">
               <a-table
                 :columns="referralColumns"
@@ -1081,11 +1073,9 @@ export default {
         const res = await getProfile()
         if (res.code === 1) {
           this.profile = res.data
-          // 提取计费信息
           if (res.data.billing) {
             this.billing = res.data.billing
           }
-          // 提取通知设置
           if (res.data.notification_settings) {
             this.notificationSettings = {
               default_channels: res.data.notification_settings.default_channels || ['browser'],
@@ -1116,7 +1106,6 @@ export default {
     },
 
     async loadRechargeUrl () {
-      // 只有管理员才能获取设置，普通用户使用默认值
       if (this.profile.role === 'admin') {
         try {
           const res = await getSettingsValues()
@@ -1124,13 +1113,11 @@ export default {
             this.rechargeTelegramUrl = res.data.billing.RECHARGE_TELEGRAM_URL || this.rechargeTelegramUrl
           }
         } catch (e) {
-          // 忽略错误，使用默认值
         }
       }
     },
 
     handleRecharge () {
-      // 跳转到站内会员/充值页
       this.$router.push('/billing')
     },
 
@@ -1419,7 +1406,6 @@ export default {
         membership_purchase: 'gold',
         membership_bonus: 'cyan',
         membership_monthly: 'lime',
-        // 指标社区相关
         indicator_purchase: 'volcano',
         indicator_sale: 'lime'
       }
@@ -1441,7 +1427,6 @@ export default {
         membership_purchase: this.$t('profile.creditsLog.actionMembershipPurchase') || '购买会员',
         membership_bonus: this.$t('profile.creditsLog.actionMembershipBonus') || '会员赠送积分',
         membership_monthly: this.$t('profile.creditsLog.actionMembershipMonthly') || '会员月度积分',
-        // 指标社区相关
         indicator_purchase: this.$t('profile.creditsLog.actionIndicatorPurchase') || '购买指标',
         indicator_sale: this.$t('profile.creditsLog.actionIndicatorSale') || '出售指标'
       }
@@ -1753,7 +1738,7 @@ export default {
         flex-direction: column;
       }
 
-      /deep/ .ant-card-body {
+      ::v-deep .ant-card-body {
         flex: 1;
         display: flex;
         flex-direction: column;
@@ -1774,7 +1759,7 @@ export default {
           flex-direction: column;
         }
 
-        /deep/ .ant-card-body {
+        ::v-deep .ant-card-body {
           flex: 1;
           display: flex;
           flex-direction: column;
@@ -1851,8 +1836,8 @@ export default {
     .password-form {
       max-width: 500px;
 
-      /deep/ .ant-input,
-      /deep/ .ant-input-password {
+      ::v-deep .ant-input,
+      ::v-deep .ant-input-password {
         border-radius: 8px;
       }
 
@@ -1911,30 +1896,29 @@ export default {
         }
       }
 
-      /deep/ .ant-checkbox-group {
+      ::v-deep .ant-checkbox-group {
         width: 100%;
       }
 
-      /deep/ .ant-checkbox-wrapper {
+      ::v-deep .ant-checkbox-wrapper {
         margin-bottom: 8px;
       }
     }
   }
 
-  // Credits Card 积分卡片
   .credits-card {
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: #fff;
 
-    /deep/ .ant-card-body {
+    ::v-deep .ant-card-body {
       background: transparent;
       display: flex;
       flex-direction: column;
     }
 
-    /deep/ .ant-divider {
+    ::v-deep .ant-divider {
       border-color: rgba(255, 255, 255, 0.2);
     }
 
@@ -2031,20 +2015,19 @@ export default {
     }
   }
 
-  // Referral Card 邀请卡片
   .referral-card {
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
     color: #fff;
 
-    /deep/ .ant-card-body {
+    ::v-deep .ant-card-body {
       background: transparent;
       display: flex;
       flex-direction: column;
     }
 
-    /deep/ .ant-divider {
+    ::v-deep .ant-divider {
       border-color: rgba(255, 255, 255, 0.2);
     }
 
@@ -2100,7 +2083,7 @@ export default {
         }
 
         .link-box {
-          /deep/ .ant-input {
+          ::v-deep .ant-input {
             background: rgba(255, 255, 255, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.3);
             color: #fff;
@@ -2110,7 +2093,7 @@ export default {
             }
           }
 
-          /deep/ .anticon-copy {
+          ::v-deep .anticon-copy {
             color: #fff;
 
             &:hover {
@@ -2200,7 +2183,7 @@ export default {
       background: #1c1c1c;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
 
-      /deep/ .ant-card-body {
+      ::v-deep .ant-card-body {
         background: #1c1c1c;
       }
     }
@@ -2228,11 +2211,11 @@ export default {
     }
 
     .edit-card {
-      /deep/ .ant-tabs-bar {
+      ::v-deep .ant-tabs-bar {
         border-bottom-color: #2a2a2a;
       }
 
-      /deep/ .ant-tabs-tab {
+      ::v-deep .ant-tabs-tab {
         color: #8b949e;
 
         &:hover {
@@ -2240,16 +2223,16 @@ export default {
         }
       }
 
-      /deep/ .ant-tabs-tab-active {
+      ::v-deep .ant-tabs-tab-active {
         color: @primary-color;
       }
 
-      /deep/ .ant-form-item-label label {
+      ::v-deep .ant-form-item-label label {
         color: #c9d1d9;
       }
 
-      /deep/ .ant-input,
-      /deep/ .ant-input-password {
+      ::v-deep .ant-input,
+      ::v-deep .ant-input-password {
         background: #141414;
         border-color: #2a2a2a;
         color: #c9d1d9;
@@ -2265,7 +2248,7 @@ export default {
       background: linear-gradient(135deg, #1c1c1c 0%, #1a1a1a 50%, #141414 100%);
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
 
-      /deep/ .ant-divider {
+      ::v-deep .ant-divider {
         border-color: rgba(255, 255, 255, 0.1);
       }
 
@@ -2282,8 +2265,7 @@ export default {
       }
     }
 
-    // Tables in tabs (消费记录、交易所配置、邀请列表)
-    /deep/ .ant-table-wrapper {
+    ::v-deep .ant-table-wrapper {
       .ant-table {
         background: #1c1c1c;
         color: #c9d1d9;
@@ -2310,7 +2292,6 @@ export default {
         color: #8b949e;
       }
 
-      // 表格内的所有文本元素
       .ant-table-tbody > tr > td,
       .ant-table-tbody > tr > td span,
       .ant-table-tbody > tr > td div,
@@ -2318,7 +2299,6 @@ export default {
         color: #c9d1d9;
       }
 
-      // 金额颜色
       .amount-positive {
         color: #52c41a;
       }
@@ -2327,7 +2307,6 @@ export default {
         color: #f5222d;
       }
 
-      // 消费记录 类型标签 - 暗黑模式增强对比度
       .ant-tag {
         border-width: 1px;
         font-weight: 600;
@@ -2344,23 +2323,22 @@ export default {
       .ant-tag-default { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: #c9d1d9; }
     }
 
-    // 表单样式（通知设置、交易所配置等）
     .profile-form,
     .password-form,
     .notification-settings-form {
-      /deep/ .ant-form-item-label > label {
+      ::v-deep .ant-form-item-label > label {
         color: #c9d1d9;
       }
 
-      /deep/ .ant-form-item-explain,
-      /deep/ .ant-form-item-extra {
+      ::v-deep .ant-form-item-explain,
+      ::v-deep .ant-form-item-extra {
         color: #8b949e;
       }
 
-      /deep/ .ant-input,
-      /deep/ .ant-input-password,
-      /deep/ .ant-select-selector,
-      /deep/ .ant-input-number {
+      ::v-deep .ant-input,
+      ::v-deep .ant-input-password,
+      ::v-deep .ant-select-selector,
+      ::v-deep .ant-input-number {
         background: #141414;
         border-color: #2a2a2a;
         color: #c9d1d9;
@@ -2370,13 +2348,13 @@ export default {
         }
       }
 
-      /deep/ .ant-select-selection-item,
-      /deep/ .ant-select-selection-placeholder {
+      ::v-deep .ant-select-selection-item,
+      ::v-deep .ant-select-selection-placeholder {
         color: #c9d1d9;
       }
 
-      /deep/ .ant-checkbox-wrapper,
-      /deep/ .ant-radio-wrapper {
+      ::v-deep .ant-checkbox-wrapper,
+      ::v-deep .ant-radio-wrapper {
         color: #c9d1d9;
 
         span {
@@ -2384,13 +2362,12 @@ export default {
         }
       }
 
-      /deep/ .ant-checkbox-checked .ant-checkbox-inner,
-      /deep/ .ant-radio-checked .ant-radio-inner {
+      ::v-deep .ant-checkbox-checked .ant-checkbox-inner,
+      ::v-deep .ant-radio-checked .ant-radio-inner {
         background-color: @primary-color;
         border-color: @primary-color;
       }
 
-      // 提示文字
       .email-hint,
       .field-hint {
         color: #8b949e;
@@ -2401,9 +2378,8 @@ export default {
       }
     }
 
-    // 通知设置表单
     .notification-settings-form {
-      /deep/ .ant-alert {
+      ::v-deep .ant-alert {
         background: #1c1c1c;
         border-color: #2a2a2a;
         color: #c9d1d9;
@@ -2418,14 +2394,12 @@ export default {
       }
     }
 
-    // 交易所配置
     .exchange-config-section {
       .credential-hint {
         color: #8b949e;
       }
     }
 
-    // 测试结果消息
     .test-result-msg {
       &.success {
         color: #52c41a;
@@ -2435,7 +2409,6 @@ export default {
       }
     }
 
-    // 邀请列表中的用户信息
     .referral-user-cell {
       .user-info {
         .nickname {
@@ -2448,29 +2421,25 @@ export default {
       }
     }
 
-    // 标签样式
-    /deep/ .ant-tag {
+    ::v-deep .ant-tag {
       color: #c9d1d9;
     }
 
-    // 消费记录「类型」列：带底色标签文字在暗黑下保持可读
-    /deep/ .ant-tag.ant-tag-has-color {
+    ::v-deep .ant-tag.ant-tag-has-color {
       color: #ffffff !important;
       border-color: transparent !important;
     }
 
-    // 修复暗黑下部分小图标仍为黑色
-    /deep/ .ant-input-prefix .anticon,
-    /deep/ .ant-input-suffix .anticon,
-    /deep/ .field-hint .anticon,
-    /deep/ .email-hint .anticon,
-    /deep/ .credits-hint .anticon,
-    /deep/ .notification-settings-form .anticon {
+    ::v-deep .ant-input-prefix .anticon,
+    ::v-deep .ant-input-suffix .anticon,
+    ::v-deep .field-hint .anticon,
+    ::v-deep .email-hint .anticon,
+    ::v-deep .credits-hint .anticon,
+    ::v-deep .notification-settings-form .anticon {
       color: #c9d1d9 !important;
     }
 
-    // 分页样式
-    /deep/ .ant-pagination {
+    ::v-deep .ant-pagination {
       .ant-pagination-item {
         background: #1c1c1c;
         border-color: #2a2a2a;
@@ -2511,8 +2480,7 @@ export default {
       }
     }
 
-    // 按钮样式
-    /deep/ .ant-btn {
+    ::v-deep .ant-btn {
       &.ant-btn-default {
         background: #1c1c1c;
         border-color: #2a2a2a;
@@ -2574,7 +2542,7 @@ export default {
       .avatar-section {
         padding: 16px 0;
 
-        /deep/ .ant-avatar {
+        ::v-deep .ant-avatar {
           width: 80px !important;
           height: 80px !important;
           line-height: 80px !important;
@@ -2690,7 +2658,7 @@ export default {
           }
 
           .link-box {
-            /deep/ .ant-input {
+            ::v-deep .ant-input {
               font-size: 12px;
             }
           }
@@ -2708,11 +2676,11 @@ export default {
       border-radius: 10px;
       margin-top: 12px !important;
 
-      /deep/ .ant-card-body {
+      ::v-deep .ant-card-body {
         padding: 12px;
       }
 
-      /deep/ .ant-tabs-nav {
+      ::v-deep .ant-tabs-nav {
         .ant-tabs-tab {
           padding: 10px 12px;
           font-size: 13px;
@@ -2720,7 +2688,7 @@ export default {
       }
 
       // Allow horizontal scroll for tabs on mobile
-      /deep/ .ant-tabs-nav-scroll {
+      ::v-deep .ant-tabs-nav-scroll {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
 
@@ -2733,7 +2701,7 @@ export default {
       .password-form {
         max-width: 100%;
 
-        /deep/ .ant-form-item-label {
+        ::v-deep .ant-form-item-label {
           padding-bottom: 4px;
 
           label {
@@ -2741,8 +2709,8 @@ export default {
           }
         }
 
-        /deep/ .ant-input,
-        /deep/ .ant-input-password {
+        ::v-deep .ant-input,
+        ::v-deep .ant-input-password {
           font-size: 14px;
         }
 
@@ -2753,7 +2721,7 @@ export default {
 
       // Password form - verification code section
       .password-form {
-        /deep/ .ant-alert {
+        ::v-deep .ant-alert {
           font-size: 12px;
           padding: 8px 12px;
         }
@@ -2761,17 +2729,17 @@ export default {
 
       // Notification settings form
       .notification-settings-form {
-        /deep/ .ant-alert {
+        ::v-deep .ant-alert {
           font-size: 12px;
           padding: 8px 12px;
           margin-bottom: 16px !important;
         }
 
-        /deep/ .ant-form {
+        ::v-deep .ant-form {
           max-width: 100%;
         }
 
-        /deep/ .ant-checkbox-group {
+        ::v-deep .ant-checkbox-group {
           .ant-row {
             margin-left: 0 !important;
             margin-right: 0 !important;
@@ -2793,12 +2761,12 @@ export default {
           flex-wrap: wrap;
         }
 
-        /deep/ .ant-form-item {
+        ::v-deep .ant-form-item {
           margin-bottom: 16px;
         }
 
         // Action buttons
-        /deep/ .ant-form-item:last-child {
+        ::v-deep .ant-form-item:last-child {
           .ant-btn {
             width: 100%;
             margin-bottom: 8px;
@@ -2811,7 +2779,7 @@ export default {
       }
 
       // Tables in tabs
-      /deep/ .ant-table-wrapper {
+      ::v-deep .ant-table-wrapper {
         overflow-x: auto;
 
         .ant-table {
@@ -2824,7 +2792,7 @@ export default {
     .referral-user-cell {
       gap: 8px;
 
-      /deep/ .ant-avatar {
+      ::v-deep .ant-avatar {
         width: 28px !important;
         height: 28px !important;
         line-height: 28px !important;
@@ -2897,7 +2865,7 @@ export default {
 
     // Edit card
     .edit-card {
-      /deep/ .ant-tabs-nav {
+      ::v-deep .ant-tabs-nav {
         .ant-tabs-tab {
           padding: 8px 10px;
           font-size: 12px;
@@ -2906,7 +2874,7 @@ export default {
 
       // Notification settings - stack checkboxes
       .notification-settings-form {
-        /deep/ .ant-checkbox-group {
+        ::v-deep .ant-checkbox-group {
           .ant-row {
             .ant-col {
               flex: 0 0 50%;

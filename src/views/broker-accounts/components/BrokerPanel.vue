@@ -265,9 +265,9 @@ export default {
   flex-shrink: 0;
 }
 .bp-inner-tabs {
-  /deep/ .ant-tabs-bar { border-bottom-color: #ececec; }
+  ::v-deep .ant-tabs-bar { border-bottom-color: #ececec; }
 }
-.theme-dark .bp-inner-tabs /deep/ .ant-tabs-bar { border-bottom-color: #303030; }
+.theme-dark .bp-inner-tabs ::v-deep .ant-tabs-bar { border-bottom-color: #303030; }
 .bp-form-wrapper {
   padding: 8px 4px 16px;
   display: flex;

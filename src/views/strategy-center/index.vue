@@ -1,6 +1,5 @@
 <template>
   <div class="strategy-center" :class="{ 'theme-dark': isDarkTheme }">
-    <!-- 顶栏：标题 + 快捷操作 -->
     <header class="sc-header">
       <div class="sc-header-main">
         <div
@@ -18,11 +17,8 @@
         <p class="sc-header-sub">{{ $t('strategyCenter.subtitle') }}</p>
       </div>
       <div class="sc-header-actions">
-        <a-button type="primary" class="sc-action-btn sc-action-btn--primary" @click="go('/strategy-live?tab=strategy&mode=create')">
-          <a-icon type="plus" /> {{ $t('strategyCenter.header.createIndicatorStrategy') }}
-        </a-button>
-        <a-button class="sc-action-btn" @click="go('/strategy-script?tab=strategy&mode=create')">
-          <a-icon type="code" /> {{ $t('strategyCenter.header.createScriptStrategy') }}
+        <a-button type="primary" class="sc-action-btn sc-action-btn--primary" @click="go('/strategy-ide')">
+          <a-icon type="code" /> {{ isZh ? '打开策略 IDE' : 'Open Strategy IDE' }}
         </a-button>
         <a-button class="sc-action-btn" @click="go('/trading-bot')">
           <a-icon type="robot" /> {{ $t('strategyCenter.header.createBot') }}
@@ -30,7 +26,6 @@
       </div>
     </header>
 
-    <!-- 迷你统计条（与概览 KPI 互补，展示库内资产） -->
     <div class="sc-mini-stats">
       <div v-for="item in miniStatItems" :key="item.key" class="sc-mini-stat" @click="item.path && go(item.path)">
         <span class="sc-mini-stat-icon" :class="`sc-mini-stat-icon--${item.key}`">
@@ -44,7 +39,6 @@
       </div>
     </div>
 
-    <!-- 主 Tab -->
     <div class="sc-dashboard-wrap">
       <dashboard-overview hide-setup-guide embedded />
     </div>
@@ -79,8 +73,11 @@ export default {
         { key: 'signal', icon: 'deployment-unit', value: this.stats.signal, label: this.$t('strategyCenter.stats.indicatorStrategy'), path: '/strategy-live?tab=strategy' },
         { key: 'script', icon: 'code-sandbox', value: this.stats.script, label: this.$t('strategyCenter.stats.script'), path: '/strategy-script?tab=strategy' },
         { key: 'bot', icon: 'robot', value: this.stats.bot, label: this.$t('strategyCenter.stats.bot'), path: '/trading-bot' },
-        { key: 'indicator', icon: 'line-chart', value: this.stats.indicator, label: this.$t('strategyCenter.stats.ownIndicators'), path: '/indicator-ide' }
+        { key: 'indicator', icon: 'line-chart', value: this.stats.indicator, label: this.$t('strategyCenter.stats.ownIndicators'), path: '/strategy-ide' }
       ]
+    },
+    isZh () {
+      return String(this.$i18n && this.$i18n.locale || '').toLowerCase().startsWith('zh')
     }
   },
   watch: {
@@ -310,7 +307,7 @@ export default {
   border-radius: @sc-radius;
   overflow: hidden;
 
-  /deep/ .dashboard-pro.dashboard-pro--embedded {
+  ::v-deep .dashboard-pro.dashboard-pro--embedded {
     min-height: auto;
     padding: 0 8px 8px;
     background: transparent;

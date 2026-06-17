@@ -155,13 +155,6 @@
         </div>
         <a-divider />
         <slot />
-        <!-- <div :style="{ marginBottom: '24px' }">
-          <a-button
-            @click="doCopy"
-            icon="copy"
-            block
-          >拷贝设置</a-button>
-        </div> -->
       </div>
     </a-drawer>
   </div>
@@ -304,7 +297,6 @@ export default {
     },
     handleLayout (mode) {
       this.$emit('change', { type: 'layout', value: mode })
-      // 因为顶部菜单不能固定左侧菜单栏，所以强制关闭
       if (mode === 'topmenu') {
         this.$emit('change', { type: 'fixSiderbar', value: false })
       }
@@ -337,7 +329,6 @@ export default {
 </script>
 
 <style lang="less" scoped>
-  /* 隐藏所有可能的悬浮按钮 */
   :deep(.ant-drawer-handle),
   :deep(.setting-drawer-index-handle) {
     display: none !important;

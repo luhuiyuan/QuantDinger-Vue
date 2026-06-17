@@ -34,6 +34,7 @@ const locale = {
   'menu.dashboard.backtestCenter': 'Trung tâm Backtest',
 
   'menu.dashboard.indicatorIde': 'Indicator IDE',
+  'menu.dashboard.strategyIde': 'Strategy IDE',
 
   'indicatorIde.direction': 'Hướng giao dịch',
   'indicatorIde.tuningLaunchTitle': 'Tối ưu thông minh',
@@ -4737,6 +4738,7 @@ const locale = {
   'settings.field.BILLING_COST_BACKTEST': 'Chi phí backtest',
   'settings.field.BILLING_COST_PORTFOLIO_MONITOR': 'Chi phí giám sát Portfolio',
   'settings.field.BILLING_COST_AI_CODE_GEN': 'Chi phí tạo mã AI',
+  'settings.field.BILLING_COST_AI_TUNING': 'Chi phí tối ưu tham số AI',
   'settings.field.CREDITS_REGISTER_BONUS': 'Thưởng đăng ký',
   'settings.field.CREDITS_REFERRAL_BONUS': 'Thưởng mời bạn',
   'settings.field.RECHARGE_TELEGRAM_URL': 'Liên kết nạp tiền Telegram',
@@ -4760,6 +4762,7 @@ const locale = {
   'settings.desc.BILLING_COST_BACKTEST': 'Số điểm tiêu hao cho mỗi lần chạy backtest',
   'settings.desc.BILLING_COST_PORTFOLIO_MONITOR': 'Số điểm tiêu hao cho mỗi lần giám sát AI Portfolio',
   'settings.desc.BILLING_COST_AI_CODE_GEN': 'Số điểm tiêu hao cho mỗi lần AI tạo mã chiến lược/chỉ báo (sử dụng token cao hơn)',
+  'settings.desc.BILLING_COST_AI_TUNING': 'Số điểm tiêu hao cho mỗi lần AI tối ưu tham số (nhiều lượt gọi mô hình và backtest)',
   'settings.desc.CREDITS_REGISTER_BONUS': 'Điểm thưởng cho người dùng mới khi đăng ký',
   'settings.desc.CREDITS_REFERRAL_BONUS': 'Điểm thưởng cho người mời khi có người đăng ký bằng mã giới thiệu của họ',
   'settings.desc.VERIFICATION_CODE_MAX_ATTEMPTS': 'Số lần thử xác minh mã tối đa trước khi khóa',
@@ -6349,3 +6352,4 @@ export default {
   ...components,
   ...locale
 }
+

@@ -2821,7 +2821,7 @@ export default {
   }
 
   .manage-tabs {
-    /deep/ .ant-tabs-bar {
+    ::v-deep .ant-tabs-bar {
       margin-bottom: 20px;
     }
   }
@@ -3007,7 +3007,7 @@ export default {
     min-width: 0;
     overflow: hidden;
 
-    /deep/ .ant-card-body {
+    ::v-deep .ant-card-body {
       padding: 20px 24px;
     }
 
@@ -3156,7 +3156,7 @@ export default {
   }
 
   // Order status tag styles - ensure expired status is visible
-  /deep/ .ant-tag {
+  ::v-deep .ant-tag {
     &.ant-tag-grey {
       background-color: #f5f5f5;
       border-color: #d9d9d9;
@@ -3178,16 +3178,16 @@ export default {
     }
 
     .manage-tabs {
-      /deep/ .ant-tabs-bar {
+      ::v-deep .ant-tabs-bar {
         border-bottom-color: #2a2a2a;
       }
-      /deep/ .ant-tabs-tab {
+      ::v-deep .ant-tabs-tab {
         color: #8b949e;
         &:hover {
           color: #c9d1d9;
         }
       }
-      /deep/ .ant-tabs-tab-active {
+      ::v-deep .ant-tabs-tab-active {
         color: @primary-color;
       }
     }
@@ -3217,11 +3217,11 @@ export default {
       background: #1c1c1c;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
 
-      /deep/ .ant-card-body {
+      ::v-deep .ant-card-body {
         background: #1c1c1c;
       }
 
-      /deep/ .ant-table {
+      ::v-deep .ant-table {
         background: #1c1c1c;
         color: #c9d1d9;
 
@@ -3274,7 +3274,7 @@ export default {
         background: #1c1c1c;
         box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
 
-        /deep/ .ant-card-body {
+        ::v-deep .ant-card-body {
           background: #1c1c1c;
         }
       }
@@ -3399,7 +3399,7 @@ export default {
       display: flex;
       flex-direction: column;
 
-      /deep/ .ant-card-body {
+      ::v-deep .ant-card-body {
         padding: 16px 18px;
         flex: 1;
         display: flex;
@@ -3526,7 +3526,6 @@ export default {
     }
   }
 
-  // —— 响应式 ——
   @media (max-width: 1200px) {
     .summary-cards {
       grid-template-columns: repeat(2, 1fr);
@@ -3613,20 +3612,20 @@ export default {
     }
 
     .manage-tabs {
-      /deep/ .ant-tabs-bar {
+      ::v-deep .ant-tabs-bar {
         margin-bottom: 12px;
       }
 
-      /deep/ .ant-tabs-nav-container {
+      ::v-deep .ant-tabs-nav-container {
         overflow-x: auto;
         overflow-y: hidden;
       }
 
-      /deep/ .ant-tabs-nav-wrap {
+      ::v-deep .ant-tabs-nav-wrap {
         margin-bottom: 0;
       }
 
-      /deep/ .ant-tabs-tab {
+      ::v-deep .ant-tabs-tab {
         padding: 10px 12px;
         margin-right: 4px;
         font-size: 13px;
@@ -3634,20 +3633,20 @@ export default {
       }
     }
 
-    .user-table-card /deep/ .ant-card-body {
+    .user-table-card ::v-deep .ant-card-body {
       padding: 12px 10px;
     }
 
-    /deep/ .ant-table {
+    ::v-deep .ant-table {
       font-size: 12px;
     }
 
-    /deep/ .ant-table-thead > tr > th,
-    /deep/ .ant-table-tbody > tr > td {
+    ::v-deep .ant-table-thead > tr > th,
+    ::v-deep .ant-table-tbody > tr > td {
       padding: 8px 6px;
     }
 
-    /deep/ .ant-pagination {
+    ::v-deep .ant-pagination {
       margin: 12px 0 0;
     }
   }
@@ -3672,7 +3671,7 @@ export default {
       line-height: 1.35;
     }
 
-    /deep/ .ant-pagination-options {
+    ::v-deep .ant-pagination-options {
       display: none;
     }
   }
@@ -3728,7 +3727,6 @@ export default {
 </style>
 
 <style lang="less">
-/* Modal 挂载在 body 上，需非 scoped */
 .user-manage-modal-dark {
   .ant-modal-content,
   .ant-modal-header,

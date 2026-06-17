@@ -285,7 +285,6 @@ body.realdark .qd-account-trigger,
   }
 }
 
-/* 暗黑主题 - 下拉菜单样式 */
 @media (max-width: 1280px) {
   .qd-account-trigger {
     gap: 10px;

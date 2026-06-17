@@ -45,6 +45,40 @@ const gitHash = (() => {
 
 const buildDate = new Date().toLocaleString()
 
+const resolveManualChunk = (id) => {
+  if (!id.includes('node_modules')) return undefined
+  if (id.includes('@ant-design-vue/pro-layout')) return 'ant-pro-layout'
+  if (id.includes('ant-design-vue')) return 'ant-design-vue'
+  if (id.includes('@ant-design') || id.includes('@antv')) return 'ant-ecosystem'
+  if (id.includes('echarts') || id.includes('klinecharts') || id.includes('viser-vue')) return 'charts'
+  if (id.includes('codemirror') || id.includes('vue-quill-editor') || id.includes('wangeditor')) return 'editors'
+  if (id.includes('pyodide') || id.includes('comlink')) return 'py-runtime'
+  if (id.includes('vue')) return 'vue-core'
+  if (
+    id.includes('axios') ||
+    id.includes('moment') ||
+    id.includes('lodash-es') ||
+    id.includes('crypto-js') ||
+    id.includes('store') ||
+    id.includes('nprogress') ||
+    id.includes('md5')
+  ) {
+    return 'vendor-utils'
+  }
+  return 'vendor'
+}
+
+const fixProLayoutLess = () => ({
+  name: 'fix-pro-layout-less-selector',
+  enforce: 'pre',
+  transform(code, id) {
+    if (!id.includes('@ant-design-vue/pro-layout') || !id.endsWith('BasicLayout.less')) {
+      return null
+    }
+    return code.replace(/:not\('\.ant-pro-basicLayout-mobile'\)/g, ':not(.ant-pro-basicLayout-mobile)')
+  }
+})
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const enableMock = env.VITE_ENABLE_MOCK === 'true'
@@ -54,18 +88,16 @@ export default defineConfig(({ mode }) => {
     base: './',
     resolve: {
       alias: [
-        // webpack 风格的 ~package/... less @import → 直接命中 node_modules
         { find: /^~(.+)/, replacement: '$1' },
-        // pro-layout 1.x 仍引用 webpack 专用插件 client，用 shim 兼容
-        { find: 'webpack-theme-color-replacer/client', replacement: fileURLToPath(new URL('./src/shims/webpack-theme-color-replacer-client.js', import.meta.url)) },
-        // moment 纯 CJS（module.exports = ctor），Vite 下 `import * as moment from 'moment'`
-        // namespace 拿不到 isMoment 等静态方法 → 走 shim 平铺 named exports
+        {
+          find: 'webpack-theme-color-replacer/client',
+          replacement: fileURLToPath(new URL('./src/shims/webpack-theme-color-replacer-client.js', import.meta.url))
+        },
         { find: /^moment$/, replacement: fileURLToPath(new URL('./src/shims/moment.js', import.meta.url)) },
         { find: /^store$/, replacement: 'store/dist/store.modern.js' },
         { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
         { find: '@$', replacement: fileURLToPath(new URL('./src', import.meta.url)) }
       ],
-      // 兼容旧代码中省略 .vue 后缀的 import（如 `import App from './App'`）
       extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.vue']
     },
     define: {
@@ -74,7 +106,6 @@ export default defineConfig(({ mode }) => {
       BUILD_DATE: JSON.stringify(buildDate),
       'process.env.APP_VERSION': JSON.stringify(appVersion),
       'process.env.VUE_APP_VERSION': JSON.stringify(appVersion),
-      // 兼容旧代码中的 process.env.VUE_APP_* 引用 —— 直接映射到 import.meta.env.VITE_*
       'process.env.VUE_APP_PREVIEW': JSON.stringify(env.VITE_PREVIEW || ''),
       'process.env.VUE_APP_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL || ''),
       'process.env.VUE_APP_PYTHON_API_BASE_URL': JSON.stringify(env.VITE_PYTHON_API_BASE_URL || ''),
@@ -86,6 +117,7 @@ export default defineConfig(({ mode }) => {
       preprocessorOptions: {
         less: {
           javascriptEnabled: true,
+          additionalData: "@import '@/styles/antd-vars.less';\n",
           modifyVars: {
             'border-radius-base': '2px'
           }
@@ -93,6 +125,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     plugins: [
+      fixProLayoutLess(),
       vue2(),
       vue2Jsx(),
       svgLoader({ defaultImport: 'url' }),
@@ -119,7 +152,6 @@ export default defineConfig(({ mode }) => {
       format: 'es'
     },
     optimizeDeps: {
-      // pyodide 自己通过 Worker 内 importScripts 加载，不参与 Vite 预构建
       exclude: ['pyodide']
     },
     build: {
@@ -131,12 +163,7 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         output: {
-          manualChunks: {
-            'ant-design-vue': ['ant-design-vue'],
-            echarts: ['echarts'],
-            klinecharts: ['klinecharts'],
-            codemirror: ['codemirror']
-          }
+          manualChunks: resolveManualChunk
         }
       }
     }

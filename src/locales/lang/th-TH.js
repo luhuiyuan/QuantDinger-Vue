@@ -21,6 +21,7 @@ const locale = {
   'menu.dashboard.tradingAssistant': 'ผู้ช่วยการซื้อขาย',
   'menu.dashboard.backtestCenter': 'ศูนย์แบ็กเทสต์',
   'menu.dashboard.indicatorIde': 'Indicator IDE',
+  'menu.dashboard.strategyIde': 'Strategy IDE',
   'indicatorIde.direction': 'ทิศทางการเทรด',
   'indicatorIde.tuningLaunchTitle': 'ปรับจูนอัจฉริยะ',
   'indicatorIde.tuningLaunchDesc': 'ค้นหาพารามิเตอร์กลยุทธ์ที่เหมาะสมโดยอัตโนมัติเพื่อปรับปรุงผลตอบแทนจากแบ็กเทสต์ เลือกวิธีด้านล่างแล้วคลิกรัน',
@@ -3572,6 +3573,7 @@ const locale = {
   'settings.field.BILLING_COST_BACKTEST': 'ค่าใช้จ่าย Backtest',
   'settings.field.BILLING_COST_PORTFOLIO_MONITOR': 'ค่าใช้จ่าย Portfolio Monitor',
   'settings.field.BILLING_COST_AI_CODE_GEN': 'ค่าใช้จ่าย AI Code Generation',
+  'settings.field.BILLING_COST_AI_TUNING': 'ค่าใช้จ่ายปรับพารามิเตอร์ AI',
   'settings.field.CREDITS_REGISTER_BONUS': 'โบนัสการลงทะเบียน',
   'settings.field.CREDITS_REFERRAL_BONUS': 'โบนัสการเชิญ',
   'settings.field.RECHARGE_TELEGRAM_URL': 'ลิงก์เติมเงิน Telegram',
@@ -3595,6 +3597,7 @@ const locale = {
   'settings.desc.BILLING_COST_BACKTEST': 'เครดิตที่ใช้ต่อการรัน backtest',
   'settings.desc.BILLING_COST_PORTFOLIO_MONITOR': 'เครดิตที่ใช้ต่อการรัน portfolio AI monitoring',
   'settings.desc.BILLING_COST_AI_CODE_GEN': 'เครดิตที่ใช้ต่อการสร้างกลยุทธ์หรือโค้ดอินดิเคเตอร์ด้วย AI (ใช้ token สูง)',
+  'settings.desc.BILLING_COST_AI_TUNING': 'เครดิตที่ใช้ต่อการปรับพารามิเตอร์ด้วย AI (เรียกโมเดลหลายรอบพร้อมแบ็กเทสต์)',
   'settings.desc.CREDITS_REGISTER_BONUS': 'เครดิตที่มอบให้ผู้ใช้ใหม่เมื่อลงทะเบียน',
   'settings.desc.CREDITS_REFERRAL_BONUS': 'เครดิตที่มอบให้ผู้เชิญเมื่อมีคนสมัครด้วยรหัสเชิญ',
   'settings.desc.VERIFICATION_CODE_MAX_ATTEMPTS': 'จำนวนครั้งสูงสุดในการยืนยันรหัสก่อนถูกล็อก',
@@ -5019,3 +5022,4 @@ export default {
   ...components,
   ...locale
 }
+

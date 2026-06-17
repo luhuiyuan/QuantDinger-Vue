@@ -35,6 +35,7 @@ const locale = {
 'menu.dashboard.tradingAssistant': '交易助手',
 'menu.dashboard.backtestCenter': '回測中心',
 'menu.dashboard.indicatorIde': '指標 IDE',
+'menu.dashboard.strategyIde': '策略 IDE',
 'indicatorIde.direction': '交易方向',
 'indicatorIde.tuningLaunchTitle': '智能調參',
 'indicatorIde.tuningLaunchDesc': '自動搜尋最佳策略參數以提升回測報酬。選擇下方調參方式後點擊執行。',
@@ -3127,6 +3128,7 @@ const locale = {
 'settings.field.BILLING_COST_BACKTEST': '回測消耗',
 'settings.field.BILLING_COST_PORTFOLIO_MONITOR': 'Portfolio監控消耗',
 'settings.field.BILLING_COST_AI_CODE_GEN': 'AI代碼生成消耗',
+'settings.field.BILLING_COST_AI_TUNING': 'AI智能調參消耗',
 'settings.field.CREDITS_REGISTER_BONUS': '注冊獎勵',
 'settings.field.CREDITS_REFERRAL_BONUS': '邀請獎勵',
 'settings.field.RECHARGE_TELEGRAM_URL': '充值Telegram鏈接',
@@ -3150,6 +3152,7 @@ const locale = {
 'settings.desc.BILLING_COST_BACKTEST': '每次回測消耗的積分數',
 'settings.desc.BILLING_COST_PORTFOLIO_MONITOR': '每次Portfolio AI監控消耗的積分數',
 'settings.desc.BILLING_COST_AI_CODE_GEN': '每次 AI 生成策略/指標代碼消耗的積分數（Token 用量較高）',
+'settings.desc.BILLING_COST_AI_TUNING': '每次 AI 智能調參消耗的積分數（多輪模型調用與批量回測）',
 'settings.desc.CREDITS_REGISTER_BONUS': '新用戶注冊時獲得的積分獎勵',
 'settings.desc.CREDITS_REFERRAL_BONUS': '用戶通過邀請鏈接成功邀請新用戶時，邀請人獲得的積分獎勵',
 'settings.desc.VERIFICATION_CODE_MAX_ATTEMPTS': '驗證碼驗證失敗的最大嘗試次數，超過後將鎖定',
@@ -5175,3 +5178,4 @@ export default {
 ...components,
 ...locale
 }
+

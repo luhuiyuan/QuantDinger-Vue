@@ -1,6 +1,5 @@
 <template>
   <div class="settings-page" :class="{ 'theme-dark': isDarkTheme }">
-    <!-- 重启提示 -->
     <a-alert
       v-if="showRestartTip"
       class="restart-alert"
@@ -27,7 +26,6 @@
 
     <a-spin :spinning="loading">
       <div class="settings-layout">
-        <!-- 左侧分组导航 -->
         <aside class="settings-nav">
           <div class="settings-search">
             <a-input
@@ -54,9 +52,7 @@
           </a-menu>
         </aside>
 
-        <!-- 右侧详情区 -->
         <section class="settings-detail">
-          <!-- 搜索模式：摊平展示所有命中项 -->
           <div v-if="searchKeyword.trim()" class="settings-detail-inner">
             <div class="detail-header">
               <a-icon type="search" class="detail-icon" />
@@ -205,7 +201,6 @@
             </a-form>
           </div>
 
-          <!-- 正常模式：只显示当前选中分组 -->
           <div v-else-if="currentGroup" class="settings-detail-inner">
             <div class="detail-header">
               <a-icon :type="currentGroup.icon || getGroupIcon(activeGroupKey)" class="detail-icon" />
@@ -214,7 +209,6 @@
               </h3>
             </div>
 
-            <!-- AI 组特殊：显示 OpenRouter 余额查询卡片 -->
             <div v-if="activeGroupKey === 'ai' && currentLlmProvider === 'openrouter'" class="openrouter-balance-card">
               <a-card size="small" :bordered="false">
                 <div class="balance-header">
@@ -624,7 +618,6 @@ export default {
       passwordVisible: {},
       marketModules: [],
       showRestartTip: false,
-      // OpenRouter 余额
       balanceLoading: false,
       openrouterBalance: null,
       selectedLlmProvider: ''
@@ -634,7 +627,6 @@ export default {
     isDarkTheme () {
       return this.navTheme === 'dark' || this.navTheme === 'realdark'
     },
-    // 按 order 排序的 schema
     sortedSchema () {
       const entries = Object.entries(this.schema)
       entries.sort((a, b) => {
@@ -846,7 +838,6 @@ export default {
         this.searchKeyword = ''
       }
     },
-    // 兼容后端 schema options 两种格式：
     // - string[]: ['openrouter','openai', ...]
     // - {value,label}[]: [{value:'openrouter',label:'OpenRouter'}, ...]
     getSelectOptions (item) {
@@ -909,7 +900,6 @@ export default {
       }
     },
 
-    // 查询 OpenRouter 余额
     async queryOpenRouterBalance () {
       this.balanceLoading = true
       try {
@@ -962,19 +952,16 @@ export default {
     },
 
     getItemDescription (groupKey, item) {
-      // 先尝试从多语言获取描述
       const key = `settings.desc.${item.key}`
       const translated = this.$t(key)
       if (translated !== key) {
         return translated
       }
-      // 回退到后端返回的描述
       return item.description || ''
     },
 
     getLinkText (linkText) {
       if (!linkText) return this.$t('settings.getApi')
-      // 如果是翻译键（以 settings.link. 开头），则翻译
       if (linkText.startsWith('settings.link.')) {
         const translated = this.$t(linkText)
         return translated !== linkText ? translated : linkText
@@ -1122,7 +1109,6 @@ export default {
 
         this.saving = true
         try {
-          // 按组整理数据
           const data = {}
           for (const groupKey of Object.keys(this.schema)) {
             data[groupKey] = {}
@@ -1130,7 +1116,6 @@ export default {
             for (const item of group.items) {
               if (item.key in formValues) {
                 let value = formValues[item.key]
-                // 布尔值转字符串
                 if (item.type === 'boolean') {
                   value = value ? 'True' : 'False'
                 } else if (item.type === 'market_multiselect') {
@@ -1236,7 +1221,7 @@ export default {
     .settings-search {
       padding: 0 16px 12px;
 
-      /deep/ .ant-input-affix-wrapper {
+      ::v-deep .ant-input-affix-wrapper {
         border-radius: 8px;
       }
     }
@@ -1245,7 +1230,7 @@ export default {
       border: none;
       background: transparent;
 
-      /deep/ .ant-menu-item {
+      ::v-deep .ant-menu-item {
         margin: 4px 8px;
         border-radius: 8px;
         height: 40px;
@@ -1364,7 +1349,6 @@ export default {
     }
   }
 
-  // 商业授权提示（Brand 分组底部）
   .commercial-license-notice {
     margin-top: 24px;
 
@@ -1408,7 +1392,6 @@ export default {
     }
   }
 
-  // OpenRouter 余额查询卡片
   .openrouter-balance-card {
     margin-bottom: 20px;
 
@@ -1434,12 +1417,12 @@ export default {
     .balance-info {
       padding: 8px 0;
 
-      /deep/ .ant-statistic-title {
+      ::v-deep .ant-statistic-title {
         font-size: 12px;
         color: #666;
       }
 
-      /deep/ .ant-statistic-content {
+      ::v-deep .ant-statistic-content {
         font-size: 18px;
       }
 
@@ -1500,7 +1483,7 @@ export default {
   }
 
   .settings-form {
-    /deep/ .ant-form-item-label {
+    ::v-deep .ant-form-item-label {
       padding-bottom: 4px;
 
       label {
@@ -1556,13 +1539,13 @@ export default {
       }
     }
 
-    /deep/ .ant-input,
-    /deep/ .ant-input-number,
-    /deep/ .ant-select-selection {
+    ::v-deep .ant-input,
+    ::v-deep .ant-input-number,
+    ::v-deep .ant-select-selection {
       border-radius: 8px;
     }
 
-    /deep/ .ant-input-number {
+    ::v-deep .ant-input-number {
       width: 100%;
     }
 
@@ -1690,7 +1673,6 @@ export default {
     }
   }
 
-  // 暗黑主题
   &.theme-dark {
     background: linear-gradient(180deg, #141414 0%, #1c1c1c 100%);
 
@@ -1723,7 +1705,7 @@ export default {
       background: #1c1c1c;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
 
-      /deep/ .ant-menu-item {
+      ::v-deep .ant-menu-item {
         color: #c9d1d9;
         .anticon { color: #8b949e; }
 
@@ -1790,7 +1772,7 @@ export default {
     }
 
     .settings-form {
-      /deep/ .ant-form-item-label {
+      ::v-deep .ant-form-item-label {
         label {
           color: #c9d1d9;
         }
@@ -1819,10 +1801,10 @@ export default {
         }
       }
 
-      /deep/ .ant-input,
-      /deep/ .ant-input-password,
-      /deep/ .ant-input-number,
-      /deep/ .ant-select-selection {
+      ::v-deep .ant-input,
+      ::v-deep .ant-input-password,
+      ::v-deep .ant-input-number,
+      ::v-deep .ant-select-selection {
         background: #141414;
         border-color: #2a2a2a;
         color: #c9d1d9;
@@ -1833,27 +1815,27 @@ export default {
         }
       }
 
-      /deep/ .ant-input-number-input {
+      ::v-deep .ant-input-number-input {
         background: transparent;
         color: #c9d1d9;
       }
 
-      /deep/ .ant-select-arrow {
+      ::v-deep .ant-select-arrow {
         color: #8b949e;
       }
 
       // Input trailing icons in dark mode (eye/clear/spinner) should stay readable
-      /deep/ .ant-input-suffix .anticon,
-      /deep/ .ant-input-clear-icon,
-      /deep/ .ant-input-clear-icon .anticon,
-      /deep/ .ant-input-number-handler-wrap {
+      ::v-deep .ant-input-suffix .anticon,
+      ::v-deep .ant-input-clear-icon,
+      ::v-deep .ant-input-clear-icon .anticon,
+      ::v-deep .ant-input-number-handler-wrap {
         color: #8b949e;
       }
 
-      /deep/ .ant-input-suffix .anticon:hover,
-      /deep/ .ant-input-clear-icon:hover,
-      /deep/ .ant-input-number-handler:hover .ant-input-number-handler-up-inner,
-      /deep/ .ant-input-number-handler:hover .ant-input-number-handler-down-inner {
+      ::v-deep .ant-input-suffix .anticon:hover,
+      ::v-deep .ant-input-clear-icon:hover,
+      ::v-deep .ant-input-number-handler:hover .ant-input-number-handler-up-inner,
+      ::v-deep .ant-input-number-handler:hover .ant-input-number-handler-down-inner {
         color: #58a6ff;
       }
 
@@ -1911,7 +1893,6 @@ export default {
   }
 }
 
-// 响应式适配
 @media (max-width: 768px) {
   .settings-page {
     padding: 12px !important;
