@@ -74,6 +74,10 @@ const user = {
         login(userInfo).then(response => {
           if (response && response.code === 1 && response.data) {
             const result = response.data
+            if (result.mfa_required) {
+              resolve(response)
+              return
+            }
             const token = result.token
             const info = result.userinfo || {}
 

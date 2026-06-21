@@ -1569,8 +1569,7 @@ const EXCHANGE_OPTIONS = [
   { value: 'coinbaseexchange', labelKey: 'coinbaseexchange' },
   { value: 'kraken', labelKey: 'kraken' },
   { value: 'kucoin', labelKey: 'kucoin' },
-  { value: 'gate', labelKey: 'gate' },
-  { value: 'deepcoin', labelKey: 'deepcoin' }
+  { value: 'gate', labelKey: 'gate' }
 ]
 
 // Traditional broker options (US stocks) - extensible for future brokers
@@ -1677,7 +1676,7 @@ export default {
     },
     needsPassphrase () {
       // Exchanges that require passphrase
-      return ['okx', 'okex', 'coinbaseexchange', 'kucoin', 'bitget', 'deepcoin'].includes(this.currentExchangeId)
+      return ['okx', 'okex', 'coinbaseexchange', 'kucoin', 'bitget'].includes(this.currentExchangeId)
     },
     // Check if current market uses IBKR (US Stock)
     isIBKRMarket () {
@@ -1831,7 +1830,7 @@ export default {
       if (String(cat).toLowerCase() === 'crypto') {
         return [
           'binance', 'okx', 'bitget', 'bybit', 'coinbaseexchange',
-          'kraken', 'kucoin', 'gate', 'deepcoin', 'htx', 'alpaca'
+          'kraken', 'kucoin', 'gate', 'htx', 'alpaca'
         ].includes(exchangeId)
       }
       // USStock uses IBKR (local TWS/Gateway) or Alpaca (REST).
@@ -2854,7 +2853,7 @@ export default {
         }
 
         // Validate crypto exchanges can only be used for Crypto
-        const cryptoExchanges = ['binance', 'okx', 'bitget', 'bybit', 'coinbaseexchange', 'kraken', 'kucoin', 'gate', 'deepcoin', 'htx']
+        const cryptoExchanges = ['binance', 'okx', 'bitget', 'bybit', 'coinbaseexchange', 'kraken', 'kucoin', 'gate', 'htx']
         if (cryptoExchanges.includes(exchangeId) && this.selectedMarketCategory !== 'Crypto') {
           this.$message.error(this.$t('trading-assistant.validation.cryptoExchangeOnlyForCrypto'))
           // Clear the selection
@@ -4640,7 +4639,7 @@ export default {
                 const totalCreated = res.data?.total_created || this.selectedSymbols.length
                 this.$message.success(this.$t('trading-assistant.messages.batchCreateSuccess', { count: totalCreated }))
               }
-              // Credentials are managed in Profile → Exchange Config; no inline save needed.
+              // Credentials are managed in Broker Accounts; no inline save needed.
               this.handleRefresh()
             } else {
               this.$message.error(res.msg || (this.isEditMode ? this.$t('trading-assistant.messages.updateFailed') : this.$t('trading-assistant.messages.createFailed')))
@@ -4923,11 +4922,11 @@ export default {
 
 .trading-assistant {
   padding: 0px;
-  height: calc(100vh - 120px);
+  min-height: calc(100vh - 120px);
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 
   .strategy-layout {
-    height: calc(100vh - 120px);
+    min-height: calc(100vh - 120px);
     align-items: stretch;
   }
 
@@ -6314,8 +6313,14 @@ export default {
   }
 
   &.theme-dark {
-    background: #141414;
+    background: #0f0f10;
     color: var(--dark-text-color, #fff);
+
+    .strategy-layout,
+    .strategy-detail-col,
+    .strategy-detail-panel {
+      background: #0f0f10;
+    }
 
     .creation-mode-toggle {
       background: rgba(24, 144, 255, 0.08);

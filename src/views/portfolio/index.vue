@@ -900,17 +900,17 @@ export default {
       symbolSearchResults: [],
       searchTimer: null,
       selectedSymbolName: '',
-      symbolSearchKeyword: '', // 褰撳墠鎼滅储鍏抽敭璇嶏紝鐢ㄤ簬鎵嬪姩杈撳叆
+      symbolSearchKeyword: '',
       // Price refresh
       priceRefreshTimer: null,
-      lastSyncTime: null, // 鏈€鍚庡悓姝ユ椂闂?
-      isSyncing: false, // 鏄惁姝ｅ湪鍚屾
+      lastSyncTime: null,
+      isSyncing: false,
       // Groups
       groups: [],
       selectedGroup: '',
       // View mode
       viewMode: 'grid', // 'grid' or 'group'
-      activeGroups: [], // 鎶樺彔闈㈡澘灞曞紑鐨勫垎缁?
+      activeGroups: [],
       // Alerts
       alerts: [],
       loadingAlerts: false,
@@ -1071,8 +1071,8 @@ export default {
       this.isSyncing = true
       try {
         await Promise.all([
-          this.loadPositions(true), // 寮哄埗鍒锋柊
-          this.loadSummary(true) // 寮哄埗鍒锋柊
+          this.loadPositions(true),
+          this.loadSummary(true)
         ])
         this.lastSyncTime = new Date()
       } finally {
@@ -1369,7 +1369,7 @@ export default {
             notification_config: {
               channels: this.alertChannels.length > 0 ? this.alertChannels : ['browser'],
               targets: targets,
-              language: this.$store.getters.lang || 'en-US' // 淇濆瓨褰撳墠璇█
+              language: this.$store.getters.lang || 'en-US'
             },
             is_active: values.is_active !== false,
             repeat_interval: values.repeat_interval || 0,

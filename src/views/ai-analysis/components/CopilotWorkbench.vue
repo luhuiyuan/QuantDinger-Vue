@@ -38,7 +38,7 @@
       <header class="chat-hero">
         <div class="hero-main">
           <div class="hero-copy">
-            <span class="eyebrow">AI Copilot</span>
+            <span class="eyebrow">{{ text.title }}</span>
             <p>{{ text.subtitle }}</p>
           </div>
           <div class="context-bar">
@@ -121,7 +121,8 @@
           <div class="bubble">
             <div v-if="msg.attachments && msg.attachments.length" class="attachment-row">
               <div v-for="att in msg.attachments" :key="att.name" class="thumb">
-                <img :src="att.data_url || att.preview" :alt="att.name">
+                <img v-if="att.data_url || att.preview" :src="att.data_url || att.preview" :alt="att.name">
+                <span v-else class="thumb-missing">{{ att.name || text.imageAttachment }}</span>
               </div>
             </div>
             <div class="message-content" v-html="renderMarkdown(msg.content)" @click="handleMessageContentClick" />
@@ -146,7 +147,7 @@
                 <a-icon :type="action.icon || 'arrow-right'" /> {{ action.label }}
               </button>
               <button v-if="strategyCodeForMessage(msg)" type="button" @click="copyStrategyCode(msg)">
-                <a-icon type="copy" /> {{ isZh ? '复制代码' : 'Copy code' }}
+                <a-icon type="copy" /> {{ text.copyCode }}
               </button>
             </div>
             <div v-if="formatMessageTime(msg)" class="message-time">{{ formatMessageTime(msg) }}</div>
@@ -176,10 +177,13 @@
         <div class="composer-foot">
           <p class="risk-disclaimer">
             <a-icon type="safety-certificate" />
-            {{ text.riskDisclaimer || (isZh ? 'AI 回答仅供参考，不构成投资建议；市场有风险，交易需谨慎。' : 'AI responses are for reference only and do not constitute investment advice. Markets involve risk.') }}
+            {{ text.riskDisclaimer }}
           </p>
           <div class="composer-actions">
             <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" multiple @change="handleFiles">
+            <a-button v-if="messages.length" @click="quickToolsVisible = true">
+              <a-icon type="appstore" /> {{ text.quickTools || 'Quick tools' }}
+            </a-button>
             <a-button @click="$refs.fileInput.click()">
               <a-icon type="picture" /> {{ uploadImageLabel }}
             </a-button>
@@ -389,6 +393,30 @@
     </a-modal>
 
     <a-modal
+      v-model="quickToolsVisible"
+      :title="text.quickTools || 'Quick tools'"
+      :footer="null"
+      wrap-class-name="copilot-modal quick-tools-modal"
+      width="760px"
+    >
+      <div class="quick-task-modal-grid">
+        <button
+          v-for="item in registeredQuickTasks"
+          :key="'modal-' + item.key"
+          type="button"
+          :class="['welcome-task', item.tone ? `welcome-task--${item.tone}` : '']"
+          @click="handleQuickPrompt(item)"
+        >
+          <span class="task-icon"><a-icon :type="item.icon" /></span>
+          <span class="task-copy">
+            <strong>{{ item.label }}</strong>
+            <em>{{ item.desc }}</em>
+          </span>
+        </button>
+      </div>
+    </a-modal>
+
+    <a-modal
       v-model="strategyFlowVisible"
       :title="text.strategyFlowTitle"
       :footer="null"
@@ -397,24 +425,57 @@
     >
       <div class="strategy-flow">
         <div class="strategy-flow-guide">
-          <span><a-icon type="edit" /> {{ isZh ? '描述想法' : 'Describe' }}</span>
-          <span><a-icon type="code" /> {{ isZh ? '生成草稿' : 'Draft' }}</span>
-          <span><a-icon type="experiment" /> {{ isZh ? '回测验证' : 'Backtest' }}</span>
-          <span><a-icon type="rocket" /> {{ isZh ? '手动启用' : 'Manual launch' }}</span>
+          <span><a-icon type="edit" /> {{ text.strategyFlowDescribe }}</span>
+          <span><a-icon type="code" /> {{ text.strategyFlowDraft }}</span>
+          <span><a-icon type="experiment" /> {{ text.strategyFlowBacktest }}</span>
+          <span><a-icon type="rocket" /> {{ text.strategyFlowManualLaunch }}</span>
         </div>
-        <button
-          v-for="item in strategyTargets"
-          :key="item.key"
-          type="button"
-          class="strategy-flow-card"
-          @click="startStrategyFlow(item.key)"
-        >
-          <a-icon :type="item.icon" />
-          <span>
-            <strong>{{ item.title }}</strong>
-            <em>{{ item.desc }}</em>
-          </span>
-        </button>
+        <div class="strategy-type-grid">
+          <button
+            v-for="item in strategyTargets"
+            :key="item.key"
+            type="button"
+            :class="['strategy-flow-card', { active: selectedStrategyTarget === item.key }]"
+            @click="selectStrategyTarget(item.key)"
+          >
+            <a-icon :type="item.icon" />
+            <span>
+              <strong>{{ item.title }}</strong>
+              <em>{{ item.desc }}</em>
+            </span>
+          </button>
+        </div>
+        <div v-if="selectedStrategyTargetDetails" class="strategy-route-panel">
+          <div class="strategy-route-main">
+            <span class="strategy-route-icon"><a-icon :type="selectedStrategyTargetDetails.icon" /></span>
+            <span>
+              <strong>{{ selectedStrategyTargetDetails.routeTitle }}</strong>
+              <em>{{ selectedStrategyTargetDetails.routeDesc }}</em>
+            </span>
+          </div>
+          <a-button type="primary" @click="startStrategyFlow(selectedStrategyTarget)">
+            <a-icon type="edit" /> {{ selectedStrategyTargetDetails.startLabel }}
+          </a-button>
+        </div>
+        <div class="strategy-examples">
+          <div class="strategy-examples-head">
+            <strong>{{ text.strategyExamplesTitle }}</strong>
+            <span>{{ text.strategyExamplesDesc }}</span>
+          </div>
+          <button
+            v-for="item in strategyPromptExamples"
+            :key="item.key"
+            type="button"
+            class="strategy-example-row"
+            @click="startStrategyFlow(item.targetType, item.prompt)"
+          >
+            <span>
+              <strong>{{ item.title }}</strong>
+              <em>{{ item.prompt }}</em>
+            </span>
+            <a-icon type="arrow-right" />
+          </button>
+        </div>
       </div>
     </a-modal>
   </div>
@@ -496,6 +557,7 @@ export default {
       loadingMonitors: false,
       analyzingSymbol: false,
       strategyFlowVisible: false,
+      selectedStrategyTarget: 'indicator',
       generatingStrategy: false,
       pendingAgentTask: null,
       agentPreflight: null,
@@ -510,7 +572,8 @@ export default {
       composerMinHeight: 98,
       composerMaxHeight: 236,
       draftContextLock: null,
-      printReportId: ''
+      printReportId: '',
+      quickToolsVisible: false
     }
   },
   computed: {
@@ -519,386 +582,185 @@ export default {
       return locale.toLowerCase().startsWith('zh')
     },
     text () {
-      if (this.isZh) {
-        return {
-          title: 'AI 交易 Copilot',
-          subtitle: '搜索标的、查看事件、分析行情、诊断策略和生成代码，都从这里发起。',
-          sessions: '会话历史',
-          newChat: '新会话',
-          noSessions: '暂无历史会话',
-          chatSession: 'AI 会话',
-          untitled: '未命名会话',
-          calendar: '财经日历',
-          highImpact: '高影响',
-          today: '今天',
-          all: '全部',
-          loading: '加载中...',
-          noEvents: '暂无事件',
-          focusSymbol: '数据源上下文',
-          symbol: '标的',
-          symbolPlaceholder: '可选：搜索并指定本次对话的数据源',
-          noSymbol: '输入关键词搜索',
-          estimatedCost: '本次约',
-          scheduleCurrent: '定时分析',
-          welcomeTitle: '用一句话开始控制 QuantDinger',
-          welcomeDesc: '可以问行情、让它解释错误日志、写策略模板，或上传 K 线图一起判断。',
-          placeholder: '例如：帮我诊断 BTC/USDT 1小时趋势，或者上传K线图问它是否适合开仓...',
-          uploadChart: '上传K线图',
-          send: '发送',
-          watchlist: '我的自选',
-          addWatchPlaceholder: '搜索并添加自选',
-          addWatch: '添加自选',
-          addWatchTitle: '添加自选标的',
-          addWatchSearchPlaceholder: '输入股票、币种、外汇或期货代码',
-          addWatchEmptyHint: '搜索标的，或从热门标的中选择',
-          search: '搜索',
-          selected: '已选择',
-          add: '添加',
-          noWatchlist: '暂无自选',
-          ask: '问AI',
-          schedule: '定时',
-          remove: '删除',
-          removeWatchConfirm: '确定从自选中删除这个标的吗？',
-          monitors: 'AI定时分析任务',
-          noMonitors: '暂无定时分析任务',
-          running: '运行中',
-          paused: '已暂停',
-          eventDetail: '财经事件详情',
-          actual: '实际',
-          forecast: '预测',
-          previous: '前值',
-          aiPreview: 'AI影响预判',
-          askAiEvent: '让AI深入分析',
-          close: '关闭',
-          createMonitor: '创建AI定时分析任务',
-          interval: '分析频率',
-          notify: '通知渠道',
-          monitorTip: '系统会按频率分析当前标的，并在命中风险或机会时记录结果。',
-          save: '保存',
-          cancel: '取消',
-          addWatchSuccess: '已加入自选',
-          addWatchFailed: '添加自选失败',
-          removeWatchSuccess: '已从自选删除',
-          removeWatchFailed: '删除自选失败',
-          deleteSessionConfirm: '确定删除这段会话历史吗？',
-          sessionDeleted: '会话已删除',
-          sessionDeleteFailed: '删除会话失败',
-          monitorCreated: '定时任务已创建',
-          monitorUpdated: '任务状态已更新',
-          monitorDeleted: '任务已删除',
-          strategyFlowTitle: '选择要创建的策略类型',
-          indicatorStrategy: '策略研发',
-          indicatorStrategyDesc: '基于已选标的生成可落地到策略 IDE 的研究、代码和回测方案',
-          scriptStrategy: '脚本策略',
-          scriptStrategyDesc: '生成 Python ScriptStrategy，适合复杂逻辑和自动执行',
-          tradingBot: '模板策略',
-          tradingBotDesc: '按标的行情推荐网格、趋势、DCA 或马丁模板策略参数',
-          analysisRunning: '正在生成专业分析报告...',
-          analysisComplete: '专业分析报告已生成',
-          strategyGenerated: '策略草稿已生成',
-          openTargetPage: '打开对应页面',
-          chatUnavailable: 'Chat API 尚未接入，当前先以本地引导回复展示。',
-          thinking: '思考中...',
-          selectSymbolFirst: '请先在上方“数据源上下文”选择要诊断的标的。',
-          uploadImage: '上传图片'
-        }
-      }
+      const locale = this.$i18n ? this.$i18n.locale : ''
+      void locale
+      const t = (key, fallback, values) => this.i18nText(`aiAssetAnalysis.copilot.${key}`, fallback, values)
       return {
-        title: 'AI Trading Copilot',
-        subtitle: 'Search symbols, inspect events, analyze markets, diagnose strategies, and generate code from one workspace.',
-        sessions: 'Chat History',
-        newChat: 'New',
-        noSessions: 'No history yet',
-        chatSession: 'AI chat',
-        untitled: 'Untitled chat',
-        calendar: 'Economic Calendar',
-        highImpact: 'High',
-        today: 'Today',
-        all: 'All',
-        loading: 'Loading...',
-        noEvents: 'No events',
-        focusSymbol: 'Data context',
-        symbol: 'Symbol',
-        symbolPlaceholder: 'Optional: choose a data source for this chat',
-        noSymbol: 'Type to search',
-        estimatedCost: 'Est.',
-        scheduleCurrent: 'Schedule',
-        welcomeTitle: 'Control QuantDinger with plain language',
-        welcomeDesc: 'Ask about markets, explain logs, draft strategies, or attach a chart screenshot.',
-        placeholder: 'Example: diagnose BTC/USDT 1H trend, or upload a chart screenshot and ask whether entry risk is acceptable...',
-        uploadChart: 'Upload chart',
-        send: 'Send',
-        watchlist: 'Watchlist',
-        addWatchPlaceholder: 'Search and add to watchlist',
-        addWatch: 'Add to watchlist',
-        addWatchTitle: 'Add Watchlist Symbol',
-        addWatchSearchPlaceholder: 'Enter a stock, crypto, forex, or futures symbol',
-        addWatchEmptyHint: 'Search for a symbol, or choose from popular symbols',
-        search: 'Search',
-        selected: 'Selected',
-        add: 'Add',
-        noWatchlist: 'No watchlist',
-        ask: 'Ask AI',
-        schedule: 'Schedule',
-        remove: 'Remove',
-        removeWatchConfirm: 'Remove this symbol from watchlist?',
-        deleteSessionConfirm: 'Delete this chat history?',
-        sessionDeleted: 'Chat history deleted',
-        sessionDeleteFailed: 'Failed to delete chat history',
-        monitors: 'AI Scheduled Analysis',
-        noMonitors: 'No scheduled tasks',
-        running: 'Running',
-        paused: 'Paused',
-        eventDetail: 'Economic Event Detail',
-        actual: 'Actual',
-        forecast: 'Forecast',
-        previous: 'Previous',
-        aiPreview: 'AI Impact Preview',
-        askAiEvent: 'Ask AI for detail',
-        close: 'Close',
-        createMonitor: 'Create AI scheduled analysis',
-        interval: 'Interval',
-        notify: 'Notification channels',
-        monitorTip: 'The system will analyze this symbol on schedule and keep results for review.',
-        save: 'Save',
-        cancel: 'Cancel',
-        addWatchSuccess: 'Added to watchlist',
-        addWatchFailed: 'Failed to add watchlist item',
-        removeWatchSuccess: 'Removed from watchlist',
-        removeWatchFailed: 'Failed to remove watchlist item',
-        monitorCreated: 'Scheduled task created',
-        monitorUpdated: 'Task updated',
-        monitorDeleted: 'Task deleted',
-        strategyFlowTitle: 'Choose Strategy Workflow',
-        indicatorStrategy: 'Strategy Lab',
-        indicatorStrategyDesc: 'Develop a strategy workflow with research, code draft, and backtest plan',
-        scriptStrategy: 'Script Strategy',
-        scriptStrategyDesc: 'Generate a Python ScriptStrategy for complex automated logic',
-        tradingBot: 'Template Strategy',
-        tradingBotDesc: 'Recommend grid, trend, DCA, or martingale template strategy parameters from market context',
-        analysisRunning: 'Generating professional analysis report...',
-        analysisComplete: 'Professional analysis report generated',
-        strategyGenerated: 'Strategy draft generated',
-        openTargetPage: 'Open target page',
-        chatUnavailable: 'Chat API is not implemented yet; showing a local guide response for now.',
-        thinking: 'Thinking...',
-        selectSymbolFirst: 'Choose a symbol in Data context before running diagnosis.',
-        uploadImage: 'Upload image'
+        title: t('title', 'AI Copilot'),
+        subtitle: t('subtitle', 'Search symbols, inspect events, analyze markets, diagnose strategies, and draft code from one workspace.'),
+        sessions: t('sessions', 'Chat History'),
+        newChat: t('newChat', 'New'),
+        noSessions: t('noSessions', 'No conversations yet'),
+        chatSession: t('chatSession', 'AI chat'),
+        untitled: t('untitled', 'New conversation'),
+        calendar: t('calendar', 'Market Calendar'),
+        highImpact: t('highImpact', 'High impact'),
+        today: t('today', 'Today'),
+        all: t('all', 'All'),
+        loading: t('loading', 'Loading...'),
+        noEvents: t('noEvents', 'No upcoming events'),
+        focusSymbol: t('focusSymbol', 'Data context'),
+        symbol: t('symbol', 'Symbol'),
+        symbolPlaceholder: t('symbolPlaceholder', 'Not fixed; AI will infer from your message'),
+        noSymbol: t('noSymbol', 'No symbol selected'),
+        estimatedCost: t('estimatedCost', 'Estimated cost'),
+        scheduleCurrent: t('scheduleCurrent', 'Schedule analysis'),
+        welcomeTitle: t('welcomeTitle', 'Control QuantDinger with plain language'),
+        welcomeDesc: t('welcomeDesc', 'Ask about markets, explain logs, draft strategies, or attach a chart screenshot.'),
+        placeholder: t('placeholder', 'Example: diagnose BTC/USDT 1H trend, or upload a chart screenshot and ask whether entry risk is acceptable...'),
+        uploadChart: t('uploadChart', 'Upload image'),
+        send: t('send', 'Send'),
+        watchlist: t('watchlist', 'Watchlist'),
+        addWatchPlaceholder: t('addWatchPlaceholder', 'Add symbol, e.g. BTC/USDT or AAPL'),
+        addWatch: t('addWatch', 'Add to watchlist'),
+        addWatchTitle: t('addWatchTitle', 'Add to watchlist'),
+        addWatchSearchPlaceholder: t('addWatchSearchPlaceholder', 'Search or enter a symbol'),
+        addWatchEmptyHint: t('addWatchEmptyHint', 'Enter a symbol to add it.'),
+        search: t('search', 'Search'),
+        selected: t('selected', 'Selected'),
+        add: t('add', 'Add'),
+        noWatchlist: t('noWatchlist', 'No symbols yet'),
+        ask: t('ask', 'Ask'),
+        schedule: t('schedule', 'Schedule'),
+        remove: t('remove', 'Remove'),
+        removeWatchConfirm: t('removeWatchConfirm', 'Remove this symbol from watchlist?'),
+        monitors: t('monitors', 'AI Scheduled Analysis'),
+        noMonitors: t('noMonitors', 'No scheduled tasks'),
+        running: t('running', 'Running'),
+        paused: t('paused', 'Paused'),
+        eventDetail: t('eventDetail', 'Event detail'),
+        actual: t('actual', 'Actual'),
+        forecast: t('forecast', 'Forecast'),
+        previous: t('previous', 'Previous'),
+        aiPreview: t('aiPreview', 'AI Preview'),
+        askAiEvent: t('askAiEvent', 'Ask AI about this event'),
+        close: t('close', 'Close'),
+        createMonitor: t('createMonitor', 'Create scheduled analysis'),
+        interval: t('interval', 'Interval'),
+        notify: t('notify', 'Notify'),
+        monitorTip: t('monitorTip', 'AI will re-check this symbol on schedule and keep a record.'),
+        save: t('save', 'Save'),
+        cancel: t('cancel', 'Cancel'),
+        addWatchSuccess: t('addWatchSuccess', 'Added to watchlist'),
+        addWatchFailed: t('addWatchFailed', 'Failed to add symbol'),
+        removeWatchSuccess: t('removeWatchSuccess', 'Removed from watchlist'),
+        removeWatchFailed: t('removeWatchFailed', 'Failed to remove symbol'),
+        deleteSessionConfirm: t('deleteSessionConfirm', 'Delete this conversation?'),
+        sessionDeleted: t('sessionDeleted', 'Conversation deleted'),
+        sessionDeleteFailed: t('sessionDeleteFailed', 'Failed to delete conversation'),
+        monitorCreated: t('monitorCreated', 'Scheduled analysis created'),
+        monitorUpdated: t('monitorUpdated', 'Scheduled analysis updated'),
+        monitorDeleted: t('monitorDeleted', 'Scheduled analysis deleted'),
+        strategyFlowTitle: t('strategyFlowTitle', 'Choose the strategy type to create'),
+        indicatorStrategy: t('indicatorStrategy', 'Strategy R&D'),
+        indicatorStrategyDesc: t('indicatorStrategyDesc', 'Draft strategies for research, backtesting, and publishing.'),
+        scriptStrategy: t('scriptStrategy', 'Script Strategy'),
+        scriptStrategyDesc: t('scriptStrategyDesc', 'Generate Python ScriptStrategy for complex logic and automated execution.'),
+        tradingBot: t('tradingBot', 'Template Strategy'),
+        tradingBotDesc: t('tradingBotDesc', 'Recommend grid, trend, DCA, or martingale template parameters from market context.'),
+        strategyRouteIndicatorTitle: t('strategyRouteIndicatorTitle', this.isZh ? '产物：指标策略代码' : 'Output: Indicator strategy code'),
+        strategyRouteIndicatorDesc: t('strategyRouteIndicatorDesc', this.isZh ? '运行在策略研发 / 指标 IDE。必须使用 QuantDinger Python 指标合约，并通过四个信号列交给回测和实盘。' : 'Runs in Strategy R&D / Indicator IDE. It must use QuantDinger Python indicator contracts and four signal columns for backtest/live handoff.'),
+        strategyRouteScriptTitle: t('strategyRouteScriptTitle', this.isZh ? '产物：ScriptStrategy 代码' : 'Output: ScriptStrategy code'),
+        strategyRouteScriptDesc: t('strategyRouteScriptDesc', this.isZh ? '运行在脚本策略 IDE。适合状态逻辑、仓位管理、接口调用、日志和自动执行。' : 'Runs in Script Strategy IDE. Use this for stateful logic, position management, API calls, logging, and automated execution.'),
+        strategyRouteTemplateTitle: t('strategyRouteTemplateTitle', this.isZh ? '产物：模板策略参数' : 'Output: Template strategy parameters'),
+        strategyRouteTemplateDesc: t('strategyRouteTemplateDesc', this.isZh ? '运行在模板策略。推荐网格、趋势、DCA 等模板参数，启动前需要人工确认。' : 'Runs in Template Strategy. It recommends grid/trend/DCA and other preset parameters for manual review before launch.'),
+        strategyStartIndicator: t('strategyStartIndicator', this.isZh ? '创建指标策略提示词' : 'Create indicator strategy prompt'),
+        strategyStartScript: t('strategyStartScript', this.isZh ? '创建脚本策略提示词' : 'Create script strategy prompt'),
+        strategyStartTemplate: t('strategyStartTemplate', this.isZh ? '创建模板策略提示词' : 'Create template strategy prompt'),
+        analysisRunning: t('analysisRunning', 'Analysis is running...'),
+        analysisComplete: t('analysisComplete', 'Analysis complete'),
+        strategyGenerated: t('strategyGenerated', 'Strategy draft generated'),
+        openTargetPage: t('openTargetPage', 'Open target page'),
+        chatUnavailable: t('chatUnavailable', 'Chat API is not connected. Showing local fallback response first.'),
+        thinking: t('thinking', 'Thinking...'),
+        selectSymbolFirst: t('selectSymbolFirst', 'Choose a symbol in Data context before running this tool.'),
+        uploadImage: t('uploadImage', 'Upload image'),
+        quickTools: t('quickTools', 'Quick tools'),
+        hideQuickTools: t('hideQuickTools', 'Hide quick tools'),
+        imageAttachment: t('imageAttachment', 'Image attachment'),
+        copyCode: t('copyCode', 'Copy code'),
+        currentSymbol: t('currentSymbol', 'this symbol'),
+        free: t('free', 'Free'),
+        contextAutoInfer: t('contextAutoInfer', 'Not fixed; AI will infer from your message'),
+        strategyFlowDescribe: t('strategyFlowDescribe', 'Describe'),
+        strategyFlowDraft: t('strategyFlowDraft', 'Draft'),
+        strategyFlowBacktest: t('strategyFlowBacktest', 'Backtest'),
+        strategyFlowManualLaunch: t('strategyFlowManualLaunch', 'Manual launch'),
+        strategyExamplesTitle: t('strategyExamplesTitle', 'Prompt examples'),
+        strategyExamplesDesc: t('strategyExamplesDesc', 'Pick one, then edit the details before sending.'),
+        strategyExampleMomentum: t('strategyExampleMomentum', 'Momentum breakout'),
+        strategyExampleReversal: t('strategyExampleReversal', 'Mean reversion'),
+        strategyExampleCode: t('strategyExampleCode', 'Code from idea'),
+        strategyExampleStateful: t('strategyExampleStateful', this.isZh ? '状态风控脚本' : 'Stateful risk script'),
+        strategyExampleGrid: t('strategyExampleGrid', this.isZh ? '网格模板' : 'Grid template'),
+        strategyExampleTrendTemplate: t('strategyExampleTrendTemplate', this.isZh ? '趋势模板' : 'Trend template'),
+        calendarUnavailable: t('calendarUnavailable', 'Calendar unavailable')
       }
     },
     uploadImageLabel () {
-      return this.text.uploadImage || (this.isZh ? '上传图片' : 'Upload image')
+      return this.text.uploadImage
     },
     thinkingText () {
-      return this.text.thinking || (this.isZh ? '思考中...' : 'Thinking...')
+      return this.text.thinking
     },
     quickPrompts () {
-      const symbol = this.context.symbol || (this.isZh ? '当前标的' : 'this symbol')
+      const locale = this.$i18n ? this.$i18n.locale : ''
+      void locale
+      const symbol = this.context.symbol || this.text.currentSymbol
+      const prompt = (key, fallback) => this.localizedQuickPrompt(key, fallback, { symbol })
       return [
-        {
-          key: 'diagnose',
-          action: 'analysis',
-          icon: 'line-chart',
-          label: this.isZh ? '诊断标的' : 'Diagnose',
-          prompt: this.isZh
-            ? `请从趋势、量能、关键支撑阻力、资金面和风险角度分析 ${symbol}。`
-            : `Analyze ${symbol} from trend, volume, key support/resistance, capital flow, and risk.`
-        },
-        {
-          key: 'strategy',
-          action: 'strategy',
-          icon: 'code',
-          label: this.isZh ? '写策略' : 'Write strategy',
-          prompt: this.isZh
-            ? `请为 ${symbol} 写一个稳健的策略模板，并说明参数、风控和适用市场。`
-            : `Draft a robust strategy template for ${symbol}, including parameters, risk controls, and suitable market conditions.`
-        },
-        {
-          key: 'logs',
-          action: 'prompt',
-          icon: 'bug',
-          label: this.isZh ? '排查日志' : 'Debug logs',
-          prompt: this.isZh
-            ? '我会粘贴策略日志，请帮我定位异常原因并给出修复建议。'
-            : 'I will paste strategy logs. Find the root cause and suggest fixes.'
-        },
-        {
-          key: 'radar',
-          action: 'prompt',
-          icon: 'radar-chart',
-          label: this.isZh ? '机会雷达' : 'Radar',
-          prompt: this.isZh
-            ? `请基于 ${symbol} 当前上下文，判断未来24小时是否有交易机会，并给出触发条件。`
-            : `Based on ${symbol}, judge whether there is a trading opportunity in the next 24 hours and list trigger conditions.`
-        }
+        { key: 'diagnose', action: 'analysis', icon: 'line-chart', label: this.i18nText('aiAssetAnalysis.copilot.quickTasks.market_diagnosis.label', 'Diagnose symbol'), prompt: prompt('diagnose', 'Diagnose {symbol}: trend, momentum, support/resistance, liquidity, and risk.') },
+        { key: 'strategy', action: 'strategy', icon: 'experiment', label: this.i18nText('aiAssetAnalysis.copilot.quickTasks.indicator_strategy.label', 'Strategy R&D'), prompt: prompt('strategy', 'Design an executable strategy workflow for {symbol}, including conditions, risk controls, and validation plan.') },
+        { key: 'logs', action: 'chat', icon: 'bug', label: this.i18nText('aiAssetAnalysis.copilot.quickTasks.debug_logs.label', 'Debug logs'), prompt: prompt('logs', 'Help me inspect recent errors and suggest the next debugging steps.') },
+        { key: 'radar', action: 'chat', icon: 'aim', label: this.i18nText('aiAssetAnalysis.copilot.quickTasks.opportunity_radar.label', 'Opportunity radar'), prompt: prompt('radar', 'Scan {symbol} for likely opportunities in the next 24 hours, with triggers and invalidation.') }
       ]
     },
     systemQuickTasks () {
-      const symbol = this.context.symbol || (this.isZh ? '当前标的' : 'this symbol')
+      const locale = this.$i18n ? this.$i18n.locale : ''
+      void locale
+      const symbol = this.context.symbol || this.text.currentSymbol
+      const task = (key, action, icon, tone, labelKey, descKey, promptKey, promptFallback) => ({
+        key,
+        action,
+        icon,
+        tone,
+        label: this.i18nText(`aiAssetAnalysis.copilot.quickTasks.${labelKey}.label`, labelKey),
+        desc: this.i18nText(`aiAssetAnalysis.copilot.quickTasks.${descKey}.desc`, ''),
+        prompt: this.localizedQuickPrompt(promptKey, promptFallback, { symbol })
+      })
       return [
-        {
-          key: 'diagnose',
-          action: 'analysis',
-          icon: 'line-chart',
-          tone: 'analysis',
-          label: this.isZh ? '诊断标的' : 'Diagnose',
-          desc: this.isZh ? '趋势、量能、支撑阻力和风险' : 'Trend, volume, levels, and risk',
-          prompt: this.isZh
-            ? `请从趋势、量能、关键支撑阻力、资金面和风险角度分析 ${symbol}。`
-            : `Analyze ${symbol} from trend, volume, key support/resistance, capital flow, and risk.`
-        },
-        {
-          key: 'chart',
-          action: 'prompt',
-          icon: 'picture',
-          tone: 'chart',
-          label: this.isZh ? '看图诊断' : 'Chart review',
-          desc: this.isZh ? '上传 K 线图，判断入场与止损' : 'Paste a chart for entry and stop review',
-          prompt: this.isZh
-            ? '我会上传一张 K 线图。请结合图形结构、趋势位置、量能、支撑阻力和风险收益比，判断当前是否适合入场，并给出止损、止盈和失效条件。'
-            : 'I will paste or upload a chart. Review structure, trend location, volume, support/resistance, and risk/reward, then decide whether entry is appropriate with stop/take-profit/invalidation conditions.'
-        },
-        {
-          key: 'strategy',
-          action: 'strategy',
-          icon: 'code',
-          tone: 'strategy',
-          label: this.isZh ? '写策略' : 'Write strategy',
-          desc: this.isZh ? '指标 IDE、脚本策略、模板策略工作流' : 'Indicator, script, or template strategy workflow',
-          prompt: this.isZh
-            ? `请为 ${symbol} 设计一个稳健的策略模板，并说明参数、风控和适用市场。`
-            : `Draft a robust strategy template for ${symbol}, including parameters, risk controls, and suitable market conditions.`
-        },
-        {
-          key: 'monitor',
-          action: 'prompt',
-          icon: 'clock-circle',
-          tone: 'monitor',
-          label: this.isZh ? '定时跟踪' : 'Scheduled scan',
-          desc: this.isZh ? '按周期自动复盘标的变化' : 'Track a symbol on a schedule',
-          prompt: this.isZh
-            ? `请帮我为 ${symbol} 规划一个 AI 定时分析任务。请先判断还缺哪些参数，并询问我周期、通知方式和重点关注条件；如果信息已足够，请整理成可创建任务的配置草案。`
-            : `Help me plan a scheduled AI analysis task for ${symbol}. First identify missing fields and ask for interval, notification channel, and focus conditions; if enough information is present, draft a task configuration.`
-        },
-        {
-          key: 'news',
-          action: 'prompt',
-          icon: 'global',
-          tone: 'research',
-          label: this.isZh ? '新闻研判' : 'News research',
-          desc: this.isZh ? '检索新闻、事件和催化因素' : 'Search news, events, and catalysts',
-          prompt: this.isZh
-            ? '请围绕当前问题和标的检索最新新闻、公司事件和宏观催化因素，并说明对价格、风险和后续观察点的影响。'
-            : 'Search recent news, company events, and macro catalysts for the current question and symbol, then explain price impact, risks, and follow-up signals.'
-        },
-        {
-          key: 'logs',
-          action: 'prompt',
-          icon: 'bug',
-          tone: 'debug',
-          label: this.isZh ? '排查日志' : 'Debug logs',
-          desc: this.isZh ? '定位策略、机器人或接口异常' : 'Find strategy, bot, or API failures',
-          prompt: this.isZh
-            ? '我会粘贴策略、模板策略或接口日志。请帮我定位异常原因，说明影响范围，并给出可执行的修复步骤。'
-            : 'I will paste strategy, bot, or API logs. Find the root cause, explain impact, and suggest fixes.'
-        },
-        {
-          key: 'macro',
-          action: 'prompt',
-          icon: 'fund',
-          tone: 'macro',
-          label: this.isZh ? '宏观数据' : 'Macro data',
-          desc: this.isZh ? 'CPI、非农、利率和风险资产联动' : 'CPI, NFP, rates, and risk-asset links',
-          prompt: this.isZh
-            ? '请查询并整理相关宏观经济数据或事件，包括发布时间、实际值、预期值、前值、市场影响和可交易观察点。'
-            : 'Look up relevant macroeconomic data or events, including release time, actual, forecast, previous, market impact, and tradable watch points.'
-        },
-        {
-          key: 'radar',
-          action: 'prompt',
-          icon: 'radar-chart',
-          tone: 'radar',
-          label: this.isZh ? '机会雷达' : 'Radar',
-          desc: this.isZh ? '筛选未来 24 小时触发条件' : 'Find 24h opportunity triggers',
-          prompt: this.isZh
-            ? `请基于 ${symbol} 当前上下文，判断未来 24 小时是否有交易机会，并给出触发条件、失效条件和需要重点观察的数据。`
-            : `Based on ${symbol}, judge whether there is a trading opportunity in the next 24 hours and list trigger conditions.`
-        }
+        task('diagnose', 'analysis', 'line-chart', 'blue', 'market_diagnosis', 'market_diagnosis', 'diagnose', 'Diagnose {symbol}: trend, momentum, support/resistance, liquidity, and risk.'),
+        task('chart', 'chart', 'picture', 'purple', 'chart_review', 'chart_review', 'chart', 'I will paste or upload a chart image. Judge whether the setup is tradable and give stop loss, take profit, and invalidation.'),
+        task('strategy', 'strategy', 'line-chart', 'green', 'indicator_strategy', 'indicator_strategy', 'strategy', 'Create a strategy research plan for {symbol}, including entry/exit logic, risk controls, and validation steps.'),
+        task('monitor', 'schedule', 'clock-circle', 'orange', 'scheduled_analysis', 'scheduled_analysis', 'monitor', 'Create a scheduled analysis task for {symbol}: track trend changes, risks, and key levels.'),
+        task('news', 'chat', 'global', 'cyan', 'news_research', 'news_research', 'news', 'Search recent news and events for {symbol}; separate facts, interpretation, and uncertainty.'),
+        task('logs', 'chat', 'bug', 'red', 'debug_logs', 'debug_logs', 'logs', 'Help me inspect strategy, bot, or API logs and identify likely causes and fixes.'),
+        task('macro', 'chat', 'global', 'indigo', 'macro_economic_data', 'macro_economic_data', 'macro', 'Review macro data such as CPI, FOMC, rates, GDP, and PCE, and explain the market impact.'),
+        task('radar', 'chat', 'radar-chart', 'gold', 'opportunity_radar', 'opportunity_radar', 'radar', 'Scan for possible opportunities in the next 24 hours and list triggers, risks, and invalidation.')
       ]
     },
     quickTaskDisplayText () {
-      if (this.isZh) {
-        return {
-          market_diagnosis: {
-            label: '诊断标的',
-            desc: '趋势、量能、支撑阻力、资金面和风险'
-          },
-          chart_review: {
-            label: '看图诊断',
-            desc: '上传图表，判断入场、止损和失效条件'
-          },
-          indicator_strategy: {
-            label: '策略研发',
-            desc: '生成可在策略 IDE 展示、回测和发布的策略草稿'
-          },
-          scheduled_analysis: {
-            label: '定时跟踪',
-            desc: '按周期自动复盘标的变化并保存结果'
-          },
-          news_research: {
-            label: '新闻/事件检索',
-            desc: '联网检索公司、资产、宏观事件和行业新闻'
-          },
-          debug_logs: {
-            label: '排查日志',
-            desc: '定位策略、机器人、接口异常'
-          },
-          macro_economic_data: {
-            label: '宏观经济数据',
-            desc: '查询非农、CPI、FOMC、利率、GDP、PCE 等全球宏观事件和市场影响'
-          },
-          opportunity_radar: {
-            label: '机会雷达',
-            desc: '筛选未来 24 小时可能触发的机会条件'
-          }
-        }
-      }
+      const locale = this.$i18n ? this.$i18n.locale : ''
+      void locale
+      const make = (id, labelFallback, descFallback) => ({
+        label: this.i18nText(`aiAssetAnalysis.copilot.quickTasks.${id}.label`, labelFallback),
+        desc: this.i18nText(`aiAssetAnalysis.copilot.quickTasks.${id}.desc`, descFallback)
+      })
       return {
-        market_diagnosis: {
-          label: 'Diagnose symbol',
-          desc: 'Trend, volume, key levels, flows, and risks'
-        },
-        chart_review: {
-          label: 'Chart review',
-          desc: 'Upload a chart for entry, stop, and invalidation review'
-        },
-        indicator_strategy: {
-          label: 'Strategy Lab',
-          desc: 'Draft a Strategy IDE workflow for chart display, backtesting, and publishing'
-        },
-        scheduled_analysis: {
-          label: 'Scheduled scan',
-          desc: 'Track symbol changes on schedule and keep results'
-        },
-        news_research: {
-          label: 'News/Event research',
-          desc: 'Search company, asset, macro, and industry events'
-        },
-        debug_logs: {
-          label: 'Debug logs',
-          desc: 'Find strategy, bot, or API failures'
-        },
-        macro_economic_data: {
-          label: 'Macro data',
-          desc: 'Inspect NFP, CPI, FOMC, rates, GDP, PCE, and market impact'
-        },
-        opportunity_radar: {
-          label: 'Opportunity radar',
-          desc: 'Find possible 24h opportunity triggers'
-        }
+        market_diagnosis: make('market_diagnosis', 'Diagnose symbol', 'Trend, momentum, support/resistance, liquidity, and risk.'),
+        chart_review: make('chart_review', 'Chart review', 'Judge entries, stops, take profit, and invalidation from a chart image.'),
+        indicator_strategy: make('indicator_strategy', 'Strategy R&D', 'Generate a strategy draft that can be reviewed, backtested, and published.'),
+        scheduled_analysis: make('scheduled_analysis', 'Scheduled tracking', 'Review watchlist changes on a schedule and save results.'),
+        news_research: make('news_research', 'News / event research', 'Search company, asset, macro, and industry news to build usable research context.'),
+        debug_logs: make('debug_logs', 'Debug logs', 'Locate strategy, bot, and API errors.'),
+        macro_economic_data: make('macro_economic_data', 'Macro data', 'Query CPI, FOMC, rates, GDP, PCE, and other macro events.'),
+        opportunity_radar: make('opportunity_radar', 'Opportunity radar', 'Scan likely opportunities over the next 24 hours.')
       }
     },
     registeredQuickTasks () {
+      const locale = this.$i18n ? this.$i18n.locale : ''
+      void locale
+      const symbol = this.context.symbol || this.text.currentSymbol
       const registry = Array.isArray(this.skillRegistry) ? this.skillRegistry : []
       if (!registry.length) return this.systemQuickTasks
 
@@ -919,6 +781,7 @@ export default {
         .map(skill => {
           const actionType = skill.action_type || ''
           const displayText = this.quickTaskDisplayText[skill.id] || {}
+          const promptKey = this.quickTaskPromptKey(skill.id)
           return {
             key: skill.id,
             skillId: skill.id,
@@ -935,7 +798,7 @@ export default {
             tone: (skill.ui && skill.ui.tone) || skill.category || '',
             label: displayText.label || skill.label,
             desc: displayText.desc || skill.description,
-            prompt: skill.prompt || ''
+            prompt: this.localizedQuickPrompt(promptKey, skill.prompt || '', { symbol })
           }
         })
     },
@@ -945,25 +808,104 @@ export default {
           key: 'indicator',
           icon: 'line-chart',
           title: this.text.indicatorStrategy,
-          desc: this.text.indicatorStrategyDesc
+          desc: this.text.indicatorStrategyDesc,
+          routeTitle: this.text.strategyRouteIndicatorTitle,
+          routeDesc: this.text.strategyRouteIndicatorDesc,
+          startLabel: this.text.strategyStartIndicator
         },
         {
           key: 'script',
           icon: 'code',
           title: this.text.scriptStrategy,
-          desc: this.text.scriptStrategyDesc
+          desc: this.text.scriptStrategyDesc,
+          routeTitle: this.text.strategyRouteScriptTitle,
+          routeDesc: this.text.strategyRouteScriptDesc,
+          startLabel: this.text.strategyStartScript
         },
         {
           key: 'bot',
           icon: 'robot',
           title: this.text.tradingBot,
-          desc: this.text.tradingBotDesc
+          desc: this.text.tradingBotDesc,
+          routeTitle: this.text.strategyRouteTemplateTitle,
+          routeDesc: this.text.strategyRouteTemplateDesc,
+          startLabel: this.text.strategyStartTemplate
         }
       ]
     },
+    selectedStrategyTargetDetails () {
+      return this.strategyTargets.find(item => item.key === this.selectedStrategyTarget) || this.strategyTargets[0]
+    },
+    strategyPromptExamples () {
+      const target = this.normalizeSymbolOption(this.context)
+      const symbol = target && target.symbol ? target.symbol : this.text.currentSymbol
+      const examples = {
+        indicator: [{
+          key: 'momentum-breakout',
+          targetType: 'indicator',
+          title: this.text.strategyExampleMomentum,
+          prompt: this.i18nText(
+            'aiAssetAnalysis.copilot.strategyExamples.momentum',
+            '{symbol} 15m momentum breakout: go long when ROC > 0 and volume breaks above average, hold above EMA10, stop loss 2%, take profit 5%, backtest 6 months.',
+            { symbol }
+          )
+        },
+        {
+          key: 'mean-reversion',
+          targetType: 'indicator',
+          title: this.text.strategyExampleReversal,
+          prompt: this.i18nText(
+            'aiAssetAnalysis.copilot.strategyExamples.reversal',
+            '{symbol} 1h mean reversion: short when price touches upper Bollinger Band and RSI > 70, long when lower band and RSI < 30, exit at middle band, stop loss 2%, take profit 3%.',
+            { symbol }
+          )
+        }],
+        script: [{
+          key: 'script-from-idea',
+          targetType: 'script',
+          title: this.text.strategyExampleCode,
+          prompt: this.i18nText(
+            'aiAssetAnalysis.copilot.strategyExamples.code',
+            'Turn my idea into a QuantDinger Python ScriptStrategy: trend filter, entry/exit rules, position sizing, stop/take-profit, logging, and validation steps.',
+            { symbol }
+          )
+        },
+        {
+          key: 'stateful-risk-script',
+          targetType: 'script',
+          title: this.text.strategyExampleStateful,
+          prompt: this.i18nText(
+            'aiAssetAnalysis.copilot.strategyExamples.statefulScript',
+            'Create a QuantDinger Python ScriptStrategy for {symbol}: keep position state, avoid duplicate entries, scale out at 2R, move stop to breakeven after 1R, and write clear logs.',
+            { symbol }
+          )
+        }],
+        bot: [{
+          key: 'grid-template',
+          targetType: 'bot',
+          title: this.text.strategyExampleGrid,
+          prompt: this.i18nText(
+            'aiAssetAnalysis.copilot.strategyExamples.gridTemplate',
+            'Evaluate whether {symbol} is suitable for a grid template strategy. Recommend price range, grid count, budget, stop condition, and when not to run it.',
+            { symbol }
+          )
+        },
+        {
+          key: 'trend-template',
+          targetType: 'bot',
+          title: this.text.strategyExampleTrendTemplate,
+          prompt: this.i18nText(
+            'aiAssetAnalysis.copilot.strategyExamples.trendTemplate',
+            'Create a trend-following template strategy plan for {symbol}: entry trigger, trailing stop, take-profit logic, position size, and manual review checklist.',
+            { symbol }
+          )
+        }]
+      }
+      return examples[this.selectedStrategyTarget] || examples.indicator
+    },
     estimatedCost () {
       if (this.billing && this.billing.billing_enabled === false) {
-        return this.isZh ? '免费' : 'Free'
+        return this.text.free
       }
       const costs = this.billing.feature_costs || {}
       const chat = Number(costs.ai_copilot_chat || 0)
@@ -975,7 +917,7 @@ export default {
     },
     currentContextLabel () {
       const target = this.normalizeSymbolOption(this.context)
-      if (!target || !target.symbol) return this.isZh ? '未指定，AI 将按问题自动识别' : 'Not fixed; AI will infer from your message'
+      if (!target || !target.symbol) return this.text.contextAutoInfer
       return `${target.market}:${target.symbol}`
     },
     selectableSymbols () {
@@ -1026,6 +968,35 @@ export default {
     if (this.addWatchSearchTimer) clearTimeout(this.addWatchSearchTimer)
   },
   methods: {
+    quickTaskPromptKey (id) {
+      const key = String(id || '').toLowerCase()
+      const aliases = {
+        market_diagnosis: 'diagnose',
+        chart_review: 'chart',
+        indicator_strategy: 'strategy',
+        scheduled_analysis: 'monitor',
+        monitor_setup: 'monitor',
+        debug_logs: 'logs',
+        macro_economic_data: 'macro',
+        macro_check: 'macro',
+        opportunity_radar: 'radar'
+      }
+      return aliases[key] || key
+    },
+    localizedQuickPrompt (id, fallback, values = {}) {
+      const key = this.quickTaskPromptKey(id)
+      return this.i18nText(`aiAssetAnalysis.copilot.quickPrompts.${key}`, fallback || '', values)
+    },
+    i18nText (key, fallback, values = {}) {
+      values = values || {}
+      const locale = this.$i18n ? this.$i18n.locale : ''
+      void locale
+      let value = this.$t ? this.$t(key, values) : ''
+      if (/\?{4,}/.test(String(value || ''))) value = ''
+      if (value && value !== key) return value
+      value = fallback == null ? '' : String(fallback)
+      return value.replace(/\{(\w+)\}/g, (_, name) => values[name] == null ? '' : values[name])
+    },
     resizeComposer () {
       const el = this.$refs && this.$refs.composerInput
       if (!el) return
@@ -1052,7 +1023,7 @@ export default {
       return !!item && (item.action === 'analysis' || requiredKeys.has(key))
     },
     promptSelectSymbolFirst () {
-      this.$message.warning(this.text.selectSymbolFirst || (this.isZh ? '请先选择要诊断的标的。' : 'Choose a symbol first.'))
+      this.$message.warning(this.text.selectSymbolFirst)
       this.seedSymbolOptions()
       this.$nextTick(() => {
         const picker = this.$refs && this.$refs.contextSymbolSelect
@@ -1067,53 +1038,34 @@ export default {
     buildLockedQuickPrompt (item, target) {
       const key = String((item && (item.key || item.skillId || item.id)) || '').toLowerCase()
       const label = this.selectedTargetLabel(target)
-      if (key === 'indicator_strategy') {
-        return this.isZh
-          ? [
-              `请基于已选数据上下文 ${label} 做一次 QuantDinger 策略研发。`,
-              '',
-              '要求：',
-              '1. 本次任务必须锁定到已选标的，不要因为提示词或示例里出现其他标的而切换上下文。',
-              '2. 生成可落地到策略 IDE 的 Python 策略草稿，当前优先使用指标策略工作流。',
-              '3. 若输出指标策略代码，必须使用 QuantDinger 执行约定：df 四方向布尔列 open_long、close_long、open_short、close_short 是回测和实盘信号来源。',
-              '4. 说明核心参数、买卖信号、止损止盈、失效条件和适用行情。',
-              '5. 代码注释使用英文，解释文字可以使用当前界面语言。'
-            ].join('\n')
-          : [
-              `Run QuantDinger strategy research for the selected data context ${label}.`,
-              '',
-              'Requirements:',
-              '1. Lock this task to the selected symbol; do not switch context because another symbol appears in examples.',
-              '2. Generate a Python strategy draft that can land in Strategy IDE; prefer the indicator-strategy workflow for now.',
-              '3. If you output indicator-strategy code, use the QuantDinger contract: df boolean columns open_long, close_long, open_short, and close_short are the backtest/live signals.',
-              '4. Explain parameters, entry/exit signals, stop/take-profit logic, invalidation, and suitable market regimes.',
-              '5. Keep code comments in English.'
-            ].join('\n')
+      if (key === 'indicator_strategy' || key === 'strategy') {
+        return this.i18nText('aiAssetAnalysis.copilot.lockedPrompts.indicatorStrategy', [
+          'Run QuantDinger strategy research for the selected data context {label}.',
+          '',
+          'Requirements:',
+          '1. Keep the task locked to the selected symbol; do not switch context because another symbol appears in examples.',
+          '2. Generate a Python strategy draft that can land in Strategy R&D; prefer the indicator-strategy workflow for now.',
+          '3. If you output indicator-strategy code, use the QuantDinger contract: df boolean columns open_long, close_long, open_short, and close_short are the backtest/live signals.',
+          '4. Explain parameters, entry/exit signals, stop/take-profit logic, invalidation, and suitable market regimes.',
+          '5. Keep code comments in English.'
+        ].join('\n'), { label })
       }
       if (key === 'opportunity_radar' || key === 'radar') {
-        return this.isZh
-          ? [
-              `请基于已选数据上下文 ${label} 做一次机会雷达扫描。`,
-              '',
-              '要求：',
-              '1. 不要切换到其他示例标的，不要因为提示词中的示例词改变分析对象。',
-              '2. 结合系统行情、新闻/事件、宏观环境、关键价位、量能和风险收益比。',
-              '3. 判断未来 24 小时是否存在可执行机会，并区分做多、做空、观望三种场景。',
-              '4. 给出触发条件、失效条件、止损思路、观察指标和优先级。',
-              '5. 如果系统数据缺失，明确说明缺口，并给出用户可以补充的数据。'
-            ].join('\n')
-          : [
-              `Run an opportunity radar scan for the selected data context ${label}.`,
-              '',
-              'Requirements:',
-              '1. Do not switch to another example symbol because of words inside the prompt.',
-              '2. Use system market data, news/events, macro context, key levels, volume, and risk/reward.',
-              '3. Judge whether the next 24 hours offer long, short, or wait scenarios.',
-              '4. Provide triggers, invalidation, stop logic, watch metrics, and priority.',
-              '5. If data is missing, state the gap and what the user should provide.'
-            ].join('\n')
+        return this.i18nText('aiAssetAnalysis.copilot.lockedPrompts.radar', [
+          'Run an opportunity radar scan for the selected data context {label}.',
+          '',
+          'Requirements:',
+          '1. Keep the task locked to the selected symbol; do not switch context because another symbol appears in examples.',
+          '2. Use system market data, news/events, macro context, key levels, volume, and risk/reward.',
+          '3. Judge whether the next 24 hours offer long, short, or wait scenarios.',
+          '4. Provide triggers, invalidation, stop logic, watch metrics, and priority.',
+          '5. If data is missing, state the gap and what the user should provide.'
+        ].join('\n'), { label })
       }
-      return item && item.prompt ? item.prompt : ''
+      return this.localizedQuickPrompt(key, item && item.prompt ? item.prompt : '', {
+        symbol: target && target.symbol,
+        label
+      })
     },
     beginMonitorSetup (target) {
       const normalized = this.normalizeSymbolOption(target)
@@ -1130,7 +1082,7 @@ export default {
         localId: `local-${localId++}`,
         role: 'assistant',
         content: this.buildMonitorQuestion(normalized),
-        meta: this.isZh ? '等待任务参数' : 'waiting for task parameters',
+        meta: this.i18nText('aiAssetAnalysis.copilot.monitorWaitingMeta', 'waiting for task parameters'),
         created_at: new Date().toISOString()
       })
       this.scrollToBottom()
@@ -1165,7 +1117,7 @@ export default {
     async loadAiSkills () {
       this.loadingSkills = true
       try {
-        const res = await getAiSkills({ language: this.isZh ? 'zh-CN' : 'en-US' })
+        const res = await getAiSkills({ language: (this.$i18n && this.$i18n.locale) || 'en-US' })
         const data = res.data || {}
         this.skillRegistry = Array.isArray(data.skills) ? data.skills : []
       } catch (_) {
@@ -1185,11 +1137,11 @@ export default {
       this.loadingCalendar = true
       this.calendarError = ''
       try {
-        const res = await getEconomicCalendar({ force: force ? 1 : 0, days: 14, lang: this.isZh ? 'zh-CN' : 'en-US' })
+        const res = await getEconomicCalendar({ force: force ? 1 : 0, days: 14, lang: (this.$i18n && this.$i18n.locale) || 'en-US' })
         const data = res.data || {}
         this.calendarEvents = Array.isArray(data) ? data : (data.events || data.calendar || [])
       } catch (e) {
-        this.calendarError = (e && e.response && e.response.data && e.response.data.msg) || (e && e.message) || (this.isZh ? '财经日历暂不可用' : 'Calendar unavailable')
+        this.calendarError = (e && e.response && e.response.data && e.response.data.msg) || (e && e.message) || this.text.calendarUnavailable
       } finally {
         this.loadingCalendar = false
       }
@@ -1451,9 +1403,11 @@ export default {
     },
     askWatch (item) {
       this.selectWatch(item)
-      this.usePrompt(this.isZh
-        ? `请分析 ${item.symbol} 当前走势，重点关注趋势、量能、支撑阻力、风险和是否值得入场。`
-        : `Analyze ${item.symbol}: trend, volume, support/resistance, risk, and whether entry is reasonable.`)
+      this.usePrompt(this.i18nText(
+        'aiAssetAnalysis.copilot.prompts.analyzeWatch',
+        'Analyze {symbol}: trend, volume, support/resistance, risk, and whether entry is reasonable.',
+        { symbol: item.symbol }
+      ))
     },
     openEventDetail (event) {
       this.selectedEvent = event
@@ -1461,23 +1415,21 @@ export default {
     },
     askAboutEvent (event, sendNow = false) {
       const title = this.eventTitle(event)
-      this.draft = this.isZh
-        ? `请深入分析财经事件「${title}」可能对 ${this.context.symbol || '当前标的'} 的影响，重点说明方向偏向、波动窗口、风险点和交易上应避免的动作。`
-        : `Analyze how the economic event "${title}" may affect ${this.context.symbol || 'the selected symbol'}, including directional bias, volatility window, risk points, and trading actions to avoid.`
+      const symbol = this.context.symbol || this.i18nText('aiAssetAnalysis.copilot.eventPreview.symbolFallback', 'the selected symbol')
+      this.draft = this.i18nText(
+        'aiAssetAnalysis.copilot.prompts.askAboutEvent',
+        'Analyze how the economic event "{title}" may affect {symbol}, including directional bias, volatility window, risk points, and trading actions to avoid.',
+        { title, symbol }
+      )
       this.eventModalVisible = false
       if (sendNow) this.$nextTick(() => this.sendMessage())
     },
     eventPreview (event) {
       const impact = this.impactClass(event)
-      const symbol = this.context.symbol || (this.isZh ? '当前标的' : 'the selected symbol')
-      if (this.isZh) {
-        if (impact === 'high') return `该事件属于高影响事件，发布前后可能显著放大 ${symbol} 的滑点和波动。建议重点观察公布前30分钟到公布后60分钟，避免无保护追单。`
-        if (impact === 'low') return `该事件影响通常有限，但若与当前市场叙事一致，仍可能成为短线波动的辅助因素。`
-        return `该事件可能带来中等波动，建议结合实际值、预测值和市场当前趋势判断，不宜只按事件名称做方向判断。`
-      }
-      if (impact === 'high') return `This is a high-impact event. Slippage and volatility may expand around ${symbol}. Watch the window from 30 minutes before to 60 minutes after release.`
-      if (impact === 'low') return 'This event is usually low impact, but it may still support short-term moves if it matches the current market narrative.'
-      return 'This event may create moderate volatility. Compare actual, forecast, and prevailing trend before forming a directional view.'
+      const symbol = this.context.symbol || this.i18nText('aiAssetAnalysis.copilot.eventPreview.symbolFallback', 'the selected symbol')
+      if (impact === 'high') return this.i18nText('aiAssetAnalysis.copilot.eventPreview.high', 'This is a high-impact event. Slippage and volatility may expand around {symbol}. Watch the window from 30 minutes before to 60 minutes after release.', { symbol })
+      if (impact === 'low') return this.i18nText('aiAssetAnalysis.copilot.eventPreview.low', 'This event is usually low impact, but it may still support short-term moves if it matches the current market narrative.', { symbol })
+      return this.i18nText('aiAssetAnalysis.copilot.eventPreview.medium', 'This event may create moderate volatility. Compare actual, forecast, and prevailing trend before forming a directional view.', { symbol })
     },
     usePrompt (prompt, options = {}) {
       this.draft = prompt
@@ -1512,17 +1464,17 @@ export default {
       if (!blockers.length && !warnings.length) return null
       const lines = []
       const actions = []
-      lines.push(`## ${this.i18nText('aiCopilot.preflight.title', this.isZh ? '开始前检查' : 'Setup Check')}`, '')
+      lines.push(`## ${this.i18nText('aiCopilot.preflight.title', 'Setup Check')}`, '')
       if (blockers.length) {
-        lines.push(this.i18nText('aiCopilot.preflight.blockersIntro', this.isZh ? '这些问题会影响 AI 工作流：' : 'These items need attention before the AI workflow can run:'))
+        lines.push(this.i18nText('aiCopilot.preflight.blockersIntro', 'These items need attention before the AI workflow can run:'))
       }
       blockers.forEach(item => {
         const isCredits = this.isCreditPreflightItem(item)
         const title = isCredits
-          ? this.i18nText('aiCopilot.preflight.creditsTitle', this.isZh ? '积分不足' : 'Insufficient credits')
+          ? this.i18nText('aiCopilot.preflight.creditsTitle', 'Insufficient credits')
           : (item.title || item.key)
         const message = isCredits
-          ? this.i18nText('aiCopilot.preflight.creditsMessage', this.isZh ? '你的积分余额不足，暂时无法运行 AI 分析或策略生成。充值后即可继续使用。' : 'You do not have enough credits to run AI analysis or strategy generation. Top up credits to continue.')
+          ? this.i18nText('aiCopilot.preflight.creditsMessage', 'You do not have enough credits to run AI analysis or strategy generation. Top up credits to continue.')
           : (item.message || '')
         lines.push(`- **${title}**: ${message}`)
         if (isCredits) {
@@ -1532,17 +1484,17 @@ export default {
           this.pushPreflightAction(actions, {
             key: `fix-${item.key}`,
             icon: item.action.icon || 'setting',
-            label: this.i18nText('aiCopilot.preflight.configureAction', this.isZh ? '去配置' : 'Configure'),
+            label: this.i18nText('aiCopilot.preflight.configureAction', 'Configure'),
             path: item.action.path,
             query: item.action.query || {}
           })
         }
       })
       if (warnings.length) {
-        lines.push('', this.i18nText('aiCopilot.preflight.recommendedNext', this.isZh ? '建议补齐：' : 'Recommended next:'))
+        lines.push('', this.i18nText('aiCopilot.preflight.recommendedNext', 'Recommended next:'))
         warnings.slice(0, 4).forEach(item => {
           const isCredits = this.isCreditPreflightItem(item)
-          lines.push(`- ${isCredits ? this.i18nText('aiCopilot.preflight.creditsMessage', this.isZh ? '你的积分余额不足，暂时无法运行 AI 分析或策略生成。充值后即可继续使用。' : 'You do not have enough credits to run AI analysis or strategy generation. Top up credits to continue.') : (item.message || item.key)}`)
+          lines.push(`- ${isCredits ? this.i18nText('aiCopilot.preflight.creditsMessage', 'You do not have enough credits to run AI analysis or strategy generation. Top up credits to continue.') : (item.message || item.key)}`)
           if (isCredits) {
             this.pushPreflightAction(actions, this.setupAction('billing'))
             this.pushPreflightAction(actions, this.setupAction('credits'))
@@ -1550,7 +1502,7 @@ export default {
             this.pushPreflightAction(actions, {
               key: `open-${item.key}`,
               icon: item.action.icon || 'arrow-right',
-              label: this.i18nText('aiCopilot.preflight.openAction', this.isZh ? '查看' : 'Open'),
+              label: this.i18nText('aiCopilot.preflight.openAction', 'Open'),
               path: item.action.path,
               query: item.action.query || {}
             })
@@ -1558,12 +1510,12 @@ export default {
         })
       }
       if (task) {
-        lines.push('', this.i18nText('aiCopilot.preflight.taskContinue', this.isZh ? '你仍然可以继续讨论策略思路，但生成代码、运行分析或创建任务前建议先处理上面的项目。' : 'You can still discuss strategy ideas, but complete the items above before code generation, analysis, or task creation.'))
+        lines.push('', this.i18nText('aiCopilot.preflight.taskContinue', 'You can still discuss strategy ideas, but complete the items above before code generation, analysis, or task creation.'))
       }
       return {
         content: lines.join('\n'),
         actions,
-        meta: this.i18nText('aiCopilot.preflight.meta', this.isZh ? '配置预检' : 'setup preflight')
+        meta: this.i18nText('aiCopilot.preflight.meta', 'setup preflight')
       }
     },
     isCreditPreflightItem (item) {
@@ -1590,7 +1542,7 @@ export default {
           key: `save-memory-${Date.now()}-${index}`,
           type: 'save_memory',
           icon: 'pushpin',
-          label: this.isZh ? '记住这个偏好' : 'Remember this',
+          label: this.i18nText('aiAssetAnalysis.copilot.rememberPreference', 'Remember this'),
           payload: candidate
         })
       })
@@ -1599,9 +1551,9 @@ export default {
       const task = this.pendingAgentTask
       if (!task || task.type !== 'strategy_design') return
       const labels = {
-        indicator: this.isZh ? '生成指标 IDE 代码' : 'Generate Indicator IDE code',
-        script: this.isZh ? '生成脚本策略代码' : 'Generate script strategy',
-        bot: this.isZh ? '生成模板策略方案' : 'Generate template strategy plan'
+        indicator: this.i18nText('aiAssetAnalysis.copilot.actions.generateIndicatorStrategy', 'Generate Strategy R&D code'),
+        script: this.i18nText('aiAssetAnalysis.copilot.actions.generateScriptStrategy', 'Generate script strategy'),
+        bot: this.i18nText('aiAssetAnalysis.copilot.actions.generateTemplateStrategy', 'Generate template strategy plan')
       }
       assistantMsg.actions = assistantMsg.actions || []
       assistantMsg.actions.push({
@@ -1624,6 +1576,7 @@ export default {
         '/indicator-ide',
         '/strategy-live',
         '/strategy-script',
+        '/strategy-scripts',
         '/trading-bot',
         '/user/login'
       ]
@@ -1658,7 +1611,7 @@ export default {
       }
       if (!action || !action.path) return
       if (!this.isAllowedMessageActionPath(action.path)) {
-        this.$message.warning(this.isZh ? '该操作不在允许的跳转范围内' : 'This action is not allowed')
+        this.$message.warning(this.i18nText('aiAssetAnalysis.copilot.actionNotAllowed', 'This action is not allowed'))
         return
       }
       try {
@@ -1683,6 +1636,7 @@ export default {
           action.group === 'strategy_workflow' ||
           path === '/indicator-ide' ||
           path === '/strategy-script' ||
+          path === '/strategy-scripts' ||
           path === '/trading-bot'
         )
       }) || null
@@ -1717,9 +1671,9 @@ export default {
           document.execCommand('copy')
           document.body.removeChild(textarea)
         }
-        this.$message.success(this.isZh ? '代码已复制' : 'Code copied')
+        this.$message.success(this.i18nText('aiAssetAnalysis.copilot.codeCopied', 'Code copied'))
       } catch (_) {
-        this.$message.error(this.isZh ? '复制失败' : 'Copy failed')
+        this.$message.error(this.i18nText('aiAssetAnalysis.copilot.copyFailed', 'Copy failed'))
       }
     },
     async saveMemoryAction (payload) {
@@ -1727,14 +1681,14 @@ export default {
       try {
         await saveUserMemory({
           category: payload.category || 'preference',
-          title: payload.title || (this.isZh ? '交易偏好' : 'Trading preference'),
+          title: payload.title || this.i18nText('aiAssetAnalysis.copilot.tradingPreference', 'Trading preference'),
           content: payload.content,
           confidence: payload.confidence || 70
         })
-        this.$message.success(this.isZh ? '已加入个人记忆' : 'Saved to memory')
+        this.$message.success(this.i18nText('aiAssetAnalysis.copilot.memorySaved', 'Saved to memory'))
         this.loadUserMemories()
       } catch (e) {
-        this.$message.error(this.isZh ? '保存记忆失败' : 'Failed to save memory')
+        this.$message.error(this.i18nText('aiAssetAnalysis.copilot.memorySaveFailed', 'Failed to save memory'))
       }
     },
     async generateStrategyFromAction (payload) {
@@ -1756,25 +1710,25 @@ export default {
     },
     isMonitorIntent (text) {
       const value = String(text || '').toLowerCase()
-      return /(定时|周期|提醒|通知|监控|跟踪|scheduled|schedule|monitor|alert)/i.test(value) &&
-        /(ai|分析|analysis|scan|任务|task)/i.test(value)
+      return /(\u5b9a\u65f6|\u5b9a\u671f|\u5468\u671f|\u63d0\u9192|\u901a\u77e5|\u76d1\u63a7|\u8ddf\u8e2a|\u8ffd\u8e2a|scheduled|schedule|monitor|alert)/i.test(value) &&
+        /(ai|\u5206\u6790|analysis|scan|\u4efb\u52a1|task)/i.test(value)
     },
     parseMonitorSetup (text) {
       const value = String(text || '')
-      const intervalMatch = value.match(/(\d+)\s*(分钟|分|小时|h|hour|hours|min|minute|minutes)/i)
+      const intervalMatch = value.match(/(\d+)\s*(\u5206\u949f|\u5206|\u5c0f\u65f6|\u5c0f\u6642|\u6642|h|hour|hours|min|minute|minutes)/i)
       let interval = null
       if (intervalMatch) {
         const n = Number(intervalMatch[1])
         const unit = String(intervalMatch[2] || '').toLowerCase()
-        interval = /小时|h|hour/.test(unit) ? n * 60 : n
-      } else if (/每天|每日|daily/i.test(value)) {
+        interval = /(\u5c0f\u65f6|\u5c0f\u6642|\u6642|h|hour)/i.test(unit) ? n * 60 : n
+      } else if (/(\u6bcf\u5929|\u6bcf\u65e5|daily)/i.test(value)) {
         interval = 1440
       }
       const channels = []
-      if (/站内|浏览器|browser|site/i.test(value)) channels.push('browser')
-      if (/邮件|邮箱|email/i.test(value)) channels.push('email')
-      if (/webhook|telegram|tg|飞书|钉钉|discord/i.test(value)) channels.push('webhook')
-      const focusMatch = value.match(/(?:重点关注|关注条件|focus)[:：]?\s*([\s\S]+)/i)
+      if (/(\u7ad9\u5185|\u7ad9\u5167|\u6d4f\u89c8\u5668|\u700f\u89bd\u5668|browser|site)/i.test(value)) channels.push('browser')
+      if (/(\u90ae\u4ef6|\u90f5\u4ef6|\u90ae\u7bb1|\u4fe1\u7bb1|email)/i.test(value)) channels.push('email')
+      if (/(webhook|telegram|tg|\u98de\u4e66|\u98db\u66f8|\u9489\u9489|\u91d8\u91d8|discord)/i.test(value)) channels.push('webhook')
+      const focusMatch = value.match(/(?:\u91cd\u70b9\u5173\u6ce8|\u91cd\u9ede\u95dc\u6ce8|\u5173\u6ce8\u6761\u4ef6|\u95dc\u6ce8\u689d\u4ef6|focus)[:\uff1a]?\s*([\s\S]+)/i)
       const focus = focusMatch ? focusMatch[1].trim() : value.trim()
       return {
         interval_min: interval,
@@ -1783,65 +1737,41 @@ export default {
       }
     },
     buildMonitorQuestion (target) {
-      const label = target && target.symbol ? (target.market + ':' + target.symbol) : (this.isZh ? '当前标的' : 'current symbol')
-      return this.isZh
-        ? [
-            '可以，我先为 **' + label + '** 准备 AI 定时分析任务。',
-            '',
-            '请补充 3 项信息，我拿到后会生成一份可提交的任务配置：',
-            '',
-            '1. **周期**：例如 15分钟 / 30分钟 / 1小时 / 4小时 / 每天',
-            '2. **通知方式**：站内消息 / 邮件 / Webhook / 只记录不通知',
-            '3. **重点关注条件**：例如突破放量、跌破支撑、4H 趋势转强、假突破风险等',
-            '',
-            '你可以直接这样回复：',
-            '',
-            '周期：1小时',
-            '通知方式：站内消息',
-            '重点关注：突破上方阻力且放量提醒；跌破关键支撑提醒；4H 趋势转强/转弱提醒；假突破单独标风险'
-          ].join('\n')
-        : [
-            'Sure. I will prepare an AI scheduled analysis task for **' + label + '**.',
-            '',
-            'Please provide:',
-            '1. Interval: 15m / 30m / 1h / 4h / daily',
-            '2. Notification: browser / email / webhook / record only',
-            '3. Focus conditions: breakout, support break, 4H trend change, false-break risk, etc.',
-            '',
-            'Example:',
-            'Interval: 1h',
-            'Notification: browser',
-            'Focus: breakout with volume, support break, 4H trend change, false-break risk'
-          ].join('\n')
+      const label = target && target.symbol ? (target.market + ':' + target.symbol) : this.i18nText('aiAssetAnalysis.copilot.eventPreview.symbolFallback', 'current symbol')
+      return this.i18nText('aiAssetAnalysis.copilot.monitorQuestion', [
+        'Sure. I will prepare an AI scheduled analysis task for **{label}**.',
+        '',
+        'Please provide:',
+        '1. Interval: 15m / 30m / 1h / 4h / daily',
+        '2. Notification: browser / email / webhook / record only',
+        '3. Focus conditions: breakout, support break, 4H trend change, false-break risk, etc.',
+        '',
+        'Example:',
+        'Interval: 1h',
+        'Notification: browser',
+        'Focus: breakout with volume, support break, 4H trend change, false-break risk'
+      ].join('\n'), { label })
     },
     buildMonitorDraftMessage (payload) {
       const target = this.normalizeSymbolOption(payload.target || payload)
       const channels = payload.notify_channels || payload.channels || []
-      return this.isZh
-        ? [
-            '## AI 定时分析任务草案',
-            '',
-            '- 标的：' + target.market + ':' + target.symbol,
-            '- 周期：' + this.formatIntervalText(payload.interval_min),
-            '- 通知：' + (channels.length ? channels.join(', ') : '只记录不通知'),
-            '',
-            '### 重点关注',
-            payload.focus_conditions || '默认关注趋势、量能、关键价位和风险变化。',
-            '',
-            '确认无误后，点击下方按钮即可创建任务。'
-          ].join('\n')
-        : [
-            '## AI Scheduled Analysis Draft',
-            '',
-            '- Symbol: ' + target.market + ':' + target.symbol,
-            '- Interval: ' + this.formatIntervalText(payload.interval_min),
-            '- Notification: ' + (channels.length ? channels.join(', ') : 'record only'),
-            '',
-            '### Focus conditions',
-            payload.focus_conditions || 'Not specified; use trend, volume, levels, and risk by default.',
-            '',
-            'Click the action below to create this task in QuantDinger.'
-          ].join('\n')
+      return this.i18nText('aiAssetAnalysis.copilot.monitorDraft', [
+        '## AI Scheduled Analysis Draft',
+        '',
+        '- Symbol: {symbol}',
+        '- Interval: {interval}',
+        '- Notification: {notification}',
+        '',
+        '### Focus conditions',
+        '{focus}',
+        '',
+        'Click the action below to create this task in QuantDinger.'
+      ].join('\n'), {
+        symbol: target.market + ':' + target.symbol,
+        interval: this.formatIntervalText(payload.interval_min),
+        notification: channels.length ? channels.join(', ') : this.i18nText('aiAssetAnalysis.copilot.monitorNoNotify', 'record only'),
+        focus: payload.focus_conditions || this.i18nText('aiAssetAnalysis.copilot.monitorDefaultFocus', 'Not specified; use trend, volume, levels, and risk by default.')
+      })
     },
     async handleMonitorAgentMessage (content) {
       const isExistingTask = this.pendingAgentTask && this.pendingAgentTask.type === 'monitor_setup'
@@ -1870,24 +1800,26 @@ export default {
           localId: 'local-' + localId++,
           role: 'assistant',
           content: this.buildMonitorQuestion(target),
-          meta: this.isZh ? '等待任务参数' : 'waiting for task parameters',
+          meta: this.i18nText('aiAssetAnalysis.copilot.monitorWaitingMeta', 'waiting for task parameters'),
           created_at: new Date().toISOString()
         })
         return true
       }
       const parsed = this.parseMonitorSetup(content)
       const missing = []
-      if (!parsed.interval_min) missing.push(this.isZh ? '周期' : 'interval')
-      if (!parsed.notify_channels.length && !/(只记录不通知|不通知|record only|no notification)/i.test(content)) missing.push(this.isZh ? '通知方式' : 'notification')
-      if (!parsed.focus_conditions || parsed.focus_conditions.length < 8) missing.push(this.isZh ? '重点关注条件' : 'focus conditions')
+      if (!parsed.interval_min) missing.push(this.i18nText('aiAssetAnalysis.copilot.monitorMissingInterval', 'interval'))
+      if (!parsed.notify_channels.length && !/(\u53ea\u8bb0\u5f55|\u50c5\u8a18\u9304|\u4e0d\u901a\u77e5|record only|no notification)/i.test(content)) missing.push(this.i18nText('aiAssetAnalysis.copilot.monitorMissingNotification', 'notification'))
+      if (!parsed.focus_conditions || parsed.focus_conditions.length < 8) missing.push(this.i18nText('aiAssetAnalysis.copilot.monitorMissingFocus', 'focus conditions'))
       if (missing.length) {
         this.messages.push({
           localId: 'local-' + localId++,
           role: 'assistant',
-          content: this.isZh
-            ? ('还缺少：' + missing.join('、') + '。\n\n把缺少的信息补上，我会整理最终任务草案。')
-            : ('Still missing: ' + missing.join(', ') + '.\n\nSend the missing items and I will prepare the final task draft.'),
-          meta: this.isZh ? '参数不完整' : 'incomplete parameters',
+          content: this.i18nText(
+            'aiAssetAnalysis.copilot.monitorStillMissing',
+            'Still missing: {items}.\n\nSend the missing items and I will prepare the final task draft.',
+            { items: missing.join(', ') }
+          ),
+          meta: this.i18nText('aiAssetAnalysis.copilot.monitorIncompleteMeta', 'incomplete parameters'),
           created_at: new Date().toISOString()
         })
         return true
@@ -1907,10 +1839,10 @@ export default {
           key: 'create-monitor-' + Date.now(),
           type: 'create_monitor_task',
           icon: 'clock-circle',
-          label: this.isZh ? '确认创建任务' : 'Create task',
+          label: this.i18nText('aiAssetAnalysis.copilot.monitorCreateAction', 'Create task'),
           payload
         }],
-        meta: this.isZh ? '待确认创建' : 'ready to create',
+        meta: this.i18nText('aiAssetAnalysis.copilot.monitorReadyMeta', 'ready to create'),
         created_at: new Date().toISOString()
       })
       return true
@@ -1951,10 +1883,16 @@ export default {
         const message = {
           localId: 'local-' + localId++,
           role: 'assistant',
-          content: this.isZh
-            ? ('已创建 AI 定时分析任务：\n\n- 标的：' + target.market + ':' + target.symbol + '\n- 周期：' + this.formatIntervalText(interval) + '\n- 通知：' + (channels.length ? channels.join(', ') : '只记录不通知') + '\n\n你可以在右侧 AI 定时分析任务面板中暂停、删除或查看任务。')
-            : ('AI scheduled analysis task created:\n\n- Symbol: ' + target.market + ':' + target.symbol + '\n- Interval: ' + this.formatIntervalText(interval) + '\n- Notifications: ' + (channels.length ? channels.join(', ') : 'record only') + '\n\nYou can pause, delete, or inspect it in the AI Scheduled Analysis panel.'),
-          meta: this.isZh ? '任务已创建' : 'task created',
+          content: this.i18nText(
+            'aiAssetAnalysis.copilot.monitorCreatedMessage',
+            'AI scheduled analysis task created:\n\n- Symbol: {symbol}\n- Interval: {interval}\n- Notifications: {notification}\n\nYou can pause, delete, or inspect it in the AI Scheduled Analysis panel.',
+            {
+              symbol: target.market + ':' + target.symbol,
+              interval: this.formatIntervalText(interval),
+              notification: channels.length ? channels.join(', ') : this.i18nText('aiAssetAnalysis.copilot.monitorNoNotify', 'record only')
+            }
+          ),
+          meta: this.i18nText('aiAssetAnalysis.copilot.monitorCreatedMeta', 'task created'),
           created_at: new Date().toISOString()
         }
         this.messages.push(message)
@@ -2121,6 +2059,7 @@ export default {
     },
     async handleQuickPrompt (item) {
       if (!item) return
+      this.quickToolsVisible = false
       const activeItem = { ...item, prompt: await this.resolveSkillPrompt(item) }
       const target = this.selectedContextTarget()
       const key = String((activeItem.key || activeItem.skillId || activeItem.id) || '').toLowerCase()
@@ -2131,14 +2070,8 @@ export default {
           return
         }
         if (key === 'indicator_strategy') {
-          this.pendingAgentTask = {
-            type: 'strategy_design',
-            targetType: 'indicator',
-            target,
-            workflow: 'QuantDinger Indicator IDE',
-            originalPrompt: ''
-          }
-          this.usePrompt(this.buildLockedQuickPrompt(activeItem, target), { contextLock: target })
+          this.pendingAgentTask = null
+          this.strategyFlowVisible = true
           return
         }
         if (key === 'scheduled_analysis' || key === 'monitor') {
@@ -2177,7 +2110,7 @@ export default {
       if (!item || !item.skillId) return item ? item.prompt : ''
       try {
         const res = await getAiSkillPrompt(item.skillId, {
-          language: this.isZh ? 'zh-CN' : 'en-US',
+          language: (this.$i18n && this.$i18n.locale) || 'en-US',
           context: this.buildMessageContext()
         })
         const data = res.data || {}
@@ -2190,15 +2123,13 @@ export default {
       const target = this.normalizeSymbolOption(this.context)
       if (!target || !target.symbol) {
         this.usePrompt(this.buildAnalysisPrompt(null))
-        this.$message.info(this.isZh ? '已填入诊断模板，请补充标的后发送。' : 'Analysis prompt inserted. Add a symbol, then send it.')
+        this.$message.info(this.i18nText('aiAssetAnalysis.copilot.analysisPromptInserted', 'Analysis prompt inserted. Add a symbol, then send it.'))
         return
       }
       const userMsg = {
         localId: `local-${localId++}`,
         role: 'user',
-        content: this.isZh
-          ? `诊断 ${target.market}:${target.symbol}`
-          : `Diagnose ${target.market}:${target.symbol}`,
+        content: this.i18nText('aiAssetAnalysis.copilot.diagnoseCommand', 'Diagnose {market}:{symbol}', { market: target.market, symbol: target.symbol }),
         created_at: new Date().toISOString()
       }
       const assistantMsg = {
@@ -2224,10 +2155,11 @@ export default {
         await this.persistCopilotMessage(assistantMsg, 'fast_analysis_report')
         this.loadSessions()
       } catch (e) {
+        const fallback = this.i18nText('aiAssetAnalysis.copilot.analysisFailed', 'Analysis failed')
         assistantMsg.reportLoading = false
-        assistantMsg.reportError = (e && e.response && e.response.data && e.response.data.msg) || (e && e.message) || (this.isZh ? '分析失败' : 'Analysis failed')
+        assistantMsg.reportError = (e && e.response && e.response.data && e.response.data.msg) || (e && e.message) || fallback
         assistantMsg.reportErrorTone = this.isInProgressError(e) ? 'warning' : 'error'
-        assistantMsg.meta = this.isZh ? '分析失败' : 'analysis failed'
+        assistantMsg.meta = fallback
       } finally {
         this.sending = false
         this.scrollToBottom()
@@ -2237,11 +2169,11 @@ export default {
       const res = await fastAnalyze({
         market: target.market,
         symbol: target.symbol,
-        language: this.$i18n ? this.$i18n.locale : 'zh-CN',
+        language: this.$i18n ? this.$i18n.locale : 'en-US',
         timeframe: '1D'
       })
       if (!res || res.code === 0) {
-        const err = new Error((res && res.msg) || (this.isZh ? '分析失败' : 'Analysis failed'))
+        const err = new Error((res && res.msg) || this.i18nText('aiAssetAnalysis.copilot.analysisFailed', 'Analysis failed'))
         err.response = { data: res || {} }
         throw err
       }
@@ -2255,7 +2187,7 @@ export default {
     isInProgressError (e) {
       const data = e && e.response && e.response.data
       const msg = String((data && data.msg) || (e && e.message) || '')
-      return msg.toLowerCase().includes('in progress') || msg.includes('正在进行')
+      return msg.toLowerCase().includes('in progress') || msg.includes('进行中') || msg.includes('处理中')
     },
     reportId (msg) {
       return String((msg && (msg.localId || msg.id)) || '')
@@ -2267,14 +2199,14 @@ export default {
           key: `export-report-${id}`,
           type: 'export_report_pdf',
           icon: 'download',
-          label: this.isZh ? '导出 PDF' : 'Export PDF',
+          label: this.i18nText('aiAssetAnalysis.copilot.exportPdf', 'Export PDF'),
           payload: { reportId: id }
         },
         {
           key: `ask-report-${id}`,
           type: 'ask_about_report',
           icon: 'message',
-          label: this.isZh ? '继续追问' : 'Ask follow-up',
+          label: this.i18nText('aiAssetAnalysis.copilot.askFollowup', 'Ask follow-up'),
           payload: { reportId: id }
         }
       ]
@@ -2293,7 +2225,7 @@ export default {
         msg.meta = this.text.analysisComplete
       } catch (e) {
         msg.reportLoading = false
-        msg.reportError = (e && e.response && e.response.data && e.response.data.msg) || (e && e.message) || (this.isZh ? '分析失败' : 'Analysis failed')
+        msg.reportError = (e && e.response && e.response.data && e.response.data.msg) || (e && e.message) || this.i18nText('aiAssetAnalysis.copilot.analysisFailed', 'Analysis failed')
         msg.reportErrorTone = this.isInProgressError(e) ? 'warning' : 'error'
       } finally {
         this.sending = false
@@ -2326,14 +2258,14 @@ export default {
       if (!reportId) return
       const msg = (this.messages || []).find(item => this.reportId(item) === String(reportId))
       if (!msg || !msg.report) {
-        this.$message.warning(this.isZh ? '没有可导出的报告数据' : 'No report data to export')
+        this.$message.warning(this.i18nText('aiAssetAnalysis.copilot.noReportData', 'No report data to export'))
         return
       }
       try {
         const blob = await exportChatReportPdf({
           report: msg.report,
           target: msg.reportTarget || this.context || {},
-          language: (this.$i18n && this.$i18n.locale) || (this.isZh ? 'zh-CN' : 'en-US')
+          language: (this.$i18n && this.$i18n.locale) || 'en-US'
         })
         const fileBlob = blob instanceof Blob ? blob : new Blob([blob], { type: 'application/pdf' })
         const url = window.URL.createObjectURL(fileBlob)
@@ -2345,7 +2277,7 @@ export default {
         document.body.removeChild(link)
         window.setTimeout(() => window.URL.revokeObjectURL(url), 1000)
       } catch (e) {
-        this.$message.error((e && (e.backendMessage || e.message)) || (this.isZh ? 'PDF 导出失败' : 'PDF export failed'))
+        this.$message.error((e && (e.backendMessage || e.message)) || this.i18nText('aiAssetAnalysis.copilot.pdfExportFailed', 'PDF export failed'))
       }
     },
     reportPdfFilename (msg) {
@@ -2358,37 +2290,24 @@ export default {
     askAboutReport (reportId) {
       const msg = (this.messages || []).find(item => this.reportId(item) === String(reportId))
       const target = (msg && msg.reportTarget) || this.context
-      const label = target && target.symbol ? `${target.market}:${target.symbol}` : (this.isZh ? '这份报告' : 'this report')
-      this.usePrompt(this.isZh
-        ? `基于刚才 ${label} 的诊断报告，请继续解释：`
-        : `Based on the diagnosis report for ${label}, explain further:`
-      )
+      const label = target && target.symbol ? `${target.market}:${target.symbol}` : this.i18nText('aiAssetAnalysis.copilot.thisReport', 'this report')
+      this.usePrompt(this.i18nText('aiAssetAnalysis.copilot.askReportFollowup', 'Based on the diagnosis report for {label}, explain further:', { label }))
     },
     buildAnalysisPrompt (target) {
-      const symbol = target && target.symbol ? `${target.market}:${target.symbol}` : (this.isZh ? '用户指定的标的' : 'the user-selected symbol')
-      return this.isZh
-        ? [
-            `请基于系统数据源，对 ${symbol} 做一份可执行的交易分析。`,
-            '',
-            '要求：',
-            '1. 明确说明当前价格、周期、数据时间；没有数据就直接说明缺口，不要编造。',
-            '2. 从趋势、量能、关键支撑阻力、资金面、风险五个角度分析。',
-            '3. 给出偏多、震荡、偏空三种情景下的触发条件。',
-            '4. 给出具体操作建议：观察位、入场确认、止损失效条件、止盈/减仓思路。',
-            '5. 结论要有优先级，不要只给通用框架。'
-          ].join('\n')
-        : [
-            `Use the system data source to produce an actionable trading analysis for ${symbol}.`,
-            '',
-            'Requirements:',
-            '1. State current price, timeframe, and data timestamp. If data is unavailable, say so instead of inventing it.',
-            '2. Analyze trend, volume, key support/resistance, capital flow, and risk.',
-            '3. Give bullish, range-bound, and bearish trigger conditions.',
-            '4. Provide concrete actions: observation levels, entry confirmation, invalidation stop, and take-profit/reduction logic.',
-            '5. Prioritize the conclusion; do not return only a generic framework.'
-          ].join('\n')
+      const symbol = target && target.symbol ? `${target.market}:${target.symbol}` : this.i18nText('aiAssetAnalysis.copilot.analysisPromptTargetPlaceholder', 'the user-selected symbol')
+      return [
+        `Use the system data source to produce an actionable trading analysis for ${symbol}.`,
+        '',
+        'Requirements:',
+        '1. State current price, timeframe, and data timestamp. If data is unavailable, say so instead of inventing it.',
+        '2. Analyze trend, volume, key support/resistance, capital flow, and risk.',
+        '3. Give bullish, range-bound, and bearish trigger conditions.',
+        '4. Provide concrete actions: observation levels, entry confirmation, invalidation stop, and take-profit/reduction logic.',
+        '5. Prioritize the conclusion; do not return only a generic framework.'
+      ].join('\n')
     },
     formatFastAnalysisMarkdown (result, target) {
+      const label = (key, fallback) => this.i18nText(`aiAssetAnalysis.copilot.report.${key}`, fallback)
       const decision = result.final_decision || result.decision || result.signal || 'HOLD'
       const confidence = result.confidence != null ? `${result.confidence}%` : '--'
       const price = result.current_price || (result.market_data && result.market_data.current_price) || result.price || '--'
@@ -2399,85 +2318,80 @@ export default {
       const risks = result.risks || result.risk_factors || []
       const detailed = result.detailed_analysis || result.analysis || {}
       const lines = [
-        `## ${target.symbol} ${this.isZh ? '专业 AI 分析报告' : 'Professional AI Analysis Report'}`,
+        `## ${target.symbol} ${label('title', 'Professional AI Analysis Report')}`,
         '',
-        `- ${this.isZh ? '结论' : 'Decision'}: **${decision}**`,
-        `- ${this.isZh ? '置信度' : 'Confidence'}: **${confidence}**`,
-        `- ${this.isZh ? '当前价' : 'Current Price'}: ${price}`,
-        `- ${this.isZh ? '参考入场' : 'Reference Entry'}: ${entry}`,
-        `- ${this.isZh ? '止损' : 'Stop Loss'}: ${stop}`,
-        `- ${this.isZh ? '止盈' : 'Take Profit'}: ${take}`,
+        `- ${label('decision', 'Decision')}: **${decision}**`,
+        `- ${label('confidence', 'Confidence')}: **${confidence}**`,
+        `- ${label('currentPrice', 'Current Price')}: ${price}`,
+        `- ${label('referenceEntry', 'Reference Entry')}: ${entry}`,
+        `- ${label('stopLoss', 'Stop Loss')}: ${stop}`,
+        `- ${label('takeProfit', 'Take Profit')}: ${take}`,
         ''
       ]
       if (result.summary || result.consensus_summary) {
-        lines.push(`### ${this.isZh ? '综合判断' : 'Summary'}`, String(result.summary || result.consensus_summary), '')
+        lines.push(`### ${label('summary', 'Summary')}`, String(result.summary || result.consensus_summary), '')
       }
       if (Array.isArray(reasons) && reasons.length) {
-        lines.push(`### ${this.isZh ? '关键理由' : 'Key Reasons'}`)
+        lines.push(`### ${label('keyReasons', 'Key Reasons')}`)
         reasons.slice(0, 6).forEach(x => lines.push(`- ${x}`))
         lines.push('')
       }
       if (detailed && typeof detailed === 'object') {
         const sections = [
-          ['technical_analysis', this.isZh ? '技术面' : 'Technical'],
-          ['fundamental_analysis', this.isZh ? '基本面/资金面' : 'Fundamental / Flow'],
-          ['sentiment_analysis', this.isZh ? '情绪面' : 'Sentiment']
+          ['technical_analysis', label('technical', 'Technical')],
+          ['fundamental_analysis', label('fundamentalFlow', 'Fundamental / Flow')],
+          ['sentiment_analysis', label('sentiment', 'Sentiment')]
         ]
-        sections.forEach(([key, label]) => {
-          if (detailed[key]) lines.push(`### ${label}`, String(detailed[key]), '')
+        sections.forEach(([key, sectionLabel]) => {
+          if (detailed[key]) lines.push(`### ${sectionLabel}`, String(detailed[key]), '')
         })
       } else if (detailed) {
-        lines.push(`### ${this.isZh ? '详细分析' : 'Detailed Analysis'}`, String(detailed), '')
+        lines.push(`### ${label('detailedAnalysis', 'Detailed Analysis')}`, String(detailed), '')
       }
       if (Array.isArray(risks) && risks.length) {
-        lines.push(`### ${this.isZh ? '风险点' : 'Risks'}`)
+        lines.push(`### ${label('risks', 'Risks')}`)
         risks.slice(0, 6).forEach(x => lines.push(`- ${x}`))
         lines.push('')
       }
       return lines.join('\n')
     },
-    buildStrategyPrompt (targetKey, target) {
+    buildStrategyPrompt (targetKey, target, seedPrompt = '') {
       const targetText = target && target.symbol
         ? `${target.market}:${target.symbol}`
-        : this.i18nText(
-          'aiAssetAnalysis.copilot.strategySymbolPlaceholder',
-          '[enter symbol here, e.g. Crypto:BTC/USDT or CNStock:300750]'
-        )
-      const commonZh = [
-        `请为 ${targetText} 设计一个策略。`,
+        : this.i18nText('aiAssetAnalysis.copilot.strategySymbolPlaceholder', '[enter symbol here, e.g. Crypto:BTC/USDT or USStock:AAPL]')
+      const promptText = (key, fallback, values = {}) => this.i18nText(`aiAssetAnalysis.copilot.strategyPrompt.${key}`, fallback, values)
+      const workflowLine = targetKey === 'indicator'
+        ? promptText('workflowIndicator', 'Run location: Strategy R&D / Indicator IDE. Generate QuantDinger Python indicator-strategy code, not ScriptStrategy code.')
+        : (targetKey === 'script'
+          ? promptText('workflowScript', 'Run location: Script Strategy IDE. Generate QuantDinger Python ScriptStrategy code, not indicator output code.')
+          : promptText('workflowTemplate', 'Run location: Template Strategy. Generate a template strategy recommendation and parameters, not custom Python code.'))
+      const typeLine = targetKey === 'indicator'
+        ? promptText('targetIndicator', 'Target type: Strategy R&D. Prefer an indicator-strategy draft that supports chart display and backtesting, with parameters, buy/sell signals, stop/take-profit, and invalidation conditions.')
+        : (targetKey === 'script'
+          ? promptText('targetScript', 'Target type: Script Strategy. It should fit Python ScriptStrategy with state management, order logic, risk parameters, error handling, and logging.')
+          : promptText('targetTemplate', 'Target type: Template Strategy. First decide whether grid, trend, DCA, martingale, or another template strategy type fits best, then explain why and list key parameters.'))
+      const contractLine = targetKey === 'indicator'
+        ? promptText('contractIndicator', 'Code contract: use df boolean columns open_long, close_long, open_short, close_short as executable signals. output.signals and output.layers are chart annotations only.')
+        : (targetKey === 'script'
+          ? promptText('contractScript', 'Code contract: define a ScriptStrategy-style draft with state variables, on-bar decision flow, order/risk handling, idempotency, and logs.')
+          : promptText('contractTemplate', 'Template contract: return template type, symbol, timeframe, price/risk parameters, enable/disable conditions, and manual verification steps.'))
+      return [
+        promptText('designFor', 'Design a strategy for {target}.', { target: targetText }),
         '',
-        '我的想法/偏好：',
-        '- 交易周期：',
-        '- 风险偏好：',
-        '- 我希望利用的信号或逻辑：',
-        '- 不希望出现的行为：',
+        seedPrompt ? `${promptText('selectedIdea', 'Selected prompt idea:')}\n${seedPrompt}` : '',
+        seedPrompt ? '' : '',
+        promptText('preferences', 'My idea / preferences:'),
+        `- ${promptText('timeframe', 'Timeframe')}:`,
+        `- ${promptText('riskProfile', 'Risk profile')}:`,
+        `- ${promptText('signals', 'Signals or logic I want to use')}:`,
+        `- ${promptText('avoid', 'Behaviors I want to avoid')}:`,
         '',
-        '如果信息足够，请直接生成可运行草稿；缺失参数用保守默认值，并把默认值和可调项列清楚。'
-      ]
-      const commonEn = [
-        `Design a strategy for ${targetText}.`,
+        promptText('generateNow', 'If there is enough information, generate a runnable draft now. Use conservative defaults for missing parameters and clearly list defaults and tunable items.'),
         '',
-        'My idea / preferences:',
-        '- Timeframe:',
-        '- Risk profile:',
-        '- Signals or logic I want to use:',
-        '- Behaviors I want to avoid:',
-        '',
-        'If there is enough information, generate a runnable draft now. Use conservative defaults for missing parameters and clearly list defaults and tunable items.'
-      ]
-      if (targetKey === 'indicator') {
-        return this.isZh
-          ? [...commonZh, '', '目标类型：策略研发。当前优先生成可落地到策略 IDE 的指标策略草稿，需要适合在 K 线图展示、回测，并说明参数、买卖信号、止损止盈和失效条件。'].join('\n')
-          : [...commonEn, '', 'Target type: Strategy Lab. Prefer a Strategy IDE-ready indicator strategy draft that supports chart display and backtesting, with parameters, buy/sell signals, stop/take-profit, and invalidation conditions.'].join('\n')
-      }
-      if (targetKey === 'script') {
-        return this.isZh
-          ? [...commonZh, '', '目标类型：脚本策略。需要适合 Python ScriptStrategy，包含状态管理、下单逻辑、风控参数、异常处理和日志输出。'].join('\n')
-          : [...commonEn, '', 'Target type: Script Strategy. It should fit Python ScriptStrategy with state management, order logic, risk parameters, error handling, and logging.'].join('\n')
-      }
-      return this.isZh
-        ? [...commonZh, '', '目标类型：模板策略。请先判断更适合网格、趋势、DCA、马丁或其他模板策略类型，并解释原因和关键参数。'].join('\n')
-        : [...commonEn, '', 'Target type: Template Strategy. First decide whether grid, trend, DCA, martingale, or another template strategy type fits best, then explain why and list key parameters.'].join('\n')
+        typeLine,
+        workflowLine,
+        contractLine
+      ].join('\n')
     },
     agentTargetFromPlan (plan, fallbackTarget) {
       const entities = plan && plan.entities ? plan.entities : {}
@@ -2517,9 +2431,10 @@ export default {
         '- Use conservative defaults for missing parameters and document them in the output.',
         '- Code comments must be English.',
         '- Stay inside QuantDinger native workflows.',
-        '- For Indicator IDE, generate runnable QuantDinger Indicator IDE Python code, not Pine Script.',
-        '- For Indicator IDE, execution must use df four-way boolean columns; output signals are chart markers only.',
-        '- For Indicator IDE chart annotations, you may use output.layers for zones, support/resistance lines, and labels when it improves readability.',
+        '- For Strategy R&D, generate runnable QuantDinger strategy Python code, not Pine Script.',
+        '- For Strategy R&D, execution must use df four-way boolean columns; output signals are chart markers only.',
+        '- For Strategy R&D chart annotations, you may use output.layers for zones, support/resistance lines, and labels when it improves readability.',
+        '- Keep chart annotations professional and sparse: use short labels, dashed borders, translucent fills, and avoid opaque gray boxes that cover candles.',
         '- For Script Strategy, generate a Python ScriptStrategy draft that can be validated by QuantDinger.',
         '- For Template Strategy, return a concrete template strategy plan with parameters; do not auto-start live trading.',
         '- Include verification steps: open in QuantDinger, run backtest, inspect drawdown/win rate/trades, then save manually.',
@@ -2590,50 +2505,24 @@ export default {
       this.pendingAgentTask = null
       return true
     },
-    async startStrategyFlow (targetKey) {
+    async startStrategyFlow (targetKey, seedPrompt = '') {
       const target = this.normalizeSymbolOption(this.context)
       this.strategyFlowVisible = false
+      this.selectedStrategyTarget = targetKey || this.selectedStrategyTarget || 'indicator'
       this.pendingAgentTask = {
         type: 'strategy_design',
         targetType: targetKey,
         target,
         workflow: targetKey === 'indicator'
-          ? 'QuantDinger Indicator IDE'
+          ? 'QuantDinger Strategy R&D'
           : (targetKey === 'script' ? 'QuantDinger Python ScriptStrategy' : 'QuantDinger Template Strategy'),
-        originalPrompt: ''
+        originalPrompt: seedPrompt || ''
       }
-      this.usePrompt(this.buildStrategyPrompt(targetKey, target))
-      this.$message.info(this.isZh ? '已填入策略需求模板，你可以继续补充想法后发送。' : 'Strategy prompt inserted. Add your idea, then send it.')
-      return
-      if (!target || !target.symbol) {
-        this.$message.warning(this.text.symbolPlaceholder)
-        return
-      }
-      this.strategyFlowVisible = false
-      const prompt = this.isZh
-        ? `请基于 ${target.market}:${target.symbol} 生成一个稳健、可回测、带风控参数的策略。说明适用市场、入场/出场、止损止盈和失效条件。`
-        : `Generate a robust, backtestable strategy for ${target.market}:${target.symbol}, including risk parameters, entries/exits, stop/take profit, and invalidation.`
-      if (targetKey === 'indicator') {
-        await this.generateIndicatorStrategyDraft(prompt, target)
-        return
-      }
-      if (targetKey === 'indicator') {
-        this.$confirm({
-          title: this.text.indicatorStrategy,
-          content: this.isZh ? '我会跳转到策略 IDE，你可以在图表与回测面板里继续运行。' : 'Open Strategy IDE so you can run it in the chart and backtest workspace.',
-          okText: this.text.openTargetPage,
-          cancelText: this.text.cancel,
-          onOk: () => this.$router.push({ path: '/indicator-ide', query: { symbol: target.symbol, market: target.market } })
-        })
-        return
-      }
-      if (targetKey === 'script') {
-        await this.generateScriptStrategyDraft(prompt, target)
-        return
-      }
-      if (targetKey === 'bot') {
-        await this.generateBotRecommendation(prompt, target)
-      }
+      this.usePrompt(this.buildStrategyPrompt(targetKey, target, seedPrompt))
+      this.$message.info(this.i18nText('aiAssetAnalysis.copilot.strategyPromptInserted', 'Strategy prompt inserted. Add your idea, then send it.'))
+    },
+    selectStrategyTarget (targetKey) {
+      this.selectedStrategyTarget = targetKey || 'indicator'
     },
     buildNativeStrategyGenerationPrompt (targetType, prompt, target) {
       const memoryLines = (this.userMemories || [])
@@ -2641,7 +2530,7 @@ export default {
         .map(item => `- ${item.title || item.category}: ${item.content}`)
         .join('\n')
       const workflow = targetType === 'indicator'
-        ? 'QuantDinger Indicator IDE'
+        ? 'QuantDinger Strategy R&D'
         : (targetType === 'script' ? 'QuantDinger Python ScriptStrategy' : 'QuantDinger Template Strategy')
       const hardRules = [
         `Workflow: ${workflow}`,
@@ -2664,10 +2553,11 @@ export default {
         hardRules.splice(
           6,
           0,
-          '- Indicator IDE output must be runnable in QuantDinger Indicator IDE and suitable for chart display/backtest.',
-          '- Indicator IDE execution must use df four-way boolean columns: open_long, close_long, open_short, close_short.',
+          '- Strategy R&D output must be runnable in QuantDinger Strategy R&D and suitable for chart display/backtest.',
+          '- Strategy R&D execution must use df four-way boolean columns: open_long, close_long, open_short, close_short.',
           '- output.signals is chart-only. It must never be the only source of backtest/live orders.',
-          '- You may add output.layers for K-line zones, support/resistance lines, BOS/CHoCH labels, invalidation ranges, or premium/discount areas. Keep overlays sparse.'
+          '- You may add output.layers for K-line zones, support/resistance lines, BOS/CHoCH labels, invalidation ranges, or premium/discount areas. Keep overlays sparse.',
+          '- Chart layers must look like lightweight analysis annotations, not blocking panels: short text, no opaque gray fill, opacity <= 0.08 for zones, dashed borders, and labels near the right edge or outside dense candles.'
         )
       } else if (targetType === 'script') {
         hardRules.splice(6, 0, '- Script output must be a Python strategy draft for QuantDinger Script Strategy.')
@@ -2679,9 +2569,9 @@ export default {
     async generateIndicatorStrategyDraft (prompt, target) {
       this.generatingStrategy = true
       const assistantMsg = {
-        localId: `local-${localId++}`,
+        localId: 'local-' + (localId++),
         role: 'assistant',
-        content: this.isZh ? '正在生成策略研发草稿...' : 'Generating Strategy Lab draft...',
+        content: this.i18nText('aiAssetAnalysis.copilot.generatingIndicatorStrategy', 'Generating Strategy R&D draft...'),
         meta: 'indicator_strategy'
       }
       this.messages.push(assistantMsg)
@@ -2689,7 +2579,7 @@ export default {
       try {
         const agentPrompt = this.buildNativeStrategyGenerationPrompt('indicator', prompt, target)
         const token = this.getAccessToken()
-        const language = this.$i18n ? this.$i18n.locale : 'zh-CN'
+        const language = this.$i18n ? this.$i18n.locale : 'en-US'
         const response = await fetch('/api/indicator/aiGenerate', {
           method: 'POST',
           headers: {
@@ -2726,7 +2616,7 @@ export default {
               assistantMsg.content = [
                 `## ${target.symbol} ${this.text.indicatorStrategy}`,
                 '',
-                this.isZh ? '已生成策略研发草稿。你可以继续在本会话里要求我修改入场、出场、风控或参数，满意后再去策略 IDE 运行。' : 'A Strategy Lab draft is ready. Keep refining entries, exits, risk controls, or parameters here, then open Strategy IDE when you are satisfied.',
+                this.i18nText('aiAssetAnalysis.copilot.indicatorStrategyReady', 'A Strategy R&D draft is ready. Keep refining entries, exits, risk controls, or parameters here, then open Strategy R&D when you are satisfied.'),
                 '',
                 '```python',
                 code,
@@ -2743,7 +2633,7 @@ export default {
           key: 'open-indicator-ide',
           group: 'strategy_workflow',
           icon: 'line-chart',
-          label: this.isZh ? '去策略 IDE 运行' : 'Open Strategy IDE',
+          label: this.i18nText('aiAssetAnalysis.copilot.openStrategyResearch', 'Open Strategy R&D'),
           path: '/indicator-ide',
           storageKey: 'qd_copilot_indicator_code',
           storageValue: code,
@@ -2760,9 +2650,9 @@ export default {
     async generateScriptStrategyDraft (prompt, target) {
       this.generatingStrategy = true
       const assistantMsg = {
-        localId: `local-${localId++}`,
+        localId: 'local-' + (localId++),
         role: 'assistant',
-        content: this.isZh ? '正在生成脚本策略草稿...' : 'Generating script strategy draft...',
+        content: this.i18nText('aiAssetAnalysis.copilot.generatingScriptStrategy', 'Generating script strategy draft...'),
         meta: 'strategy_build'
       }
       this.messages.push(assistantMsg)
@@ -2775,7 +2665,7 @@ export default {
         assistantMsg.content = [
           `## ${target.symbol} ${this.text.scriptStrategy}`,
           '',
-          this.isZh ? '已生成脚本策略草稿。你可以复制代码，或跳转到脚本策略页面继续创建/运行。' : 'A script strategy draft is ready. Copy the code or open Script Strategy to continue creating/running it.',
+          this.i18nText('aiAssetAnalysis.copilot.scriptStrategyReady', 'A script strategy draft is ready. Keep refining it here, or open Script Strategy IDE to edit, backtest, and publish it.'),
           '',
           '```python',
           res.code,
@@ -2786,21 +2676,13 @@ export default {
           key: 'open-script-strategy',
           group: 'strategy_workflow',
           icon: 'code',
-          label: this.isZh ? '去脚本策略创建' : 'Open Script Strategy',
-          path: '/strategy-script',
+          label: this.i18nText('aiAssetAnalysis.copilot.openScriptStrategyIde', 'Open Script Strategy IDE'),
+          path: '/strategy-scripts',
           storageKey: 'qd_copilot_script_strategy_code',
           storageValue: res.code,
           query: { aiDraft: '1', symbol: target.symbol, market: target.market }
         }]
         await this.persistCopilotMessage(assistantMsg, 'strategy_build')
-        return
-        this.$confirm({
-          title: this.text.scriptStrategy,
-          content: this.isZh ? '是否跳转到脚本策略页面继续创建？' : 'Open Script Strategy to continue creating it?',
-          okText: this.text.openTargetPage,
-          cancelText: this.text.cancel,
-          onOk: () => this.$router.push({ path: '/strategy-script', query: { aiDraft: '1', symbol: target.symbol, market: target.market } })
-        })
       } catch (e) {
         assistantMsg.content = `${this.text.chatUnavailable}\n\n${(e && e.message) || ''}`
       } finally {
@@ -2811,9 +2693,9 @@ export default {
     async generateBotRecommendation (prompt, target) {
       this.generatingStrategy = true
       const assistantMsg = {
-        localId: `local-${localId++}`,
+        localId: 'local-' + (localId++),
         role: 'assistant',
-        content: this.isZh ? '正在生成模板策略推荐...' : 'Generating template strategy recommendation...',
+        content: this.i18nText('aiAssetAnalysis.copilot.generatingTemplateStrategy', 'Generating template strategy recommendation...'),
         meta: 'bot_recommend'
       }
       this.messages.push(assistantMsg)
@@ -2840,21 +2722,13 @@ export default {
           key: 'open-trading-bot',
           group: 'strategy_workflow',
           icon: 'robot',
-          label: this.isZh ? '去创建模板策略' : 'Open Template Strategy',
+          label: this.i18nText('aiAssetAnalysis.copilot.openTemplateStrategy', 'Open Template Strategy'),
           path: '/trading-bot',
           storageKey: 'qd_copilot_bot_recommend',
           storageValue: recommendation,
           query: { aiPreset: '1' }
         }]
         await this.persistCopilotMessage(assistantMsg, 'bot_recommend')
-        return
-        this.$confirm({
-          title: this.text.tradingBot,
-          content: this.isZh ? '是否跳转到模板策略页面，用这份 AI 推荐继续创建？' : 'Open Template Strategy and continue with this AI recommendation?',
-          okText: this.text.openTargetPage,
-          cancelText: this.text.cancel,
-          onOk: () => this.$router.push({ path: '/trading-bot', query: { aiPreset: '1' } })
-        })
       } catch (e) {
         assistantMsg.content = `${this.text.chatUnavailable}\n\n${(e && e.message) || ''}`
       } finally {
@@ -2938,7 +2812,7 @@ export default {
       if (!files.length) return
       event.preventDefault()
       this.appendImageFiles(files)
-      this.$message.success(this.isZh ? '图片已添加到本次对话' : 'Image added to this message')
+      this.$message.success(this.i18nText('aiAssetAnalysis.copilot.imageAdded', 'Image added to this message'))
     },
     removeAttachment (idx) {
       this.attachments.splice(idx, 1)
@@ -2959,7 +2833,7 @@ export default {
       this.messages.push({
         localId: `local-${localId++}`,
         role: 'user',
-        content: content || (this.isZh ? '[已上传图片]' : '[image uploaded]'),
+        content: content || this.i18nText('aiAssetAnalysis.copilot.imageUploadedFallback', '[image uploaded]'),
         attachments,
         created_at: createdAt
       })
@@ -3408,47 +3282,47 @@ export default {
         document.execCommand('copy')
         document.body.removeChild(textarea)
       }
-      this.$message.success(this.isZh ? '代码已复制' : 'Code copied')
+      this.$message.success(this.i18nText('aiAssetAnalysis.copilot.codeCopied', 'Code copied'))
     },
     setupAction (key) {
       const map = {
         ai: {
           key: 'settings-ai',
           icon: 'setting',
-          label: this.i18nText('aiCopilot.setup.action.ai', this.isZh ? '配置 AI/LLM' : 'Configure AI/LLM'),
+          label: this.i18nText('aiCopilot.setup.action.ai', 'Configure AI/LLM'),
           path: '/settings',
           query: { section: 'ai' }
         },
         data: {
           key: 'settings-data',
           icon: 'database',
-          label: this.i18nText('aiCopilot.setup.action.data', this.isZh ? '配置数据源' : 'Configure data sources'),
+          label: this.i18nText('aiCopilot.setup.action.data', 'Configure data sources'),
           path: '/settings',
           query: { section: 'data_source' }
         },
         broker: {
           key: 'broker-accounts',
           icon: 'bank',
-          label: this.i18nText('aiCopilot.setup.action.broker', this.isZh ? '配置券商账户' : 'Configure broker accounts'),
+          label: this.i18nText('aiCopilot.setup.action.broker', 'Configure broker accounts'),
           path: '/broker-accounts'
         },
         billing: {
           key: 'billing',
           icon: 'wallet',
-          label: this.i18nText('aiCopilot.setup.action.billing', this.isZh ? '去充值' : 'Top up'),
+          label: this.i18nText('aiCopilot.setup.action.billing', 'Top up'),
           path: '/billing'
         },
         credits: {
           key: 'profile-credits',
           icon: 'profile',
-          label: this.i18nText('aiCopilot.setup.action.credits', this.isZh ? '查看消费记录' : 'View credit records'),
+          label: this.i18nText('aiCopilot.setup.action.credits', 'View credit records'),
           path: '/profile',
           query: { tab: 'credits' }
         },
         login: {
           key: 'login',
           icon: 'login',
-          label: this.i18nText('aiCopilot.setup.action.login', this.isZh ? '重新登录' : 'Sign in again'),
+          label: this.i18nText('aiCopilot.setup.action.login', 'Sign in again'),
           path: '/user/login'
         }
       }
@@ -3461,27 +3335,54 @@ export default {
       if (includesAny([
         /local-only|not implemented/i,
         /llm|large language model|provider|model provider|api key|apikey|base url|openrouter|openai|anthropic|deepseek|atlascloud/i,
-        /未配置|大模型|模型供应商|模型提供商|密钥|接口密钥|api\s*key/i
+        '大模型',
+        '模型供应商',
+        '模型提供商',
+        '接口密钥',
+        '密钥',
+        '未接入'
       ])) return 'llm'
       if (includesAny([
-        /insufficient|credit|credits|billing|quota|payment|vip/i,
-        /积分|余额不足|额度|充值|会员|扣费/i
+        /insufficient|credit|credits|billing|quota|payment|vip|top up/i,
+        '积分',
+        '余额不足',
+        '充值',
+        '计费',
+        '额度',
+        '支付'
       ])) return 'billing'
       if (includesAny([
         /broker|broker account|exchange account|credential|api secret|trade account/i,
-        /券商|交易所账户|经纪商|账户未配置|交易账户|实盘账户/i
+        '券商',
+        '交易所账户',
+        '交易账户',
+        '凭据',
+        'api secret'
       ])) return 'broker'
       if (includesAny([
         /data source|market data|quote|quotes|price feed|symbol not found|no data|provider unavailable|akshare|tushare|yfinance|ccxt/i,
-        /数据源|行情源|行情接口|行情数据|报价|价格数据|标的不存在|没有数据/i
+        '数据源',
+        '行情',
+        '报价',
+        '没有数据',
+        '标的不存在',
+        '数据不可用'
       ])) return 'data'
       if (includesAny([
         /401|403|unauthorized|forbidden|permission|token|login/i,
-        /未登录|登录|权限|无权限|令牌/i
+        '未授权',
+        '无权限',
+        '登录',
+        '令牌',
+        '权限'
       ])) return 'auth'
       if (includesAny([
         /network|timeout|failed to fetch|502|503|504|gateway|connection|econn/i,
-        /网络|超时|连接失败|服务不可用|网关/i
+        '网络',
+        '超时',
+        '连接失败',
+        '网关',
+        '请求失败'
       ])) return 'network'
       return 'unknown'
     },
@@ -3489,167 +3390,80 @@ export default {
       const raw = (error && error.response && error.response.data && error.response.data.msg) || (error && error.message) || ''
       const type = this.classifySetupIssue(raw)
       const symbol = context && context.symbol ? `${context.market || ''}:${context.symbol}`.replace(/^:/, '') : ''
-      const baseActions = []
-      const zh = this.isZh
       const rawLine = raw ? `\n\n> ${raw}` : ''
+      const guide = (typeKey, metaFallback, titleFallback, bodyFallback, actionKeys, values = {}) => ({
+        meta: this.i18nText(`aiCopilot.setup.${typeKey}.meta`, metaFallback, values),
+        content: [
+          `### ${this.i18nText(`aiCopilot.setup.${typeKey}.title`, titleFallback, values)}`,
+          '',
+          this.i18nText(`aiCopilot.setup.${typeKey}.body`, bodyFallback, values)
+        ].join('\n') + rawLine,
+        actions: actionKeys.map(key => this.setupAction(key)).filter(Boolean)
+      })
       if (type === 'llm') {
-        return {
-          meta: zh ? '部署检查：AI/LLM' : 'Setup check: AI/LLM',
-          content: zh
-            ? [
-                '### 需要先配置大模型',
-                '',
-                '我已经收到你的问题，但当前 AI 对话没有可用的大模型配置，所以无法继续生成有效回答。',
-                '',
-                '**建议处理：**',
-                '- 进入「系统设置 → AI/LLM配置」选择模型供应商。',
-                '- 填写对应供应商的 API Key、模型名称和 Base URL。',
-                '- 保存后如果后端读取环境配置，请重构并重启后端 Docker。',
-                '',
-                '配置完成后，你可以直接回到这里继续问，不需要手动选择数据源。'
-              ].join('\n') + rawLine
-            : [
-                '### Configure an LLM first',
-                '',
-                'I received your question, but no usable LLM provider is available yet.',
-                '',
-                '**Next steps:**',
-                '- Open Admin → AI/LLM settings.',
-                '- Fill the provider API key, model, and Base URL.',
-                '- Save settings and restart the backend Docker service if the backend reads environment config.',
-                '',
-                'After that, come back here and ask naturally.'
-              ].join('\n') + rawLine,
-          actions: [this.setupAction('ai')].filter(Boolean)
-        }
+        return guide(
+          'llm',
+          'Setup check: AI/LLM',
+          'Configure an LLM first',
+          'No usable LLM provider is available yet. Open AI/LLM settings, fill the provider API key, model, and Base URL, then save and retry.',
+          ['ai']
+        )
       }
       if (type === 'data') {
-        return {
-          meta: zh ? '部署检查：数据源' : 'Setup check: data source',
-          content: zh
-            ? [
-                '### 行情数据源可能还没配置好',
-                '',
-                symbol
-                  ? `我识别到你想分析 **${symbol}**，但系统没有拿到可用行情/报价数据。`
-                  : '我尝试从你的问题里识别标的，但系统没有拿到可用行情/报价数据。',
-                '',
-                '**建议处理：**',
-                '- 进入「系统设置 → 数据源」检查行情源配置。',
-                '- 加密货币通常需要交易所/CCXT 或行情接口可用。',
-                '- A股/港股/美股需要对应数据源配置和网络访问正常。',
-                '- 如果只是临时没有实时价格，我仍可以基于你上传的K线图或手动给出的价格区间继续分析。'
-              ].join('\n') + rawLine
-            : [
-                '### Market data source may not be configured',
-                '',
-                symbol
-                  ? `I recognized **${symbol}**, but the system could not fetch usable quotes or market data.`
-                  : 'I tried to infer the symbol, but no usable quotes or market data were available.',
-                '',
-                '**Next steps:**',
-                '- Open Admin → Data source settings.',
-                '- Check exchange/CCXT or quote-provider configuration.',
-                '- For stocks, confirm the corresponding market data provider and network access.',
-                '- You can still upload a chart or provide price levels and I can continue from that.'
-              ].join('\n') + rawLine,
-          actions: [this.setupAction('data')].filter(Boolean)
-        }
+        return guide(
+          'data',
+          'Setup check: data source',
+          'Market data source may not be configured',
+          symbol
+            ? 'I recognized {symbol}, but the system could not fetch usable quotes or market data. Check data source settings and provider connectivity.'
+            : 'The system could not fetch usable quotes or market data. Check data source settings and provider connectivity.',
+          ['data'],
+          { symbol }
+        )
       }
       if (type === 'broker') {
-        return {
-          meta: zh ? '部署检查：券商账户' : 'Setup check: broker account',
-          content: zh
-            ? [
-                '### 交易账户还没有配置',
-                '',
-                '这类操作需要可用的券商/交易所账户。当前系统没有检测到可用账户或凭证。',
-                '',
-                '**建议处理：**',
-                '- 进入「券商账户」添加交易所或券商连接。',
-                '- 先使用只读/模拟盘确认行情、持仓和订单接口正常。',
-                '- 确认风险参数后再开启自动交易或实盘动作。'
-              ].join('\n') + rawLine
-            : [
-                '### Broker account is not configured',
-                '',
-                'This action needs a connected broker or exchange account.',
-                '',
-                '**Next steps:**',
-                '- Open Broker Accounts and add a broker/exchange connection.',
-                '- Test read-only or paper trading first.',
-                '- Confirm risk parameters before enabling live automation.'
-              ].join('\n') + rawLine,
-          actions: [this.setupAction('broker')].filter(Boolean)
-        }
+        return guide(
+          'broker',
+          'Setup check: broker account',
+          'Broker account is not configured',
+          'This action needs a connected broker or exchange account. Add a broker account, test read-only or paper trading first, then enable live automation.',
+          ['broker']
+        )
       }
       if (type === 'billing') {
-        return {
-          meta: zh ? '部署检查：积分/额度' : 'Setup check: credits',
-          content: zh
-            ? [
-                '### 当前积分或额度不足',
-                '',
-                'AI 对话、图片分析、回测或监控可能会消耗积分。当前请求没有足够额度继续执行。',
-                '',
-                '**建议处理：**',
-                '- 前往充值页面补充积分或开通会员。',
-                '- 到个人中心查看消费记录，确认是哪项功能产生了消耗。'
-              ].join('\n') + rawLine
-            : [
-                '### Not enough credits or quota',
-                '',
-                'AI chat, image analysis, backtests, or monitors may consume credits.',
-                '',
-                '**Next steps:**',
-                '- Top up credits or purchase a membership.',
-                '- Review credit records in your profile.'
-              ].join('\n') + rawLine,
-          actions: [this.setupAction('billing'), this.setupAction('credits')].filter(Boolean)
-        }
+        return guide(
+          'billing',
+          'Setup check: credits',
+          'Not enough credits',
+          'AI chat, image analysis, backtests, or monitors may consume credits. Top up credits or review credit records before retrying.',
+          ['billing', 'credits']
+        )
       }
       if (type === 'auth') {
-        return {
-          meta: zh ? '部署检查：登录/权限' : 'Setup check: auth',
-          content: zh
-            ? '### 登录状态或权限异常\n\n当前请求没有通过认证或权限检查。请重新登录，或确认当前账号有访问 AI 分析/系统设置的权限。' + rawLine
-            : '### Sign-in or permission issue\n\nThis request did not pass authentication or permission checks. Please sign in again or confirm your account has access to AI analysis/settings.' + rawLine,
-          actions: [this.setupAction('login')].filter(Boolean)
-        }
+        return guide(
+          'auth',
+          'Setup check: auth',
+          'Sign-in or permission issue',
+          'This request did not pass authentication or permission checks. Sign in again or confirm your account has access to this feature.',
+          ['login']
+        )
       }
       if (type === 'network') {
-        baseActions.push(this.setupAction('ai'), this.setupAction('data'))
-        return {
-          meta: zh ? '部署检查：服务连接' : 'Setup check: service connection',
-          content: zh
-            ? [
-                '### 后端服务或外部接口暂时不可用',
-                '',
-                '这通常不是你的提问问题，而是服务连接、Docker 后端、外部模型接口或行情接口暂时不可达。',
-                '',
-                '**建议处理：**',
-                '- 确认后端 Docker 服务正在运行。',
-                '- 检查模型供应商和行情源网络是否可访问。',
-                '- 如果刚修改配置，请保存后重启对应后端服务。'
-              ].join('\n') + rawLine
-            : [
-                '### Backend service or external provider is unavailable',
-                '',
-                'This is usually a service connectivity issue rather than a prompt issue.',
-                '',
-                '**Next steps:**',
-                '- Confirm the backend Docker service is running.',
-                '- Check LLM provider and market data network access.',
-                '- Restart backend services after configuration changes.'
-              ].join('\n') + rawLine,
-          actions: baseActions.filter(Boolean)
-        }
+        return guide(
+          'network',
+          'Setup check: service connection',
+          'Backend service or external provider is unavailable',
+          'This looks like a service connectivity issue. Confirm the backend service is running and check LLM/data-provider network access.',
+          ['ai', 'data']
+        )
       }
-      return {
-        meta: zh ? '部署检查' : 'Setup check',
-        content: `${this.text.chatUnavailable}${rawLine}\n\n${zh ? '你也可以先检查：系统设置里的 AI/LLM、数据源配置，以及券商账户是否已连接。' : 'You can also check AI/LLM settings, data source settings, and broker account connections.'}`,
-        actions: [this.setupAction('ai'), this.setupAction('data'), this.setupAction('broker')].filter(Boolean)
-      }
+      return guide(
+        'unknown',
+        'Setup check',
+        'Configuration check needed',
+        'Check AI/LLM settings, data source settings, and broker account connections, then retry.',
+        ['ai', 'data', 'broker']
+      )
     },
     scrollToBottom () {
       this.$nextTick(() => {
@@ -3690,10 +3504,13 @@ export default {
       return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`
     },
     i18nText (key, fallback, values) {
+      values = values || {}
+      const locale = this.$i18n ? this.$i18n.locale : ''
+      void locale
       const translated = this.$t ? this.$t(key, values) : key
       if (translated && translated !== key) return translated
-      return Object.entries(values || {}).reduce((text, [name, value]) => {
-        return text.replace(new RegExp(`\\{${name}\\}`, 'g'), value)
+      return Object.entries(values).reduce((text, [name, value]) => {
+        return String(text == null ? '' : text).replace(new RegExp('\\{' + name + '\\}', 'g'), value)
       }, fallback)
     },
     marketLabel (market) {
@@ -3719,16 +3536,16 @@ export default {
     },
     formatIntervalText (value) {
       const minutes = Number(value || 0)
-      if (!minutes) return this.isZh ? '未设置' : 'Not set'
+      if (!minutes) return this.i18nText('aiAssetAnalysis.copilot.intervalNotSet', 'Not set')
       if (minutes >= 1440 && minutes % 1440 === 0) {
         const days = Math.round(minutes / 1440)
-        return this.isZh ? `每${days}天` : `${days}d`
+        return this.i18nText('aiAssetAnalysis.copilot.intervalDays', '{days}d', { days })
       }
       if (minutes >= 60 && minutes % 60 === 0) {
         const hours = Math.round(minutes / 60)
-        return this.isZh ? `每${hours}小时` : `${hours}h`
+        return this.i18nText('aiAssetAnalysis.copilot.intervalHours', '{hours}h', { hours })
       }
-      return this.isZh ? `每${minutes}分钟` : `${minutes}m`
+      return this.i18nText('aiAssetAnalysis.copilot.intervalMinutes', '{minutes}m', { minutes })
     },
     formatNum (num) {
       const n = Number(num)
@@ -4292,6 +4109,31 @@ export default {
   margin-top: 18px;
 }
 
+.quick-task-shelf {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+  width: min(940px, calc(100% - 20px));
+  margin: 0 auto 18px;
+  padding: 10px;
+  border: 1px solid var(--qd-border-soft);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--qd-panel) 82%, transparent);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.quick-task-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.quick-tools-modal .ant-modal-body {
+  padding: 18px;
+}
+
+.quick-task-modal-grid .welcome-task,
+.quick-task-shelf .welcome-task,
 .welcome-prompts button {
   display: flex;
   align-items: flex-start;
@@ -4308,6 +4150,8 @@ export default {
   transition: border-color 0.18s, color 0.18s, background 0.18s, transform 0.18s, box-shadow 0.18s;
 }
 
+.quick-task-modal-grid .welcome-task:hover,
+.quick-task-shelf .welcome-task:hover,
 .welcome-prompts button:hover {
   border-color: var(--qd-accent-border);
   background: var(--qd-accent-soft);
@@ -4315,6 +4159,8 @@ export default {
   transform: translateY(-1px);
 }
 
+.quick-task-modal-grid .welcome-task:hover .task-icon,
+.quick-task-shelf .welcome-task:hover .task-icon,
 .welcome-prompts button:hover .task-icon {
   border-color: var(--qd-accent-border);
   color: #fff;
@@ -4685,6 +4531,19 @@ export default {
   object-fit: cover;
 }
 
+.thumb-missing {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+  color: var(--qd-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 .pending-attachments {
   flex: 0 0 auto;
   max-height: 92px;
@@ -5029,10 +4888,16 @@ export default {
 }
 
 .strategy-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0 2px;
+}
+
+.strategy-type-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
-  padding: 4px 0 2px;
 }
 
 .strategy-flow-guide {
@@ -5059,12 +4924,12 @@ export default {
 
 .strategy-flow-card {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-columns: 36px minmax(0, 1fr);
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  min-height: 132px;
-  padding: 16px;
+  min-height: 116px;
+  padding: 14px;
   border: 1px solid var(--qd-border-soft, #e8eff7);
   border-radius: 10px;
   background:
@@ -5083,16 +4948,22 @@ export default {
   transform: translateY(-1px);
 }
 
+.strategy-flow-card.active {
+  border-color: color-mix(in srgb, var(--qd-accent) 72%, transparent);
+  background: color-mix(in srgb, var(--qd-accent) 10%, var(--qd-panel, #fff));
+  box-shadow: 0 10px 24px var(--qd-accent-ring);
+}
+
 .strategy-flow-card > .anticon {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   border: 1px solid color-mix(in srgb, var(--qd-accent) 22%, transparent);
   border-radius: 10px;
   background: var(--qd-accent-soft);
   color: var(--qd-accent, #1677ff);
-  font-size: 19px;
+  font-size: 17px;
 }
 
 .strategy-flow-card strong,
@@ -5101,21 +4972,143 @@ export default {
 }
 
 .strategy-flow-card strong {
-  margin-bottom: 7px;
+  margin-bottom: 6px;
   color: var(--qd-text, #12243d);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 900;
   line-height: 1.25;
 }
 
 .strategy-flow-card em {
   color: var(--qd-text-muted, #6b7f99);
-  font-size: 12px;
+  font-size: 11px;
   font-style: normal;
-  line-height: 1.55;
+  line-height: 1.45;
   white-space: normal;
   word-break: normal;
   overflow-wrap: anywhere;
+}
+
+.strategy-route-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--qd-accent) 24%, var(--qd-border-soft, #e8eff7));
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--qd-accent) 8%, var(--qd-panel, #fff)), var(--qd-panel-soft, #f7fafd));
+}
+
+.strategy-route-main {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.strategy-route-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--qd-accent-soft, #eef6ff);
+  color: var(--qd-accent, #1677ff);
+  font-size: 16px;
+}
+
+.strategy-route-main strong,
+.strategy-route-main em {
+  display: block;
+}
+
+.strategy-route-main strong {
+  margin-bottom: 4px;
+  color: var(--qd-text, #12243d);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.strategy-route-main em {
+  color: var(--qd-text-muted, #6b7f99);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.strategy-examples {
+  width: 100%;
+  margin-top: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--qd-border-soft, #e8eff7);
+  border-radius: 10px;
+  background: var(--qd-panel-soft, #f7fafd);
+}
+
+.strategy-examples-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.strategy-examples-head strong {
+  color: var(--qd-text, #12243d);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.strategy-examples-head span {
+  color: var(--qd-text-muted, #6b7f99);
+  font-size: 12px;
+}
+
+.strategy-example-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  padding: 9px 10px;
+  border: 0;
+  border-top: 1px solid var(--qd-border-soft, #e8eff7);
+  background: transparent;
+  color: var(--qd-text, #12243d);
+  text-align: left;
+  cursor: pointer;
+}
+
+.strategy-example-row:hover {
+  background: var(--qd-accent-soft, #eef6ff);
+}
+
+.strategy-example-row strong,
+.strategy-example-row em {
+  display: block;
+}
+
+.strategy-example-row strong {
+  margin-bottom: 3px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.strategy-example-row em {
+  color: var(--qd-text-muted, #6b7f99);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.42;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.strategy-example-row .anticon {
+  color: var(--qd-accent, #1677ff);
 }
 
 .copilot-workbench ::v-deep .ant-select-selection {
@@ -5158,7 +5151,7 @@ export default {
   .monitor-panel {
     min-height: 260px;
   }
-  .strategy-flow {
+  .strategy-type-grid {
     grid-template-columns: 1fr;
   }
   .strategy-flow-guide,
@@ -5434,12 +5427,14 @@ export default {
   line-height: 1.7;
 }
 
+.quick-task-shelf,
 .welcome-prompts {
   grid-template-columns: repeat(4, minmax(160px, 1fr));
   gap: 12px;
   margin-top: 24px;
 }
 
+.quick-task-shelf .welcome-task,
 .welcome-prompts button {
   min-height: 84px;
   padding: 14px;
@@ -5449,6 +5444,7 @@ export default {
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.055);
 }
 
+.quick-task-shelf .welcome-task:hover,
 .welcome-prompts button:hover {
   box-shadow: 0 18px 36px rgba(15, 23, 42, 0.1);
   transform: translateY(-2px);
@@ -5644,10 +5640,16 @@ export default {
 }
 
 .strategy-flow {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  padding: 2px 0 0 !important;
+}
+
+.strategy-type-grid {
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   gap: 14px !important;
-  padding: 2px 0 0 !important;
 }
 
 .strategy-flow-guide {
@@ -5656,10 +5658,10 @@ export default {
 
 .strategy-flow-card {
   display: grid !important;
-  grid-template-columns: 42px minmax(0, 1fr) !important;
+  grid-template-columns: 36px minmax(0, 1fr) !important;
   align-items: flex-start !important;
-  min-height: 130px !important;
-  padding: 16px !important;
+  min-height: 116px !important;
+  padding: 14px !important;
   border-radius: 10px !important;
   white-space: normal !important;
 }
@@ -5724,39 +5726,76 @@ body.dark .copilot-workbench .session-row,
 body.dark .copilot-workbench .calendar-card,
 body.dark .copilot-workbench .watch-card,
 body.dark .copilot-workbench .monitor-card,
+body.dark .copilot-workbench .quick-task-shelf,
+body.dark .copilot-workbench .quick-task-shelf .welcome-task,
 body.dark .copilot-workbench .welcome-prompts button,
+body.dark .quick-tools-modal .quick-task-modal-grid .welcome-task,
 body.dark .copilot-workbench .strategy-flow-card,
+body.dark .copilot-workbench .strategy-route-panel,
+body.dark .copilot-workbench .strategy-examples,
 body.realdark .copilot-workbench .session-row,
 body.realdark .copilot-workbench .calendar-card,
 body.realdark .copilot-workbench .watch-card,
 body.realdark .copilot-workbench .monitor-card,
+body.realdark .copilot-workbench .quick-task-shelf,
+body.realdark .copilot-workbench .quick-task-shelf .welcome-task,
 body.realdark .copilot-workbench .welcome-prompts button,
+body.realdark .quick-tools-modal .quick-task-modal-grid .welcome-task,
 body.realdark .copilot-workbench .strategy-flow-card,
+body.realdark .copilot-workbench .strategy-route-panel,
+body.realdark .copilot-workbench .strategy-examples,
 .theme-dark .copilot-workbench .session-row,
 .theme-dark .copilot-workbench .calendar-card,
 .theme-dark .copilot-workbench .watch-card,
 .theme-dark .copilot-workbench .monitor-card,
+.theme-dark .copilot-workbench .quick-task-shelf,
+.theme-dark .copilot-workbench .quick-task-shelf .welcome-task,
 .theme-dark .copilot-workbench .welcome-prompts button,
-.theme-dark .copilot-workbench .strategy-flow-card {
+.theme-dark .quick-tools-modal .quick-task-modal-grid .welcome-task,
+.theme-dark .copilot-workbench .strategy-flow-card,
+.theme-dark .copilot-workbench .strategy-route-panel,
+.theme-dark .copilot-workbench .strategy-examples {
   border-color: rgba(255, 255, 255, 0.11) !important;
   background: #141414 !important;
   box-shadow: none !important;
 }
 
+body.dark .copilot-workbench .strategy-flow-card.active,
+body.realdark .copilot-workbench .strategy-flow-card.active,
+.theme-dark .copilot-workbench .strategy-flow-card.active {
+  border-color: color-mix(in srgb, var(--qd-accent) 72%, rgba(255, 255, 255, 0.14)) !important;
+  background: color-mix(in srgb, var(--qd-accent) 15%, #141414) !important;
+}
+
 body.dark .copilot-workbench .session-row:hover,
 body.dark .copilot-workbench .calendar-card:hover,
 body.dark .copilot-workbench .watch-card:hover,
+body.dark .copilot-workbench .quick-task-shelf .welcome-task:hover,
 body.dark .copilot-workbench .welcome-prompts button:hover,
+body.dark .quick-tools-modal .quick-task-modal-grid .welcome-task:hover,
+body.dark .copilot-workbench .strategy-example-row:hover,
 body.realdark .copilot-workbench .session-row:hover,
 body.realdark .copilot-workbench .calendar-card:hover,
 body.realdark .copilot-workbench .watch-card:hover,
+body.realdark .copilot-workbench .quick-task-shelf .welcome-task:hover,
 body.realdark .copilot-workbench .welcome-prompts button:hover,
+body.realdark .quick-tools-modal .quick-task-modal-grid .welcome-task:hover,
+body.realdark .copilot-workbench .strategy-example-row:hover,
 .theme-dark .copilot-workbench .session-row:hover,
 .theme-dark .copilot-workbench .calendar-card:hover,
 .theme-dark .copilot-workbench .watch-card:hover,
-.theme-dark .copilot-workbench .welcome-prompts button:hover {
+.theme-dark .copilot-workbench .quick-task-shelf .welcome-task:hover,
+.theme-dark .copilot-workbench .welcome-prompts button:hover,
+.theme-dark .quick-tools-modal .quick-task-modal-grid .welcome-task:hover,
+.theme-dark .copilot-workbench .strategy-example-row:hover {
   border-color: color-mix(in srgb, var(--qd-accent) 42%, rgba(255, 255, 255, 0.14)) !important;
   background: #191919 !important;
+}
+
+body.dark .copilot-workbench .strategy-example-row,
+body.realdark .copilot-workbench .strategy-example-row,
+.theme-dark .copilot-workbench .strategy-example-row {
+  border-top-color: rgba(255, 255, 255, 0.11) !important;
 }
 
 body.dark .copilot-workbench .session-row.active,
@@ -5808,13 +5847,14 @@ body.realdark .copilot-workbench .empty-mini,
 }
 
 @media (max-width: 1360px) {
-  .strategy-flow {
+  .strategy-type-grid {
     grid-template-columns: 1fr !important;
   }
 }
 
 @media (max-width: 960px) {
   .copilot-workbench .hero-main,
+  .copilot-workbench .quick-task-shelf,
   .copilot-workbench .welcome-prompts {
     grid-template-columns: 1fr;
   }

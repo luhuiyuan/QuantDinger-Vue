@@ -25,12 +25,21 @@ const normalizeVersion = (value) => {
 }
 
 const resolveAppVersion = (env) => {
+  const gitVersion = (() => {
+    try {
+      return execSync('git describe --tags --exact-match HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+    } catch (e) {
+      return ''
+    }
+  })()
   return normalizeVersion(env.VITE_APP_VERSION) ||
     normalizeVersion(env.APP_VERSION) ||
     normalizeVersion(process.env.APP_VERSION) ||
     normalizeVersion(env.GIT_TAG) ||
     normalizeVersion(process.env.GIT_TAG) ||
     normalizeVersion(process.env.GITHUB_REF_NAME) ||
+    normalizeVersion(process.env.GITHUB_REF) ||
+    normalizeVersion(gitVersion) ||
     normalizeVersion(pkg.version) ||
     '0.0.0-dev'
 }

@@ -272,7 +272,6 @@ export default {
         { id: 'kucoin', name: 'KuCoin', docsUrl: 'https://www.kucoin.com/docs-new/authentication' },
         { id: 'gate', name: 'Gate.io', docsUrl: 'https://www.gate.com/docs/developers/apiv4/' },
         { id: 'bitfinex', name: 'Bitfinex', docsUrl: 'https://docs.bitfinex.com/docs/create-an-api-key' },
-        { id: 'deepcoin', name: 'Deepcoin', docsUrl: 'https://www.deepcoin.com/docs/authentication' },
         { id: 'htx', name: 'HTX', docsUrl: 'https://www.htx.com/en-us/opend/newApiPages/?id=414' }
       ]
     }
@@ -340,7 +339,6 @@ export default {
         kucoin: 'KuCoin',
         gate: 'Gate.io',
         bitfinex: 'Bitfinex',
-        deepcoin: 'Deepcoin',
         htx: 'HTX',
         ibkr: 'IBKR',
         mt5: 'MetaTrader 5',

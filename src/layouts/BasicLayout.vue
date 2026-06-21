@@ -280,7 +280,7 @@ export default {
       return this.brandConfig
     },
     appVersion () {
-      const buildVersion = typeof APP_VERSION !== 'undefined' ? APP_VERSION : '3.0.28'
+      const buildVersion = typeof APP_VERSION !== 'undefined' ? APP_VERSION : '0.0.0-dev'
       return (this.brandConfig && this.brandConfig.app_version) || defaultSettings.appVersion || buildVersion
     },
     currentLogo () {

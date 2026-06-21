@@ -65,7 +65,7 @@
               :description="emptySearchLabel"
               style="margin-top: 48px;"
             />
-            <a-form v-else :form="form" layout="vertical" class="settings-form">
+            <a-form v-else :form="form" layout="vertical" class="settings-form" autocomplete="off">
               <a-row :gutter="24">
                 <a-col
                   v-for="entry in searchResults"
@@ -106,6 +106,12 @@
                       <a-input
                         v-decorator="[entry.item.key, { initialValue: getFieldValue(entry.groupKey, entry.item.key) }]"
                         :placeholder="entry.item.default ? `${$t('settings.default')}: ${entry.item.default}` : ''"
+                        :name="getSafeInputName(entry.item)"
+                        :autocomplete="getAutocomplete(entry.item)"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-bwignore="true"
+                        data-form-type="other"
                         allowClear
                       />
                     </template>
@@ -113,8 +119,17 @@
                       <div class="password-field">
                         <a-input
                           v-decorator="[entry.item.key, { initialValue: getFieldValue(entry.groupKey, entry.item.key) }]"
-                          :type="passwordVisible[entry.item.key] ? 'text' : 'password'"
+                          type="text"
+                          :class="{ 'secret-masked-input': !passwordVisible[entry.item.key] }"
                           :placeholder="$t('settings.inputApiKey')"
+                          :name="getSafeInputName(entry.item)"
+                          :autocomplete="getAutocomplete(entry.item)"
+                          spellcheck="false"
+                          autocapitalize="off"
+                          data-lpignore="true"
+                          data-1p-ignore="true"
+                          data-bwignore="true"
+                          data-form-type="other"
                           allowClear
                         >
                           <a-icon
@@ -261,7 +276,7 @@
               </a-card>
             </div>
 
-            <a-form :form="form" layout="vertical" class="settings-form">
+            <a-form :form="form" layout="vertical" class="settings-form" autocomplete="off">
               <div v-if="activeGroupKey === 'ai'" class="ai-settings-panel">
                 <a-alert
                   class="ai-provider-alert"
@@ -326,6 +341,12 @@
                           <a-input
                             v-decorator="[entry.item.key, { initialValue: getFieldValue(activeGroupKey, entry.item.key) }]"
                             :placeholder="entry.item.default ? `${$t('settings.default')}: ${entry.item.default}` : ''"
+                            :name="getSafeInputName(entry.item)"
+                            :autocomplete="getAutocomplete(entry.item)"
+                            data-lpignore="true"
+                            data-1p-ignore="true"
+                            data-bwignore="true"
+                            data-form-type="other"
                             allowClear
                           />
                         </template>
@@ -333,8 +354,17 @@
                           <div class="password-field">
                             <a-input
                               v-decorator="[entry.item.key, { initialValue: getFieldValue(activeGroupKey, entry.item.key) }]"
-                              :type="passwordVisible[entry.item.key] ? 'text' : 'password'"
+                              type="text"
+                              :class="{ 'secret-masked-input': !passwordVisible[entry.item.key] }"
                               :placeholder="$t('settings.inputApiKey')"
+                              :name="getSafeInputName(entry.item)"
+                              :autocomplete="getAutocomplete(entry.item)"
+                              spellcheck="false"
+                              autocapitalize="off"
+                              data-lpignore="true"
+                              data-1p-ignore="true"
+                              data-bwignore="true"
+                              data-form-type="other"
                               allowClear
                             >
                               <a-icon
@@ -462,6 +492,12 @@
                       <a-input
                         v-decorator="[entry.item.key, { initialValue: getFieldValue(activeGroupKey, entry.item.key) }]"
                         :placeholder="entry.item.default ? `${$t('settings.default')}: ${entry.item.default}` : ''"
+                        :name="getSafeInputName(entry.item)"
+                        :autocomplete="getAutocomplete(entry.item)"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-bwignore="true"
+                        data-form-type="other"
                         allowClear
                       />
                     </template>
@@ -469,8 +505,17 @@
                       <div class="password-field">
                         <a-input
                           v-decorator="[entry.item.key, { initialValue: getFieldValue(activeGroupKey, entry.item.key) }]"
-                          :type="passwordVisible[entry.item.key] ? 'text' : 'password'"
+                          type="text"
+                          :class="{ 'secret-masked-input': !passwordVisible[entry.item.key] }"
                           :placeholder="$t('settings.inputApiKey')"
+                          :name="getSafeInputName(entry.item)"
+                          :autocomplete="getAutocomplete(entry.item)"
+                          spellcheck="false"
+                          autocapitalize="off"
+                          data-lpignore="true"
+                          data-1p-ignore="true"
+                          data-bwignore="true"
+                          data-form-type="other"
                           allowClear
                         >
                           <a-icon
@@ -558,8 +603,7 @@
 
             <!-- Brand group footer: commercial license notice. Shown only
                  under "Brand & Identity" so it's visible right where an
-                 operator sets up their fork. Single official email channel
-                 to avoid impersonation risk via informal IM handles. -->
+                 operator sets up their fork. -->
             <div v-if="activeGroupKey === 'brand'" class="commercial-license-notice">
               <a-alert
                 type="warning"
@@ -570,8 +614,13 @@
                   <p>{{ $t('settings.commercialLicense.body') }}</p>
                   <p class="license-contact">
                     <span class="contact-label">{{ $t('settings.commercialLicense.contactLabel') }}:</span>
-                    <a href="mailto:support@quantdinger.com" class="contact-link">
-                      <a-icon type="mail" /> support@quantdinger.com
+                    <a
+                      href="https://www.quantdinger.com/#license"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="contact-link"
+                    >
+                      <a-icon type="link" /> {{ $t('settings.commercialLicense.applyLink') }}
                     </a>
                   </p>
                 </div>
@@ -620,7 +669,8 @@ export default {
       showRestartTip: false,
       balanceLoading: false,
       openrouterBalance: null,
-      selectedLlmProvider: ''
+      selectedLlmProvider: '',
+      settingsInputNonce: Math.random().toString(36).slice(2, 10)
     }
   },
   computed: {
@@ -715,7 +765,6 @@ export default {
         if (item.key === 'LLM_PROVIDER' || item.group || this.isSearchSetting(item)) return false
         return true
       })
-      const searchItems = this.aiItems.filter(item => this.isSearchSetting(item))
       return [
         {
           key: 'provider',
@@ -736,12 +785,6 @@ export default {
           title: this.tOr('settings.llm.commonSection', 'Common AI parameters'),
           description: this.tOr('settings.llm.commonSectionDesc', 'Shared behavior used across providers.'),
           items: commonItems
-        },
-        {
-          key: 'search',
-          title: this.tOr('settings.llm.searchSection', 'News and web search'),
-          description: this.tOr('settings.llm.searchSectionDesc', 'Optional search keys used to enrich AI analysis with market news.'),
-          items: searchItems
         }
       ]
         .filter(section => section.items.length > 0)
@@ -782,6 +825,63 @@ export default {
       return key.startsWith('SEARCH_') ||
         key === 'TAVILY_API_KEYS' ||
         key === 'SERPAPI_KEYS'
+    },
+    isAutofillSensitiveSetting (item) {
+      const key = String(item && item.key ? item.key : '').toUpperCase()
+      return item && (item.type === 'password' || /(^|_)(KEY|SECRET|TOKEN|PASSWORD|CLIENT_ID|SITE_KEY)(_|$)/.test(key))
+    },
+    hashSettingKey (key) {
+      let hash = 0
+      const text = String(key || '')
+      for (let i = 0; i < text.length; i += 1) {
+        hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0
+      }
+      return Math.abs(hash).toString(36)
+    },
+    getSafeInputName (item) {
+      return `qd-config-${this.settingsInputNonce}-${this.hashSettingKey(item && item.key)}`
+    },
+    getAutocomplete (item) {
+      return this.isAutofillSensitiveSetting(item) ? 'new-password' : 'off'
+    },
+    isSuspiciousAutofillValue (item, value) {
+      if (!this.isAutofillSensitiveSetting(item)) return false
+      const normalized = String(value || '').trim().toLowerCase()
+      if (!normalized) return false
+      return [
+        'admin',
+        'administrator',
+        'quantdinger',
+        'root',
+        'user',
+        'test',
+        'demo',
+        'password',
+        '123456',
+        'changeme',
+        'change-me',
+        'placeholder',
+        'dummy'
+      ].includes(normalized)
+    },
+    formatMessage (key, fallback, params = {}) {
+      let text = this.tOr(key, fallback)
+      Object.keys(params).forEach((name) => {
+        text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), params[name])
+      })
+      return text
+    },
+    findSuspiciousAutofillFields (formValues) {
+      const hits = []
+      for (const [groupKey, group] of Object.entries(this.schema)) {
+        for (const item of (group.items || [])) {
+          if (!(item.key in formValues)) continue
+          if (this.isSuspiciousAutofillValue(item, formValues[item.key])) {
+            hits.push(this.getItemLabel(groupKey, item) || item.key)
+          }
+        }
+      }
+      return hits
     },
     buildSettingEntries (items) {
       const basicItems = (items || []).filter(item => !item.is_advanced)
@@ -1104,6 +1204,16 @@ export default {
     async handleSave () {
       this.form.validateFields(async (err, formValues) => {
         if (err) {
+          return
+        }
+
+        const suspiciousFields = this.findSuspiciousAutofillFields(formValues)
+        if (suspiciousFields.length) {
+          this.$message.warning(this.formatMessage(
+            'settings.sensitiveAutofillBlocked',
+            'Some sensitive settings look like browser autofill values: {fields}. Clear them or enter the real keys before saving.',
+            { fields: suspiciousFields.join(', ') }
+          ))
           return
         }
 
@@ -1550,6 +1660,12 @@ export default {
     }
 
     .password-field {
+      ::v-deep .secret-masked-input {
+        -webkit-text-security: disc;
+        text-security: disc;
+        font-family: text-security-disc, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+
       .field-hint {
         margin-top: 4px;
         font-size: 12px;
@@ -1674,7 +1790,7 @@ export default {
   }
 
   &.theme-dark {
-    background: linear-gradient(180deg, #141414 0%, #1c1c1c 100%);
+    background: #0f0f10;
 
     .restart-alert {
       background: #1c1c1c;
@@ -1702,7 +1818,7 @@ export default {
     }
 
     .settings-nav {
-      background: #1c1c1c;
+      background: #181818;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
 
       ::v-deep .ant-menu-item {
@@ -1724,7 +1840,7 @@ export default {
     }
 
     .settings-detail {
-      background: #1c1c1c;
+      background: #181818;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
 
       .detail-header {
@@ -1754,8 +1870,8 @@ export default {
 
     .ai-settings-panel {
       .ai-settings-section {
-        background: #161b22;
-        border-color: rgba(255, 255, 255, 0.08);
+        background: #141414;
+        border-color: #2a2a2a;
       }
 
       .ai-section-header {
@@ -1769,6 +1885,17 @@ export default {
           color: #8b949e;
         }
       }
+    }
+
+    ::v-deep .ant-alert-info {
+      background: #141414 !important;
+      border-color: #2a2a2a !important;
+      color: rgba(255, 255, 255, 0.82) !important;
+    }
+
+    ::v-deep .ant-alert-info .ant-alert-message,
+    ::v-deep .ant-alert-info .ant-alert-description {
+      color: rgba(255, 255, 255, 0.82) !important;
     }
 
     .settings-form {

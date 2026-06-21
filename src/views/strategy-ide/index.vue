@@ -969,7 +969,7 @@ export default {
 
 <style lang="less" scoped>
 .strategy-ide-shell {
-  min-height: calc(100vh - 96px);
+  min-height: calc(100vh - 64px);
   background: #f5f7fb;
 
   ::v-deep .ant-tabs-bar {
@@ -1333,8 +1333,24 @@ export default {
   background: #0f0f10;
 
   ::v-deep .ant-tabs-bar {
-    background: #141414;
+    background: #0f0f10;
     border-bottom-color: #303030;
+  }
+
+  ::v-deep .ant-tabs-tab {
+    color: rgba(255, 255, 255, 0.58) !important;
+  }
+
+  ::v-deep .ant-tabs-tab:hover {
+    color: rgba(255, 255, 255, 0.82) !important;
+  }
+
+  ::v-deep .ant-tabs-tab-active {
+    color: #177ddc !important;
+  }
+
+  ::v-deep .ant-tabs-tab-disabled {
+    color: rgba(255, 255, 255, 0.25) !important;
   }
 
   .panel-title,
@@ -1358,7 +1374,7 @@ export default {
   }
 
   .panel-head {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.34) 0%, rgba(24, 24, 24, 0.96) 100%);
+    background: #181818;
   }
 
   .panel-head,
@@ -1510,4 +1526,3 @@ export default {
   }
 }
 </style>
-

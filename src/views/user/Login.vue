@@ -413,6 +413,38 @@
       </div>
     </div>
 
+    <!-- MFA Login Modal -->
+    <a-modal
+      v-model="mfaLoginVisible"
+      :title="$t('user.login.mfa.title') || 'Two-step verification'"
+      :confirmLoading="mfaLoginLoading"
+      :okText="$t('user.login.mfa.verify') || 'Verify'"
+      :cancelText="$t('common.cancel') || 'Cancel'"
+      :destroyOnClose="true"
+      @ok="handleMfaLoginVerify"
+      @cancel="resetMfaLogin"
+    >
+      <div class="mfa-login-panel">
+        <a-alert
+          type="info"
+          showIcon
+          :message="$t('user.login.mfa.hint') || 'Open your authenticator app and enter the 6-digit code for this account.'"
+          style="margin-bottom: 16px"
+        />
+        <a-input
+          v-model="mfaLoginCode"
+          size="large"
+          :maxLength="16"
+          autocomplete="one-time-code"
+          :placeholder="$t('user.login.mfa.placeholder') || '6-digit code'"
+          @pressEnter="handleMfaLoginVerify"
+        >
+          <a-icon slot="prefix" type="safety-certificate" />
+        </a-input>
+        <div v-if="mfaLoginError" class="mfa-login-error">{{ mfaLoginError }}</div>
+      </div>
+    </a-modal>
+
     <!-- Reset Password Modal -->
     <a-modal
       v-model="showResetModal"
@@ -623,7 +655,7 @@
 <script>
 import { mapActions } from 'vuex'
 import { timeFix } from '@/utils/util'
-import { getSecurityConfig, sendVerificationCode, register, resetPassword, loginWithCode, getGoogleOAuthUrl, getGitHubOAuthUrl } from '@/api/auth'
+import { getSecurityConfig, sendVerificationCode, register, resetPassword, loginWithCode, getGoogleOAuthUrl, getGitHubOAuthUrl, verifyLoginMfa } from '@/api/auth'
 import Turnstile from '@/components/Turnstile/index.vue'
 import storage from 'store'
 import { ACCESS_TOKEN, USER_INFO, USER_ROLES } from '@/store/mutation-types'
@@ -665,6 +697,11 @@ export default {
       loginError: '',
       loginLoading: false,
       loginTurnstileToken: null,
+      mfaLoginVisible: false,
+      mfaLoginLoading: false,
+      mfaLoginCode: '',
+      mfaLoginError: '',
+      mfaChallengeId: '',
 
       // Email Code Login
       codeLoginForm: this.$form.createForm(this, { name: 'codeLoginForm' }),
@@ -830,13 +867,15 @@ export default {
         this.loginError = ''
 
         this.Login({ ...values, turnstile_token: this.loginTurnstileToken })
-          .then(() => {
-            this.$router.push({ path: '/' })
-            this.$notification.success({
-              message: 'Welcome',
-              description: `${timeFix()}, welcome back.`
-            })
-            this.$nextTick(() => promptChangeInitialPassword())
+          .then((res) => {
+            if (res && res.data && res.data.mfa_required) {
+              this.mfaChallengeId = res.data.challenge_id
+              this.mfaLoginCode = ''
+              this.mfaLoginError = ''
+              this.mfaLoginVisible = true
+              return
+            }
+            this.afterLoginSuccess()
           })
           .catch(err => {
             const response = err.response || {}
@@ -849,6 +888,82 @@ export default {
             this.loginLoading = false
           })
       })
+    },
+
+    async handleMfaLoginVerify () {
+      const code = (this.mfaLoginCode || '').trim()
+      if (!code) {
+        this.mfaLoginError = this.$t('user.login.mfa.required') || 'Please enter the verification code'
+        return
+      }
+      this.mfaLoginLoading = true
+      this.mfaLoginError = ''
+      try {
+        const res = await verifyLoginMfa({
+          challenge_id: this.mfaChallengeId,
+          code
+        })
+        if (res.code === 1 && res.data && res.data.token) {
+          this.applyLoginResult(res.data)
+          this.resetMfaLogin()
+          this.afterLoginSuccess()
+        } else {
+          this.mfaLoginError = res.msg || this.$t('user.login.mfa.failed') || 'Verification failed'
+        }
+      } catch (err) {
+        this.mfaLoginError = err.response?.data?.msg || err.message || this.$t('user.login.mfa.failed') || 'Verification failed'
+      } finally {
+        this.mfaLoginLoading = false
+      }
+    },
+
+    resetMfaLogin () {
+      this.mfaLoginVisible = false
+      this.mfaLoginCode = ''
+      this.mfaLoginError = ''
+      this.mfaChallengeId = ''
+    },
+
+    afterLoginSuccess () {
+      this.$router.push({ path: '/' })
+      this.$notification.success({
+        message: 'Welcome',
+        description: `${timeFix()}, welcome back.`
+      })
+      this.$nextTick(() => promptChangeInitialPassword())
+    },
+
+    applyLoginResult (data) {
+      const expiresAt = new Date().getTime() + 7 * 24 * 60 * 60 * 1000
+      storage.set(ACCESS_TOKEN, data.token, expiresAt)
+      this.$store.commit('SET_TOKEN', data.token)
+
+      if (data.userinfo) {
+        const userInfoData = { ...data.userinfo }
+        if (typeof userInfoData.is_demo === 'undefined') {
+          userInfoData.is_demo = false
+        }
+
+        storage.set(USER_INFO, userInfoData, expiresAt)
+        this.$store.commit('SET_INFO', userInfoData)
+
+        const name = userInfoData.nickname || userInfoData.username || 'User'
+        this.$store.commit('SET_NAME', { name, welcome: timeFix() })
+        this.$store.commit('SET_AVATAR', userInfoData.avatar || '/avatar2.jpg')
+
+        let roles = [{ id: 'default', permissionList: [] }]
+        if (userInfoData.role) {
+          if (Array.isArray(userInfoData.role)) {
+            roles = userInfoData.role
+          } else if (typeof userInfoData.role === 'object') {
+            roles = [userInfoData.role]
+          } else {
+            roles = [{ id: userInfoData.role, permissionList: [] }]
+          }
+        }
+        storage.set(USER_ROLES, roles, expiresAt)
+        this.$store.commit('SET_ROLES', roles)
+      }
     },
 
     // ==================== Email Code Login ====================
@@ -1519,6 +1634,15 @@ export default {
       color: #ff4d4f;
       font-size: 12px;
       line-height: 1.4;
+    }
+  }
+
+  .mfa-login-panel {
+    .mfa-login-error {
+      margin-top: 8px;
+      color: #ff4d4f;
+      font-size: 13px;
+      line-height: 1.5;
     }
   }
 }

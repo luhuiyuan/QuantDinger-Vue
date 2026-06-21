@@ -186,7 +186,7 @@
 
 
 
-  /* ========== GlobalHeader 鏍稿績鏍峰紡锛堝熀浜?.ant-pro-global-header锛?========== */
+  /* ========== GlobalHeader core styles ========== */
   /* Dropdown controls. */
   body.dark .ant-pro-global-header,
   body.realdark .ant-pro-global-header,
@@ -208,7 +208,7 @@
       color: rgba(255, 255, 255, 0.85) !important;
     }
 
-    /* Logo 鍖哄煙 */
+    /* Logo surface. */
     .ant-pro-global-header-logo {
       background: transparent !important;
       color: rgba(255, 255, 255, 0.85) !important;
@@ -227,7 +227,7 @@
     }
   }
 
-  /* Header 鍐呭鍖哄煙锛堜腑闂撮儴鍒嗭紝鍖呭惈鍒锋柊鎸夐挳绛夛級 */
+  /* Header content area. */
   .ant-pro-global-header-content {
     background: transparent !important;
     color: rgba(255, 255, 255, 0.85) !important;
@@ -236,7 +236,7 @@
       color: rgba(255, 255, 255, 0.85) !important;
     }
 
-    /* 鍒锋柊鎸夐挳绛夊浘鏍?*/
+    /* Header action icons. */
     .anticon {
       color: rgba(255, 255, 255, 0.85) !important;
 
@@ -247,7 +247,7 @@
       }
     }
 
-    /* 宸ュ叿鎻愮ず鍐呯殑鍥炬爣 */
+    /* Keep tooltip-open icons readable. */
     .ant-tooltip-open .anticon {
       color: rgba(255, 255, 255, 0.85) !important;
     }
@@ -262,7 +262,7 @@
       color: rgba(255, 255, 255, 0.85) !important;
     }
 
-    /* 鎿嶄綔鎸夐挳锛堝ご鍍忋€佽瑷€銆佽缃級 */
+    /* Right-side header actions. */
     .ant-pro-global-header-index-action {
       color: rgba(255, 255, 255, 0.85) !important;
 
@@ -340,12 +340,12 @@
   /* Theme compatibility override. */
   &.dark,
   &.realdark {
-    /* 0. 鍩虹 Layout 鑳屾櫙 */
+    /* 0. Base layout background. */
     :global(.ant-layout) {
       background-color: #0a0a0a !important;
     }
 
-    /* 1. 椤堕儴 Header */
+    /* 1. Header. */
     :global(.ant-layout-header) {
       background: #111111 !important;
       border-bottom: 1px solid #1c1c1c !important;
@@ -405,12 +405,12 @@
 
   /* Theme compatibility override. */
   &.light {
-    /* 0. 鍩虹 Layout 鑳屾櫙 */
+    /* 0. Base layout background. */
     :global(.ant-layout) {
       background-color: #f0f2f5 !important;
     }
 
-    /* 1. 椤堕儴 Header */
+    /* 1. Header. */
     :global(.ant-layout-header) {
       background: #fff !important;
       border-bottom: 1px solid #e8e8e8 !important;
@@ -514,11 +514,11 @@
   }
 }
 
-/* ========== 渚ц竟鏍?body 绾у己鍔涜鐩?========== */
+/* ========== Body-level sidebar overrides ========== */
 :global {
   body.dark,
   body.realdark {
-    /* 渚ц竟鏍忓鍣?*/
+    /* Sidebar containers. */
     .ant-layout-sider,
     .ant-layout-sider-dark,
     .ant-pro-sider-menu-sider,
@@ -528,7 +528,7 @@
     .ant-layout-sider-children {
       background: #0a0a0a !important;
     }
-    /* 鑿滃崟鏈綋 */
+    /* Dark menu surfaces. */
     .ant-menu-dark,
     .ant-menu.ant-menu-dark,
     .ant-menu-dark .ant-menu-inline.ant-menu-sub,
@@ -542,11 +542,11 @@
     .ant-menu-dark .ant-menu-item-selected {
       background: rgba(24, 144, 255, 0.25) !important;
     }
-    /* Logo 鍖哄煙 */
+    /* Logo surface. */
     .ant-pro-sider-menu-logo {
       background: #0a0a0a !important;
     }
-    /* 鎶樺彔瑙﹀彂鍣?*/
+    /* Sidebar trigger. */
     .ant-layout-sider-trigger {
       background: #111111 !important;
       border-top: 1px solid #1c1c1c;
@@ -594,7 +594,7 @@
   }
 }
 
-/* 鎵嬫満绔€傞厤 */
+/* Mobile layout adjustments. */
 @media (max-width: 768px) {
   :global {
     /* Theme compatibility override. */

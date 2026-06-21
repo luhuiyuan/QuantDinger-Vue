@@ -1062,6 +1062,22 @@ const withAlpha = (color, alpha) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
+const isSolidHexColor = (color) => /^#?[0-9a-fA-F]{6}$/.test(String(color || '').trim())
+
+const resolveLayerColor = (color, fallback, alpha) => {
+  const raw = String(color || '').trim()
+  const base = raw || fallback
+  if (isSolidHexColor(base)) return withAlpha(base, alpha)
+  if (/^rgba?\(/i.test(base)) return base
+  return withAlpha(fallback, alpha)
+}
+
+const measureLayerText = (text, fontSize = 10, min = 40, max = 140) => {
+  const raw = String(text || '')
+  const width = raw.split('').reduce((acc, char) => acc + (char.charCodeAt(0) > 255 ? fontSize : fontSize * 0.58), 0)
+  return Math.max(min, Math.min(max, width + 18))
+}
+
 const normalizeCompactBacktestMarkerText = (text, side) => {
   const raw = String(text || '').trim()
   const lower = raw.toLowerCase()
@@ -1308,30 +1324,54 @@ registerOverlay({
         const x2 = Math.max(coordinates[0].x, coordinates[1].x)
         const y1 = Math.min(coordinates[0].y, coordinates[1].y)
         const y2 = Math.max(coordinates[0].y, coordinates[1].y)
-        const color = data.color || '#1890ff'
-        const opacity = Number.isFinite(Number(data.opacity)) ? Number(data.opacity) : 0.14
+        const isDark = chartTheme.value === 'dark'
+        const text = String(data.text || '')
+        const lowerText = text.toLowerCase()
+        const semanticAccent = lowerText.includes('risk') || lowerText.includes('atr')
+          ? '#fa8c16'
+          : (lowerText.includes('support') ? '#13c2c2' : (lowerText.includes('resistance') ? '#f5222d' : '#1890ff'))
+        const color = data.color || semanticAccent
+        const opacity = Number.isFinite(Number(data.opacity)) ? Math.min(Number(data.opacity), 0.10) : (isDark ? 0.075 : 0.055)
+        const fillColor = resolveLayerColor(data.fillColor, color, opacity)
+        const borderColor = resolveLayerColor(data.borderColor, color, isDark ? 0.48 : 0.42)
         const figures = [
           {
             type: 'rect',
             attrs: { x: x1, y: y1, width: Math.max(1, x2 - x1), height: Math.max(1, y2 - y1) },
             styles: {
               style: 'stroke_fill',
-              color: data.fillColor || withAlpha(color, opacity),
-              borderColor: data.borderColor || withAlpha(color, Math.min(opacity + 0.22, 0.55)),
+              color: fillColor,
+              borderColor,
               borderSize: Number(data.borderSize || 1),
-              borderDashedValue: data.dashed ? [4, 4] : []
+              borderDashedValue: data.dashed === false ? [] : [5, 4]
             },
             ignoreEvent: true
           }
         ]
-        if (data.text) {
+        if (text) {
+          const fontSize = Number(data.fontSize || 10)
+          const labelWidth = measureLayerText(text, fontSize, 48, 150)
+          const labelHeight = Math.max(17, fontSize + 8)
+          const labelX = x1 + 8
+          const labelY = y1 + 8
+          figures.push({
+            type: 'rect',
+            attrs: { x: labelX, y: labelY, width: labelWidth, height: labelHeight, r: 5 },
+            styles: {
+              style: 'stroke_fill',
+              color: isDark ? 'rgba(14, 18, 25, 0.78)' : 'rgba(255, 255, 255, 0.78)',
+              borderColor: resolveLayerColor(data.borderColor, color, isDark ? 0.38 : 0.30),
+              borderSize: 1
+            },
+            ignoreEvent: true
+          })
           figures.push({
             type: 'text',
-            attrs: { x: x1 + 6, y: y1 + 13, text: String(data.text), align: 'left', baseline: 'middle' },
+            attrs: { x: labelX + 9, y: labelY + labelHeight / 2, text, align: 'left', baseline: 'middle' },
             styles: {
               color: data.textColor || color,
-              size: Number(data.fontSize || 10),
-              weight: '600',
+              size: fontSize,
+              weight: '700',
               backgroundColor: 'transparent'
             },
             ignoreEvent: true
@@ -1396,28 +1436,34 @@ registerOverlay({
         const data = overlay.extendData || {}
         const text = String(data.text || '')
         if (!text) return []
-        const color = data.color || '#1890ff'
+        const isDark = chartTheme.value === 'dark'
+        const lowerText = text.toLowerCase()
+        const color = data.color || (lowerText.includes('bull') ? '#12b76a' : (lowerText.includes('bear') ? '#f04438' : '#1677ff'))
         const isAbove = data.side === 'above' || data.side === 'sell'
         const fontSize = Number(data.fontSize || 10)
-        const width = Math.max(24, Math.min(86, text.length * 7 + 12))
-        const height = fontSize + 8
+        const width = measureLayerText(text, fontSize, 38, 132)
+        const height = fontSize + 9
         const x = coordinates[0].x
+        const anchorRight = data.side === 'right' || lowerText.startsWith('regime')
+        const rectX = anchorRight ? x + 8 : x - width / 2
         const y = coordinates[0].y + (isAbove ? -height - 7 : 7)
         return [
           {
             type: 'rect',
-            attrs: { x: x - width / 2, y, width, height, r: 4 },
+            attrs: { x: rectX, y, width, height, r: 5 },
             styles: {
               style: 'stroke_fill',
-              color: data.fillColor || withAlpha(color, 0.14),
-              borderColor: data.borderColor || withAlpha(color, 0.55),
+              color: data.fillColor
+                ? resolveLayerColor(data.fillColor, color, isDark ? 0.20 : 0.12)
+                : (isDark ? 'rgba(14, 18, 25, 0.76)' : 'rgba(255, 255, 255, 0.82)'),
+              borderColor: data.borderColor ? resolveLayerColor(data.borderColor, color, 0.46) : withAlpha(color, 0.46),
               borderSize: 1
             },
             ignoreEvent: true
           },
           {
             type: 'text',
-            attrs: { x, y: y + height / 2, text, align: 'center', baseline: 'middle' },
+            attrs: { x: rectX + width / 2, y: y + height / 2, text, align: 'center', baseline: 'middle' },
             styles: {
               color: data.textColor || color,
               size: fontSize,

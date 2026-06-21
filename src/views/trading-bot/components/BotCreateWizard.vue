@@ -85,7 +85,7 @@
               </a-select-option>
             </a-select>
             <div class="form-hint" style="margin-top: 6px;">
-              <router-link to="/profile?tab=exchange">
+              <router-link to="/broker-accounts">
                 <a-icon type="setting" /> {{ $t('trading-bot.wizard.manageCredentials') }}
               </router-link>
             </div>
