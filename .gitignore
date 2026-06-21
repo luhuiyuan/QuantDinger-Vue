@@ -1,4 +1,11 @@
 .DS_Store
+.cache/
+.codex/
+.codex-logs/
+.agents/
+.local_tools/
+outputs/
+.pytest_cache/
 node_modules
 /dist
 # local env files
