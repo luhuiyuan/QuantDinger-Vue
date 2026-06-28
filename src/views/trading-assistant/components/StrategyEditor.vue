@@ -98,7 +98,7 @@
           </a-tab-pane>
 
           <a-tab-pane key="params" :tab="$t('trading-assistant.editor.paramsTab')" :force-render="true">
-            <div v-if="activeParamTemplate" class="params-panel">
+            <div class="params-panel">
               <div class="panel-intro">
                 <div class="panel-intro__title">
                   {{ activeParamTemplateTitle }}
@@ -107,6 +107,21 @@
                   {{ activeParamTemplateDesc }}
                 </div>
               </div>
+              <div class="param-item param-item--strategy-name">
+                <div class="param-item__label-row">
+                  <span class="param-item__label">{{ $t('trading-assistant.form.strategyName') }}</span>
+                  <span class="param-item__type">{{ getParamTypeLabel('text') }}</span>
+                </div>
+                <div class="param-item__desc">{{ $t('trading-assistant.form.strategyNameHint') }}</div>
+                <a-input
+                  :value="strategyName"
+                  :placeholder="$t('trading-assistant.form.strategyName')"
+                  @input="handleStrategyNameInput($event.target.value)"
+                  @blur="commitStrategyNameToCode"
+                  @pressEnter="commitStrategyNameToCode"
+                />
+              </div>
+              <template v-if="activeParamTemplate">
               <a-alert
                 type="info"
                 show-icon
@@ -177,8 +192,9 @@
                   {{ $t('trading-assistant.editor.applyTemplateParams') }}
                 </a-button>
               </div>
+              </template>
             </div>
-            <div v-else class="params-empty-guide">
+            <div v-if="!activeParamTemplate" class="params-empty-guide">
               <a-empty :description="$t('trading-assistant.editor.paramsEmpty')">
                 <a-button type="primary" size="small" ghost @click="activeTab = 'templates'">
                   <a-icon type="appstore" />
@@ -317,6 +333,7 @@ export default {
     isDark: { type: Boolean, default: false },
     userId: { type: [Number, String], default: 1 },
     strategyId: { type: [Number, String], default: null },
+    strategyName: { type: String, default: '' },
     visible: { type: Boolean, default: false },
     initialTemplateKey: { type: String, default: '' }
   },
@@ -698,6 +715,36 @@ def on_bar(ctx, bar):
       this.$set(this.templateParamValues, param.name, value)
       this.templateDirty = true
     },
+    handleStrategyNameInput (value) {
+      this.$emit('name-change', String(value || ''))
+    },
+    commitStrategyNameToCode () {
+      const name = String(this.strategyName || '').trim()
+      if (!name) return
+      const nextCode = this.replaceCodeTitle(this.getCode(), name)
+      if (nextCode !== this.getCode()) {
+        this.setCode(nextCode)
+      }
+    },
+    replaceCodeTitle (code, name) {
+      const source = String(code || '')
+      const cleanName = String(name || '').replace(/\s+/g, ' ').replace(/("""|''')/g, '').trim()
+      if (!cleanName) return source
+      const match = source.match(/^(\s*)("""|''')([\s\S]*?)(\2)/)
+      if (!match) {
+        return `"""\n${cleanName}\n"""\n\n${source}`
+      }
+      const body = String(match[3] || '')
+      const newline = body.includes('\r\n') ? '\r\n' : '\n'
+      const lines = body.split(/\r?\n/)
+      const titleIndex = lines.findIndex(line => String(line || '').trim())
+      if (titleIndex >= 0) {
+        lines[titleIndex] = cleanName
+      } else {
+        lines.splice(1, 0, cleanName)
+      }
+      return `${match[1]}${match[2]}${lines.join(newline)}${match[4]}${source.slice(match[0].length)}`
+    },
 
     applyPromptSuggestion (value) {
       this.aiPrompt = value
@@ -1040,7 +1087,7 @@ def on_bar(ctx, bar):
   }
 
   ::v-deep .CodeMirror-cursor {
-    border-left: 2px solid #1890ff;
+    border-left: 2px solid var(--primary-color, #1890ff);
   }
 }
 
@@ -1133,7 +1180,7 @@ def on_bar(ctx, bar):
     justify-content: center;
     flex-shrink: 0;
     background: rgba(24, 144, 255, 0.12);
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
     font-size: 16px;
   }
 
@@ -1177,7 +1224,7 @@ def on_bar(ctx, bar):
 
   &:hover,
   &.active {
-    border-color: #1890ff;
+    border-color: var(--primary-color, #1890ff);
     background: rgba(24, 144, 255, 0.03);
   }
 
@@ -1219,7 +1266,7 @@ def on_bar(ctx, bar):
 
   &__check {
     flex-shrink: 0;
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
     font-size: 16px;
   }
 }
@@ -1257,7 +1304,7 @@ def on_bar(ctx, bar):
     top: 0;
     bottom: 0;
     width: 3px;
-    background: #1890ff;
+    background: var(--primary-color, #1890ff);
     opacity: 0.75;
   }
 
@@ -1333,7 +1380,7 @@ def on_bar(ctx, bar):
   &__action {
     font-size: 11px;
     font-weight: 600;
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
 
     .anticon {
       font-size: 10px;
@@ -1344,6 +1391,10 @@ def on_bar(ctx, bar):
 
 .params-tip {
   margin-bottom: 12px;
+
+  ::v-deep .ant-alert-message {
+    line-height: 1.6;
+  }
 }
 
 .param-list {
@@ -1357,6 +1408,11 @@ def on_bar(ctx, bar):
   border: 1px solid #f0f0f0;
   border-radius: 8px;
   background: #fff;
+}
+
+.param-item--strategy-name {
+  border-color: #d6e4ff;
+  background: #f8fbff;
 }
 
 .param-item__label-row {
@@ -1411,7 +1467,7 @@ def on_bar(ctx, bar):
 
 .ai-status {
   margin-top: 8px;
-  color: #1890ff;
+  color: var(--primary-color, #1890ff);
   font-size: 13px;
   text-align: center;
 }
@@ -1439,7 +1495,7 @@ def on_bar(ctx, bar):
 .ai-debug-card__badge {
   width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
   border-radius: 7px; flex-shrink: 0; font-size: 13px;
-  background: rgba(24, 144, 255, 0.1); color: #1890ff;
+  background: rgba(24, 144, 255, 0.1); color: var(--primary-color, #1890ff);
 }
 .ai-debug-card--success .ai-debug-card__badge { background: rgba(82, 196, 26, 0.1); color: #389e0d; }
 .ai-debug-card--warning .ai-debug-card__badge { background: rgba(250, 140, 22, 0.1); color: #d46b08; }
@@ -1447,7 +1503,7 @@ def on_bar(ctx, bar):
 .ai-debug-card__headline { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
 .ai-debug-card__tag {
   font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
-  color: #1890ff; white-space: nowrap;
+  color: var(--primary-color, #1890ff); white-space: nowrap;
 }
 .ai-debug-card--success .ai-debug-card__tag { color: #389e0d; }
 .ai-debug-card--warning .ai-debug-card__tag { color: #d46b08; }
@@ -1466,11 +1522,11 @@ def on_bar(ctx, bar):
 .ai-debug-chip {
   display: inline-flex; align-items: center; gap: 3px;
   padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;
-  background: rgba(24, 144, 255, 0.08); color: #1890ff;
+  background: rgba(24, 144, 255, 0.08); color: var(--primary-color, #1890ff);
 }
 .ai-debug-chip--success { background: rgba(82, 196, 26, 0.08); color: #389e0d; }
 .ai-debug-chip--warning { background: rgba(250, 140, 22, 0.08); color: #d46b08; }
-.ai-debug-chip--info { background: rgba(24, 144, 255, 0.08); color: #1890ff; }
+.ai-debug-chip--info { background: rgba(24, 144, 255, 0.08); color: var(--primary-color, #1890ff); }
 
 .ai-debug-card__body { padding: 8px 10px 0; line-height: 1.6; color: #595959; }
 
@@ -1508,6 +1564,12 @@ def on_bar(ctx, bar):
     color: #e0e6ed;
   }
 
+  .current-template-tag {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: rgba(255, 255, 255, 0.72) !important;
+  }
+
   .side-tabs {
     border-color: rgba(255, 255, 255, 0.1);
 
@@ -1524,7 +1586,7 @@ def on_bar(ctx, bar):
       }
 
       &.ant-tabs-tab-active .ant-tabs-tab-btn {
-        color: #1890ff;
+        color: var(--primary-color, #1890ff);
       }
     }
   }
@@ -1532,6 +1594,19 @@ def on_bar(ctx, bar):
   .panel-intro {
     background: #1c1c1c;
     border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .params-tip {
+    border-color: rgba(24, 144, 255, 0.18);
+    background: rgba(24, 144, 255, 0.07);
+
+    ::v-deep .ant-alert-icon {
+      color: #69c0ff;
+    }
+
+    ::v-deep .ant-alert-message {
+      color: rgba(255, 255, 255, 0.78);
+    }
   }
 
   .panel-intro__title,
@@ -1551,6 +1626,11 @@ def on_bar(ctx, bar):
   .template-card {
     border-color: rgba(255, 255, 255, 0.08);
     background: #1c1c1c;
+  }
+
+  .param-item--strategy-name {
+    border-color: rgba(64, 169, 255, 0.25);
+    background: rgba(24, 144, 255, 0.08);
   }
 
   .indicator-redirect {
@@ -1584,7 +1664,7 @@ def on_bar(ctx, bar):
 
     &:hover,
     &.active {
-      border-color: #177ddc;
+      border-color: var(--primary-color-active, #177ddc);
       background: rgba(23, 125, 220, 0.06);
     }
 
@@ -1602,7 +1682,7 @@ def on_bar(ctx, bar):
     }
 
     &__check {
-      color: #40a9ff;
+      color: var(--primary-color-hover, #40a9ff);
     }
   }
 
@@ -1635,13 +1715,13 @@ def on_bar(ctx, bar):
     }
 
     &__action {
-      color: #40a9ff;
+      color: var(--primary-color-hover, #40a9ff);
     }
   }
 
   .template-item:hover,
   .template-item.active {
-    border-color: #177ddc;
+    border-color: var(--primary-color-active, #177ddc);
     background: rgba(23, 125, 220, 0.06);
   }
 
@@ -1676,7 +1756,7 @@ def on_bar(ctx, bar):
   }
 
   .ai-status {
-    color: #40a9ff;
+    color: var(--primary-color-hover, #40a9ff);
   }
 
   .ai-debug-card { border-color: #303030; background: #1f1f1f; }

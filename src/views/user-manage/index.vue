@@ -260,7 +260,7 @@
                 </a-tooltip>
                 <a-tooltip :title="$t('systemOverview.viewUserStrategies') || 'View strategies'">
                   <a-button type="link" size="small" @click.stop="filterStrategiesByUser(record.id)">
-                    <a-icon type="bar-chart" style="color: #1890ff" />
+                    <a-icon type="bar-chart" style="color: var(--primary-color, #1890ff)" />
                   </a-button>
                 </a-tooltip>
                 <a-tooltip :title="$t('common.delete') || 'Delete'">
@@ -894,7 +894,7 @@
 
             <!-- Analysis Count -->
             <template slot="analysisCountInfo" slot-scope="text">
-              <span style="font-weight: 600; color: #1890ff;">{{ text || 0 }}</span>
+              <span style="font-weight: 600; color: var(--primary-color, #1890ff);">{{ text || 0 }}</span>
             </template>
 
             <!-- Correct/Incorrect -->
@@ -2017,7 +2017,7 @@ export default {
     },
 
     getUserColor (userId) {
-      const colors = ['#1890ff', '#722ed1', '#13c2c2', '#fa8c16', '#eb2f96', '#52c41a', '#2f54eb', '#faad14']
+      const colors = ['var(--primary-color, #1890ff)', '#722ed1', '#13c2c2', '#fa8c16', '#eb2f96', '#52c41a', '#2f54eb', '#faad14']
       return colors[(userId || 0) % colors.length]
     },
 
@@ -2788,15 +2788,14 @@ export default {
 </script>
 
 <style lang="less" scoped>
-@primary-color: #1890ff;
-
 .user-manage-page {
-  padding: 24px;
+  padding: 16px !important;
   min-height: calc(100vh - 120px);
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 
   .page-header {
     margin-bottom: 24px;
+    max-width: 720px;
 
     .page-title {
       font-size: 24px;
@@ -2809,7 +2808,7 @@ export default {
 
       .anticon {
         font-size: 28px;
-        color: @primary-color;
+        color: var(--primary-color, #1890ff);
       }
     }
 
@@ -2823,6 +2822,15 @@ export default {
   .manage-tabs {
     ::v-deep .ant-tabs-bar {
       margin-bottom: 20px;
+    }
+
+    ::v-deep .ant-tabs-ink-bar {
+      background: var(--primary-color, #1890ff);
+    }
+
+    ::v-deep .ant-tabs-tab-active,
+    ::v-deep .ant-tabs-tab:hover {
+      color: var(--primary-color, #1890ff);
     }
   }
 
@@ -3147,7 +3155,7 @@ export default {
   .hash-text {
     font-family: 'Roboto Mono', 'Courier New', monospace;
     font-size: 12px;
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
     cursor: pointer;
 
     &:hover {
@@ -3188,7 +3196,7 @@ export default {
         }
       }
       ::v-deep .ant-tabs-tab-active {
-        color: @primary-color;
+        color: var(--primary-color, #1890ff);
       }
     }
 
@@ -3330,7 +3338,7 @@ export default {
 
     .value {
       font-weight: 600;
-      color: #1890ff;
+      color: var(--primary-color, #1890ff);
       font-size: 18px;
 
       &.active {

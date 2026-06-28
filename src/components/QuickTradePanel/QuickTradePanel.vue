@@ -1578,7 +1578,7 @@ export default {
   }
 
   ::v-deep .ant-slider-mark-text-active {
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
     font-weight: 600;
   }
 
@@ -1690,7 +1690,7 @@ export default {
   &:hover { color: #595959; }
   &.active {
     background: #fff;
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
     font-weight: 600;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }

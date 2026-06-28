@@ -273,7 +273,7 @@ export default {
       const colorMap = {
         'ai_monitor': '#722ed1',
         'price_alert': '#faad14',
-        'signal': '#1890ff',
+        'signal': 'var(--primary-color, #1890ff)',
         'buy': '#52c41a',
         'sell': '#f5222d',
         'hold': '#faad14',
@@ -281,7 +281,7 @@ export default {
         'security_login': '#fa541c',
         'profile_test': '#2f54eb'
       }
-      return colorMap[signalType] || '#1890ff'
+      return colorMap[signalType] || 'var(--primary-color, #1890ff)'
     },
     displayTitle (item) {
       return noticeTitle(item, (key, params) => this.$t(key, params))
@@ -462,11 +462,11 @@ export default {
 
   .notice-action {
     font-size: 12px;
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
     cursor: pointer;
 
     &:hover {
-      color: #40a9ff;
+      color: var(--primary-color-hover, #40a9ff);
     }
   }
 }
@@ -545,11 +545,11 @@ export default {
   border-top: 1px solid #f0f0f0;
 
   a {
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
     cursor: pointer;
 
     &:hover {
-      color: #40a9ff;
+      color: var(--primary-color-hover, #40a9ff);
     }
   }
 }

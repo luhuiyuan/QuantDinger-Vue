@@ -247,7 +247,7 @@ export default {
 }
 .theme-dark .bp-status-line { color: rgba(255, 255, 255, 0.65); }
 .bp-status-text { font-weight: 500; }
-.bp-status-account { color: #1890ff; font-variant-numeric: tabular-nums; }
+.bp-status-account { color: var(--primary-color, #1890ff); font-variant-numeric: tabular-nums; }
 .bp-badge-row {
   margin-top: 10px;
   display: flex;
@@ -263,20 +263,37 @@ export default {
 }
 .bp-inner-tabs {
   ::v-deep .ant-tabs-bar { border-bottom-color: #ececec; }
+  ::v-deep .ant-tabs-ink-bar { background: var(--primary-color, #1677ff); }
+  ::v-deep .ant-tabs-tab {
+    color: #475569 !important;
+    background: transparent !important;
+  }
+  ::v-deep .ant-tabs-tab-active,
+  ::v-deep .ant-tabs-tab:hover {
+    color: var(--primary-color-active, #0958d9) !important;
+    background: transparent !important;
+  }
+  ::v-deep .ant-tabs-tab-active span,
+  ::v-deep .ant-tabs-tab:hover span {
+    color: inherit;
+  }
 }
 .theme-dark .bp-inner-tabs ::v-deep .ant-tabs-bar { border-bottom-color: #303030; }
-.theme-dark .bp-inner-tabs ::v-deep .ant-tabs-ink-bar { background: #1890ff; }
+.theme-dark .bp-inner-tabs ::v-deep .ant-tabs-ink-bar { background: var(--primary-color, #1890ff); }
 .theme-dark .bp-inner-tabs ::v-deep .ant-tabs-tab {
+  background: transparent !important;
   color: rgba(255, 255, 255, 0.58) !important;
 }
 .theme-dark .bp-inner-tabs ::v-deep .ant-tabs-tab span {
   color: inherit;
 }
 .theme-dark .bp-inner-tabs ::v-deep .ant-tabs-tab:hover {
-  color: rgba(255, 255, 255, 0.82) !important;
+  background: transparent !important;
+  color: var(--primary-color, #1890ff) !important;
 }
 .theme-dark .bp-inner-tabs ::v-deep .ant-tabs-tab-active {
-  color: #1890ff !important;
+  background: transparent !important;
+  color: var(--primary-color, #1890ff) !important;
 }
 .theme-dark .bp-inner-tabs ::v-deep .ant-tabs-tab-disabled {
   color: rgba(255, 255, 255, 0.25) !important;
@@ -298,14 +315,14 @@ export default {
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  i { color: #1890ff; margin-top: 2px; }
-  a { color: #1890ff; }
+  i { color: var(--primary-color, #1890ff); margin-top: 2px; }
+  a { color: var(--primary-color, #1890ff); }
 }
 .theme-dark .bp-form-helper {
-  background: rgba(24, 144, 255, 0.08);
-  border-color: rgba(88, 166, 255, 0.3);
+  background: color-mix(in srgb, var(--primary-color, #1890ff) 8%, transparent);
+  border-color: color-mix(in srgb, var(--primary-color, #1890ff) 30%, transparent);
   color: rgba(255, 255, 255, 0.55);
-  a { color: #58a6ff; }
+  a { color: var(--primary-color, #1890ff); }
 }
 .bp-cloud-alert { margin-bottom: 0; }
 </style>

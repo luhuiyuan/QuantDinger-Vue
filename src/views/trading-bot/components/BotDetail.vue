@@ -936,7 +936,7 @@ export default {
   background: #fafafa; border-radius: 8px; border: 1px solid #f0f0f0;
   .param-label { font-size: 12px; color: #8c8c8c; line-height: 1.4; }
   .param-value { font-size: 14px; font-weight: 500; color: #262626;
-    &.highlight { font-weight: 700; color: #1890ff; }
+    &.highlight { font-weight: 700; color: var(--primary-color, #1890ff); }
     &.danger { color: #f5222d; }
     &.success { color: #52c41a; }
   }
@@ -1103,7 +1103,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #1890ff, #667eea);
+    background: linear-gradient(135deg, var(--primary-color, #1890ff), #667eea);
     color: #fff;
     font-size: 16px;
     box-shadow: 0 4px 12px rgba(24, 144, 255, 0.25);
@@ -1112,7 +1112,7 @@ export default {
     font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
     font-weight: 700;
     font-size: 12px;
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
     text-align: center;
     line-height: 1.35;
     word-break: break-all;
@@ -1247,7 +1247,7 @@ export default {
     }
     &--profit {
       background: rgba(24, 144, 255, 0.1);
-      color: #1890ff;
+      color: var(--primary-color, #1890ff);
     }
   }
   &__label {
@@ -1406,7 +1406,7 @@ export default {
     &--short &__price { color: #ff4d4f; }
   }
   .resting-book-mid {
-    &__price { color: #40a9ff; }
+    &__price { color: var(--primary-color-hover, #40a9ff); }
     &__label, &__range { color: #595959; }
   }
 }

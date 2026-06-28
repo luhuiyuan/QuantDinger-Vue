@@ -11,7 +11,7 @@
           <a-progress
             :percent="progressPercent"
             :showInfo="false"
-            strokeColor="#1890ff"
+            strokeColor="var(--primary-color, #1890ff)"
             :strokeWidth="8"
           />
           <span class="progress-text">{{ formatProgress(progressPercent) }}%</span>
@@ -581,7 +581,7 @@ export default {
     confidenceColor () {
       const c = this.result?.confidence || 50
       if (c >= 70) return '#52c41a'
-      if (c >= 50) return '#1890ff'
+      if (c >= 50) return 'var(--primary-color, #1890ff)'
       return '#faad14'
     },
     consensusBlock () {
@@ -876,7 +876,7 @@ export default {
     },
     getScoreColor (score) {
       if (score >= 70) return '#52c41a'
-      if (score >= 50) return '#1890ff'
+      if (score >= 50) return 'var(--primary-color, #1890ff)'
       if (score >= 30) return '#faad14'
       return '#ff4d4f'
     },

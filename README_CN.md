@@ -81,7 +81,7 @@
 | 项目 | 说明 |
 |------|------|
 | 官方前端镜像 | `ghcr.io/brokermr810/quantdinger-frontend` |
-| 常用标签 | `latest`、semver（`4.0.3`）、`{major}.{minor}`（`4.0`） |
+| 常用标签 | `latest`、semver（`4.0.4`）、`{major}.{minor}`（`4.0`） |
 
 可用标签见 [QuantDinger Releases](https://github.com/brokermr810/QuantDinger/releases) 与 [QuantDinger-Vue Releases](https://github.com/brokermr810/QuantDinger-Vue/releases)。
 
@@ -129,7 +129,7 @@ docker run -d --name quantdinger-frontend \
 固定版本而非 `latest`：
 
 ```bash
-docker pull ghcr.io/brokermr810/quantdinger-frontend:4.0.3
+docker pull ghcr.io/brokermr810/quantdinger-frontend:4.0.4
 ```
 
 ### 固定标签与更新镜像（Compose）
@@ -138,11 +138,11 @@ docker pull ghcr.io/brokermr810/quantdinger-frontend:4.0.3
 
 ```ini
 # 前后端锁定同一版本
-IMAGE_TAG=4.0.3
+IMAGE_TAG=4.0.4
 
 # 或仅覆盖前端（后端仍用 IMAGE_TAG / latest）
-# FRONTEND_TAG=4.0.3
-# BACKEND_TAG=4.0.3
+# FRONTEND_TAG=4.0.4
+# BACKEND_TAG=4.0.4
 ```
 
 标签解析优先级（高者生效）：**`FRONTEND_TAG` → `IMAGE_TAG` → `latest`**。

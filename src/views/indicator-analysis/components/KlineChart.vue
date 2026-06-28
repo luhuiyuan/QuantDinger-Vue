@@ -106,7 +106,7 @@
 
       <div v-if="!symbol && !loading && !error && !pyodideLoadFailed" class="chart-overlay initial-hint">
         <div class="hint-box">
-          <a-icon type="line-chart" style="font-size: 48px; color: #1890ff; margin-bottom: 16px" />
+          <a-icon type="line-chart" style="font-size: 48px; color: var(--primary-color, #1890ff); margin-bottom: 16px" />
           <div class="hint-title">{{ $t('dashboard.indicator.hint.selectSymbol') }}</div>
           <div class="hint-desc">{{ $t('dashboard.indicator.hint.selectSymbolDesc') }}</div>
         </div>
@@ -497,7 +497,7 @@ export default {
     const normalizeIndicatorStyle = (style = {}, fallbackColor = '') => {
       const lineWidth = Math.max(1, Math.min(6, parseInt(style.lineWidth, 10) || 2))
       return {
-        color: String(style.color || fallbackColor || '').trim() || fallbackColor || '#1890ff',
+        color: String(style.color || fallbackColor || '').trim() || fallbackColor || 'var(--primary-color, #1890ff)',
         lineWidth
       }
     }
@@ -852,7 +852,7 @@ export default {
           splitAreaColor: ['rgba(250,250,250,0.05)', 'rgba(200,200,200,0.02)'],
           dataZoomBorder: '#e8e8e8',
           dataZoomFiller: 'rgba(24, 144, 255, 0.15)',
-          dataZoomHandle: '#1890ff',
+          dataZoomHandle: 'var(--primary-color, #1890ff)',
           dataZoomText: '#999',
           dataZoomBg: '#f0f2f5'
         }
@@ -866,8 +866,6 @@ export default {
         return ['#13c2c2', '#9c27b0', '#f57c00', '#1976d2', '#c2185b', '#7b1fa2'][idx % 6]
       }
     }
-
-
 
     const castPythonParamValue = (rawValue, type) => {
       const paramType = String(type || '').toLowerCase()
@@ -1037,22 +1035,6 @@ export default {
       }
     }
 
-const normalizeBacktestMarkerText = (text, side) => {
-  const raw = String(text || '').trim()
-  const lower = raw.toLowerCase()
-  if (lower.includes('liquid') || raw.includes('强平')) return 'LQ'
-  if (lower.includes('trailing') || raw.includes('追踪')) return 'TR'
-  if (lower.includes('profit') || lower.includes('tp') || raw.includes('止盈')) return 'TP'
-  if (lower.includes('stop') || lower.includes('sl') || raw.includes('止损')) return 'SL'
-  if (raw.includes('开多') || lower.includes('open long')) return 'L'
-  if (raw.includes('开空') || lower.includes('open short')) return 'S'
-  if (raw.includes('平多') || lower.includes('close long')) return 'XL'
-  if (raw.includes('平空') || lower.includes('close short')) return 'XS'
-  if (raw.includes('信号') || lower.includes('signal')) return side === 'buy' ? 'L?' : 'S?'
-  if (/^[A-Za-z0-9?]{1,4}$/.test(raw)) return raw
-  return side === 'buy' ? 'L' : 'S'
-}
-
 const withAlpha = (color, alpha) => {
   const hex = String(color || '').replace('#', '')
   if (!/^[0-9a-fA-F]{6}$/.test(hex)) return color
@@ -1140,7 +1122,7 @@ registerOverlay({
           const shortText = normalizeCompactBacktestMarkerText(overlay.extendData?.shortText || textStr, side)
           const compactFontSize = Number(overlay.extendData?.fontSize) || (isDashed ? 9 : 10)
           const compactHeight = isDashed ? 13 : 15
-          const compactWidth = Math.max(17, Math.min(32, shortText.length * 7 + 9))
+          const compactWidth = Math.max(18, Math.min(38, shortText.length * 7 + 10))
           const laneShift = lane * 16
           const compactY = isBuy ? signalY + laneShift : signalY - compactHeight - laneShift
           const dotY = anchorY
@@ -1329,7 +1311,7 @@ registerOverlay({
         const lowerText = text.toLowerCase()
         const semanticAccent = lowerText.includes('risk') || lowerText.includes('atr')
           ? '#fa8c16'
-          : (lowerText.includes('support') ? '#13c2c2' : (lowerText.includes('resistance') ? '#f5222d' : '#1890ff'))
+          : (lowerText.includes('support') ? '#13c2c2' : (lowerText.includes('resistance') ? '#f5222d' : 'var(--primary-color, #1890ff)'))
         const color = data.color || semanticAccent
         const opacity = Number.isFinite(Number(data.opacity)) ? Math.min(Number(data.opacity), 0.10) : (isDark ? 0.075 : 0.055)
         const fillColor = resolveLayerColor(data.fillColor, color, opacity)
@@ -1392,7 +1374,7 @@ registerOverlay({
       createPointFigures: ({ coordinates, overlay }) => {
         if (!coordinates[0] || !coordinates[1]) return []
         const data = overlay.extendData || {}
-        const color = data.color || '#1890ff'
+        const color = data.color || 'var(--primary-color, #1890ff)'
         const figures = [
           {
             type: 'line',
@@ -1875,10 +1857,11 @@ registerOverlay({
           return date1.getFullYear() === date2.getFullYear() &&
                  date1.getMonth() === date2.getMonth() &&
                  date1.getDate() === date2.getDate()
-        case '1W':
+        case '1W': {
           const week1 = Math.floor((date1.getTime() - new Date(date1.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))
           const week2 = Math.floor((date2.getTime() - new Date(date2.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))
           return date1.getFullYear() === date2.getFullYear() && week1 === week2
+        }
         default:
           return time1 === time2
       }
@@ -1918,7 +1901,7 @@ registerOverlay({
             throw new Error(errMsg)
           }
         } catch (apiErr) {
-          throw apiErr
+          throw new Error(apiErr && apiErr.message ? apiErr.message : String(apiErr))
         }
 
         if (!formattedData || formattedData.length === 0) {
@@ -1950,11 +1933,7 @@ registerOverlay({
             )
 
             if (validData.length > 0 && chartRef.value) {
-              try {
-                chartRef.value.applyNewData(validData)
-              } catch (e) {
-                chartRef.value.applyNewData(validData)
-              }
+              chartRef.value.applyNewData(validData)
 
               setTimeout(() => {
                 if (chartRef.value) {
@@ -1983,6 +1962,7 @@ registerOverlay({
           try {
             chartRef.value.applyNewData([])
           } catch (e) {
+            // Best-effort cleanup after a failed load.
           }
         }
       } finally {
@@ -2161,9 +2141,9 @@ registerOverlay({
               updateIndicators()
             }
           })
-        } else {
         }
       } catch (err) {
+        // Ignore incremental history failures; the current chart stays usable.
       } finally {
         loadingHistory.value = false
       }
@@ -2297,7 +2277,6 @@ registerOverlay({
         realtimeTimer.value = null
       }
     }
-
 
     let pendingWsBar = null
     let wsTickRafId = null
@@ -2694,7 +2673,6 @@ registerOverlay({
               } catch (e2) {
               }
             }
-
 
             nextTick(() => {
               updateIndicators()
@@ -3158,9 +3136,9 @@ registerOverlay({
                               }
                             }
                           } catch (overlayErr) {
+                            // Drawing overlays are best-effort; one failed marker should not break the chart.
                           }
                         }
-                      } else {
                       }
                     }
                   }
@@ -3347,9 +3325,9 @@ registerOverlay({
                               }
                             }
                           } catch (overlayErr) {
+                            // Drawing overlays are best-effort; one failed marker should not break the chart.
                           }
                         }
-                      } else {
                       }
                     }
                   }
@@ -3446,7 +3424,6 @@ registerOverlay({
             }
             continue
           }
-
 
           const indicatorStyle = normalizeIndicatorStyle(indicator.style || {}, getIndicatorColor(idx))
           const color = indicatorStyle.color
@@ -4278,7 +4255,7 @@ registerOverlay({
 
 .drawing-tool-btn:hover {
   background: #f0f2f5;
-  color: #1890ff;
+  color: var(--primary-color, #1890ff);
 }
 
 .chart-left.theme-dark .drawing-tool-btn:hover {
@@ -4288,8 +4265,8 @@ registerOverlay({
 
 .drawing-tool-btn.active {
   background: #e6f7ff;
-  color: #1890ff;
-  border: 1px solid #1890ff;
+  color: var(--primary-color, #1890ff);
+  border: 1px solid var(--primary-color, #1890ff);
 }
 
 .chart-left.theme-dark .drawing-tool-btn.active {
@@ -4385,7 +4362,7 @@ registerOverlay({
 }
 
 .indicator-active-chip__action:hover {
-  color: #1890ff;
+  color: var(--primary-color, #1890ff);
 }
 
 .chart-left.theme-dark .indicator-active-chip__action {
@@ -4485,7 +4462,7 @@ registerOverlay({
 
 ::v-deep .indicator-editor-modal--dark .ant-input-number:hover,
 ::v-deep .indicator-editor-modal--dark .ant-input-number-focused {
-  border-color: #177ddc;
+  border-color: var(--primary-color-active, #177ddc);
 }
 
 ::v-deep .indicator-editor-modal--dark .indicator-editor-field__label {
@@ -4552,8 +4529,8 @@ registerOverlay({
 }
 
 .indicator-btn:hover {
-  color: #1890ff;
-  border-color: #1890ff;
+  color: var(--primary-color, #1890ff);
+  border-color: var(--primary-color, #1890ff);
   background: #f0f8ff;
 }
 
@@ -4564,9 +4541,9 @@ registerOverlay({
 }
 
 .indicator-btn.active {
-  color: #1890ff;
+  color: var(--primary-color, #1890ff);
   background: #fff;
-  border-color: #1890ff;
+  border-color: var(--primary-color, #1890ff);
   border-width: 2px;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
 }

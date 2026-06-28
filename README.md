@@ -82,7 +82,7 @@ If you are looking for one-click deployment, Docker Compose, backend APIs, or th
 | Image | Registry path |
 |-------|----------------|
 | Official frontend | `ghcr.io/brokermr810/quantdinger-frontend` |
-| Tags | `latest`, semver (`4.0.3`), `{major}.{minor}` (`4.0`) |
+| Tags | `latest`, semver (`4.0.4`), `{major}.{minor}` (`4.0`) |
 
 See available tags on [QuantDinger Releases](https://github.com/brokermr810/QuantDinger/releases) and [QuantDinger-Vue Releases](https://github.com/brokermr810/QuantDinger-Vue/releases).
 
@@ -130,7 +130,7 @@ docker run -d --name quantdinger-frontend \
 Pin a release instead of `latest`:
 
 ```bash
-docker pull ghcr.io/brokermr810/quantdinger-frontend:4.0.3
+docker pull ghcr.io/brokermr810/quantdinger-frontend:4.0.4
 ```
 
 ### Pin and update image tags (Compose)
@@ -139,11 +139,11 @@ In the **main repo project root**, create or edit `.env`:
 
 ```ini
 # Lock both backend and frontend to the same release
-IMAGE_TAG=4.0.3
+IMAGE_TAG=4.0.4
 
 # Or override frontend only (backend keeps IMAGE_TAG / latest)
-# FRONTEND_TAG=4.0.3
-# BACKEND_TAG=4.0.3
+# FRONTEND_TAG=4.0.4
+# BACKEND_TAG=4.0.4
 ```
 
 Tag resolution (highest wins): **`FRONTEND_TAG` → `IMAGE_TAG` → `latest`**.

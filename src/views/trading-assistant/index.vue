@@ -800,7 +800,7 @@
                             </div>
                           </a-select-option>
                           <a-select-option key="__add_symbol_option__" value="__add_symbol_option__" class="add-symbol-option">
-                            <div style="width: 100%; text-align: center; padding: 4px 0; color: #1890ff; cursor: pointer;">
+                            <div style="width: 100%; text-align: center; padding: 4px 0; color: var(--primary-color, #1890ff); cursor: pointer;">
                               <a-icon type="plus" style="margin-right: 4px;" />
                               <span>{{ $t('trading-assistant.form.addSymbol') }}</span>
                             </div>
@@ -886,7 +886,7 @@
                           </div>
                         </a-select-option>
                         <a-select-option key="__add_symbol_option__" value="__add_symbol_option__" class="add-symbol-option">
-                          <div style="width: 100%; text-align: center; padding: 4px 0; color: #1890ff; cursor: pointer;">
+                          <div style="width: 100%; text-align: center; padding: 4px 0; color: var(--primary-color, #1890ff); cursor: pointer;">
                             <a-icon type="plus" style="margin-right: 4px;" />
                             <span>{{ $t('trading-assistant.form.addSymbol') }}</span>
                           </div>
@@ -916,7 +916,7 @@
                           </div>
                         </a-select-option>
                         <a-select-option key="__add_symbol_option__" value="__add_symbol_option__" class="add-symbol-option">
-                          <div style="width: 100%; text-align: center; padding: 4px 0; color: #1890ff; cursor: pointer;">
+                          <div style="width: 100%; text-align: center; padding: 4px 0; color: var(--primary-color, #1890ff); cursor: pointer;">
                             <a-icon type="plus" style="margin-right: 4px;" />
                             <span>{{ $t('trading-assistant.form.addSymbol') }}</span>
                           </div>
@@ -1276,7 +1276,7 @@
                       <div v-show="notifySectionExpanded" class="collapsible-body">
                         <a-form-item :label="$t('trading-assistant.form.notifyChannels')" class="compact-form-item">
                           <a-checkbox-group
-                            v-decorator="['notify_channels', { initialValue: ['browser'] }]"
+                            v-decorator="['notify_channels', { initialValue: ['browser', 'email'] }]"
                             class="notify-channel-grid"
                             @change="onNotifyChannelsChange">
                             <a-checkbox value="browser">{{ $t('trading-assistant.notify.browser') }}</a-checkbox>
@@ -1297,7 +1297,7 @@
                           <template #message>
                             <span>
                               {{ $t('trading-assistant.form.notificationConfigMissing', { channels: unconfiguredChannels.join(', ') }) }}
-                              <router-link to="/profile" style="margin-left: 8px">
+                              <router-link :to="{ path: '/profile', query: { tab: 'notifications' } }" style="margin-left: 8px">
                                 <a-icon type="setting" /> {{ $t('trading-assistant.form.goToProfile') }}
                               </router-link>
                             </span>
@@ -1312,7 +1312,7 @@
                           <template #message>
                             <span>
                               {{ $t('trading-assistant.form.notificationFromProfile') }}
-                              <router-link to="/profile" style="margin-left: 8px">
+                              <router-link :to="{ path: '/profile', query: { tab: 'notifications' } }" style="margin-left: 8px">
                                 <a-icon type="setting" /> {{ $t('trading-assistant.form.goToProfile') }}
                               </router-link>
                             </span>
@@ -1559,6 +1559,11 @@ const CRYPTO_SYMBOLS = [
   'XRP/USDT', 'DOGE/USDT', 'DOT/USDT', 'MATIC/USDT', 'AVAX/USDT',
   'LINK/USDT', 'UNI/USDT', 'LTC/USDT', 'ATOM/USDT', 'ETC/USDT'
 ]
+
+const DEFAULT_NOTIFICATION_CHANNELS = ['browser', 'email']
+const normalizeNotificationChannels = channels => (
+  Array.isArray(channels) && channels.length ? channels : DEFAULT_NOTIFICATION_CHANNELS
+)
 
 // Crypto exchange options
 const EXCHANGE_OPTIONS = [
@@ -2099,11 +2104,11 @@ export default {
       supportedIPs: [], // 白名单IP列表
       executionModeUi: 'live',
       liveDisclaimerAckUi: false,
-      notifySectionExpanded: false,
-      notifyChannelsUi: ['browser'],
+      notifySectionExpanded: true,
+      notifyChannelsUi: [...DEFAULT_NOTIFICATION_CHANNELS],
       // User's notification settings from profile
       userNotificationSettings: {
-        default_channels: ['browser'],
+        default_channels: [...DEFAULT_NOTIFICATION_CHANNELS],
         telegram_bot_token: '',
         telegram_chat_id: '',
         email: '',
@@ -2160,6 +2165,7 @@ export default {
         if (this.isScriptStrategiesOnlyPage) {
           this.strategyMode = 'script'
           this.pendingScriptTemplateKey = ''
+          this.selectedScriptSourceId = this.$route.query.source_id ? String(this.$route.query.source_id) : ''
           this._openCreateModal()
           return
         }
@@ -2226,7 +2232,7 @@ export default {
         const res = await getNotificationSettings()
         if (res.code === 1 && res.data) {
           this.userNotificationSettings = {
-            default_channels: res.data.default_channels || ['browser'],
+            default_channels: normalizeNotificationChannels(res.data.default_channels),
             telegram_bot_token: res.data.telegram_bot_token || '',
             telegram_chat_id: res.data.telegram_chat_id || '',
             email: res.data.email || '',
@@ -2976,7 +2982,7 @@ export default {
       this.selectedIndicator = null
       this.connectionTestResult = null
       this.executionModeUi = 'live'
-      this.notifyChannelsUi = ['browser']
+      this.notifyChannelsUi = [...DEFAULT_NOTIFICATION_CHANNELS]
       this.saveCredentialUi = false
       this.aiFilterEnabledUi = false
       this.selectedMarketCategory = 'Crypto'
@@ -2984,9 +2990,12 @@ export default {
       this.crossSectionalSymbols = []
       this.csStrategyTypeUi = 'single'
       this.crossSectionalIndicatorCodeOverride = null
-      this.selectedScriptSourceId = ''
-      this.strategyCode = ''
       const isScriptCreate = this.strategyMode === 'script'
+      const routeScriptSourceId = isScriptCreate && this.$route.query.source_id
+        ? String(this.$route.query.source_id)
+        : ''
+      this.selectedScriptSourceId = routeScriptSourceId
+      this.strategyCode = ''
       const defaultStrategyName = isScriptCreate
         ? this.buildScriptStrategyDefaultName(this.pendingScriptTemplateKey || null)
         : this.buildStrategyDefaultName()
@@ -3003,7 +3012,7 @@ export default {
         this.safeSetFormFields({
           strategy_name: defaultStrategyName,
           execution_mode: 'signal',
-          notify_channels: ['browser'],
+          notify_channels: [...DEFAULT_NOTIFICATION_CHANNELS],
           save_credential: false,
           live_disclaimer_ack: false,
           initial_capital: 1000,
@@ -3020,6 +3029,10 @@ export default {
         await this.loadIndicators()
         if (isScriptCreate) {
           await this.loadScriptSources()
+          if (routeScriptSourceId) {
+            this.selectedScriptSourceId = routeScriptSourceId
+            await this.handleScriptSourceChange(routeScriptSourceId)
+          }
         }
         this.applyPendingRouteIndicatorSelection()
         this.loadExchangeCredentials()
@@ -3079,8 +3092,8 @@ export default {
       this.executionModeUi = executionMode
       // Editing an existing live strategy: default as acknowledged to avoid blocking edits
       this.liveDisclaimerAckUi = executionMode === 'live'
-      const notifyChannels = (strategy.notification_config && strategy.notification_config.channels) || ['browser']
-      this.notifyChannelsUi = Array.isArray(notifyChannels) ? notifyChannels : ['browser']
+      const notifyChannels = strategy.notification_config && strategy.notification_config.channels
+      this.notifyChannelsUi = [...normalizeNotificationChannels(notifyChannels)]
 
       // Initialize AI filter state
       let aiFilterEnabled = false
@@ -4165,8 +4178,8 @@ export default {
             try {
               const execMode = this.form.getFieldValue('execution_mode') || 'signal'
               this.executionModeUi = execMode
-              const chans = this.form.getFieldValue('notify_channels') || ['browser']
-              this.notifyChannelsUi = Array.isArray(chans) ? chans : ['browser']
+              const chans = this.form.getFieldValue('notify_channels')
+              this.notifyChannelsUi = [...normalizeNotificationChannels(chans)]
             } catch (e) { }
             this.currentStep = 2
           })
@@ -4217,8 +4230,8 @@ export default {
           try {
             const execMode = this.form.getFieldValue('execution_mode') || 'signal'
             this.executionModeUi = execMode
-            const chans = this.form.getFieldValue('notify_channels') || ['browser']
-            this.notifyChannelsUi = Array.isArray(chans) ? chans : ['browser']
+            const chans = this.form.getFieldValue('notify_channels')
+            this.notifyChannelsUi = [...normalizeNotificationChannels(chans)]
           } catch (e) { }
           this.currentStep = 1
         })
@@ -4240,7 +4253,7 @@ export default {
 
             if (this.strategyMode === 'script') {
               const notificationConfig = {
-                channels: values.notify_channels || ['browser'],
+                channels: normalizeNotificationChannels(values.notify_channels),
                 targets: {
                   email: this.userNotificationSettings.email || '',
                   phone: this.userNotificationSettings.phone || '',
@@ -4623,10 +4636,10 @@ export default {
     color: rgba(255,255,255,0.65);
   }
   ::v-deep .ant-tabs-tab-active {
-    color: #177ddc;
+    color: var(--primary-color-active, #177ddc);
   }
   ::v-deep .ant-tabs-ink-bar {
-    background: #177ddc;
+    background: var(--primary-color-active, #177ddc);
   }
 }
 
@@ -5214,7 +5227,7 @@ export default {
 
         .ant-btn-primary {
           border-radius: @border-radius-sm;
-          background: linear-gradient(135deg, @primary-color 0%, #40a9ff 100%);
+          background: linear-gradient(135deg, @primary-color 0%, var(--primary-color-hover, #40a9ff) 100%);
           border: none;
           box-shadow: 0 4px 12px rgba(24, 144, 255, 0.35);
           transition: all 0.3s ease;
@@ -6600,13 +6613,13 @@ export default {
 
               &.ant-tabs-tab-active {
                 .ant-tabs-tab-btn {
-                  color: #1890ff;
+                  color: var(--primary-color, #1890ff);
                 }
               }
             }
 
             .ant-tabs-ink-bar {
-              background: linear-gradient(90deg, @primary-color 0%, #40a9ff 100%);
+              background: linear-gradient(90deg, @primary-color 0%, var(--primary-color-hover, #40a9ff) 100%);
             }
           }
 
@@ -6761,7 +6774,7 @@ export default {
 }
 
 .ai-filter-title .anticon {
-  color: #1890ff;
+  color: var(--primary-color, #1890ff);
 }
 
 .ai-filter-hint {
@@ -6858,7 +6871,7 @@ export default {
 .simple-mode-kicker {
   font-size: 12px;
   font-weight: 600;
-  color: #1890ff;
+  color: var(--primary-color, #1890ff);
   margin-bottom: 4px;
 }
 
@@ -6939,7 +6952,7 @@ export default {
       transition: color 0.2s;
       margin-bottom: 0;
 
-      &:hover { color: #1890ff; }
+      &:hover { color: var(--primary-color, #1890ff); }
     }
 
     .collapse-arrow {
@@ -7039,7 +7052,7 @@ export default {
   }
 
   &.active {
-    border-color: #1890ff;
+    border-color: var(--primary-color, #1890ff);
     background: linear-gradient(135deg, rgba(24, 144, 255, 0.08) 0%, rgba(24, 144, 255, 0.03) 100%);
     box-shadow: 0 10px 28px rgba(24, 144, 255, 0.12);
   }
@@ -7067,7 +7080,7 @@ export default {
   font-size: 18px;
 
   &.signal {
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
     background: rgba(24, 144, 255, 0.1);
   }
 
@@ -7099,7 +7112,7 @@ export default {
   position: absolute;
   top: 12px;
   right: 12px;
-  color: #1890ff;
+  color: var(--primary-color, #1890ff);
   font-size: 18px;
 }
 
@@ -7230,12 +7243,12 @@ export default {
     justify-content: center;
 
     &:hover {
-      border-color: #1890ff;
+      border-color: var(--primary-color, #1890ff);
       box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
     }
 
     &.selected {
-      border-color: #1890ff;
+      border-color: var(--primary-color, #1890ff);
       background-color: #e6f7ff;
       box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
     }
@@ -7246,7 +7259,7 @@ export default {
 
       .strategy-type-icon {
         font-size: 48px;
-        color: #1890ff;
+        color: var(--primary-color, #1890ff);
         margin-bottom: 16px;
       }
 
@@ -7355,7 +7368,7 @@ export default {
 
     &.active {
       background: linear-gradient(135deg, rgba(24, 144, 255, 0.16) 0%, rgba(24, 144, 255, 0.08) 100%);
-      border-color: #1890ff;
+      border-color: var(--primary-color, #1890ff);
     }
 
     &.disabled {
@@ -7426,12 +7439,12 @@ export default {
   border: 1px solid #91d5ff;
   border-radius: 4px;
   font-size: 13px;
-  color: #1890ff;
+  color: var(--primary-color, #1890ff);
   line-height: 1.6;
 
   .anticon {
     margin-right: 6px;
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
   }
 
   .ip-list {
@@ -7710,8 +7723,8 @@ body.dark {
     }
 
     .ant-steps-item-process .ant-steps-item-icon {
-      background: #1890ff;
-      border-color: #1890ff;
+      background: var(--primary-color, #1890ff);
+      border-color: var(--primary-color, #1890ff);
 
       .ant-steps-icon {
         color: #fff;
@@ -7720,10 +7733,10 @@ body.dark {
 
     .ant-steps-item-finish .ant-steps-item-icon {
       background: transparent;
-      border-color: #1890ff;
+      border-color: var(--primary-color, #1890ff);
 
       .ant-steps-icon {
-        color: #1890ff;
+        color: var(--primary-color, #1890ff);
       }
     }
 
@@ -7760,7 +7773,7 @@ body.dark {
 
       &:hover,
       &:focus {
-        border-color: #1890ff;
+        border-color: var(--primary-color, #1890ff);
       }
     }
 
@@ -7773,7 +7786,7 @@ body.dark {
         color: rgba(255, 255, 255, 0.45);
 
         &:hover {
-          color: #1890ff;
+          color: var(--primary-color, #1890ff);
         }
       }
     }
@@ -7789,7 +7802,7 @@ body.dark {
         }
 
         &:hover {
-          border-color: #1890ff;
+          border-color: var(--primary-color, #1890ff);
         }
       }
     }
@@ -7801,12 +7814,12 @@ body.dark {
         color: rgba(255, 255, 255, 0.65);
 
         &:hover {
-          color: #1890ff;
+          color: var(--primary-color, #1890ff);
         }
 
         &.ant-radio-button-wrapper-checked {
-          background: #1890ff;
-          border-color: #1890ff;
+          background: var(--primary-color, #1890ff);
+          border-color: var(--primary-color, #1890ff);
           color: #fff;
         }
       }
@@ -7820,7 +7833,7 @@ body.dark {
       background: rgba(255, 255, 255, 0.15);
 
       &.ant-switch-checked {
-        background: #1890ff;
+        background: var(--primary-color, #1890ff);
       }
     }
 
@@ -7874,7 +7887,7 @@ body.dark {
     }
 
     .section-block-title--toggle:hover {
-      color: #40a9ff;
+      color: var(--primary-color-hover, #40a9ff);
     }
 
     .simple-mode-hero {
@@ -7928,7 +7941,7 @@ body.dark {
     .ip-whitelist-tip {
       background: rgba(24, 144, 255, 0.08);
       border-color: rgba(24, 144, 255, 0.2);
-      color: #40a9ff;
+      color: var(--primary-color-hover, #40a9ff);
     }
 
     /* indicator description */
@@ -7955,11 +7968,11 @@ body.dark {
         color: #d1d4dc;
 
         &:hover {
-          border-color: #177ddc;
+          border-color: var(--primary-color-active, #177ddc);
         }
 
         &.selected {
-          border-color: #177ddc;
+          border-color: var(--primary-color-active, #177ddc);
           background: rgba(23, 125, 220, 0.08);
         }
 
@@ -8004,7 +8017,7 @@ body.dark {
 
       &.active {
         background: linear-gradient(135deg, rgba(24, 144, 255, 0.16) 0%, rgba(24, 144, 255, 0.08) 100%);
-        border-color: #1890ff;
+        border-color: var(--primary-color, #1890ff);
       }
 
       &.disabled {
@@ -8085,7 +8098,7 @@ body.dark {
 
       &-selected {
         background: rgba(24, 144, 255, 0.15);
-        color: #1890ff;
+        color: var(--primary-color, #1890ff);
       }
 
       &-disabled {

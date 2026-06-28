@@ -1594,14 +1594,14 @@ export default {
   color: #595959;
   margin-bottom: 20px;
 
-  .anticon { color: #1890ff; margin-right: 6px; }
+  .anticon { color: var(--primary-color, #1890ff); margin-right: 6px; }
 }
 
 .form-hint {
   font-size: 12px;
   color: #8c8c8c;
 
-  a { color: #1890ff; font-size: 12px; }
+  a { color: var(--primary-color, #1890ff); font-size: 12px; }
 }
 
 .confirm-section {
@@ -1642,7 +1642,7 @@ export default {
 }
 
 .bot-symbol-opt-add .anticon {
-  color: #1890ff;
+  color: var(--primary-color, #1890ff);
   margin-right: 6px;
 }
 
@@ -1650,7 +1650,7 @@ export default {
   margin-left: 8px;
   cursor: pointer;
   font-size: 12px;
-  color: #1890ff;
+  color: var(--primary-color, #1890ff);
 
   .anticon { margin-right: 4px; }
 }
@@ -1662,7 +1662,7 @@ export default {
   border-radius: 6px;
   padding: 8px 12px;
 
-  .anticon { color: #1890ff; margin-right: 6px; }
+  .anticon { color: var(--primary-color, #1890ff); margin-right: 6px; }
 }
 
 .bot-add-symbol-empty {

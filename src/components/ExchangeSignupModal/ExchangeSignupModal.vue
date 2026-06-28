@@ -254,7 +254,7 @@ export default {
     top: 0;
     bottom: 0;
     width: 4px;
-    background: linear-gradient(180deg, #1890ff 0%, #0052a3 100%);
+    background: linear-gradient(180deg, var(--primary-color, #1890ff) 0%, #0052a3 100%);
     border-radius: 16px 0 0 16px;
   }
 
@@ -315,12 +315,12 @@ export default {
   .forex-signup-btn {
     height: 40px;
     padding: 0 20px;
-    background: linear-gradient(135deg, #1890ff 0%, #0052a3 100%);
+    background: linear-gradient(135deg, var(--primary-color, #1890ff) 0%, #0052a3 100%);
     border: none;
     box-shadow: 0 4px 12px rgba(0, 82, 155, 0.25);
     &:hover,
     &:focus {
-      background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+      background: linear-gradient(135deg, var(--primary-color-hover, #40a9ff) 0%, var(--primary-color, #1890ff) 100%);
     }
   }
 }

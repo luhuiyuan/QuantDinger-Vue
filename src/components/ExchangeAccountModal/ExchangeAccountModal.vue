@@ -517,7 +517,7 @@ export default {
     align-items: center;
     justify-content: center;
     background: rgba(24, 144, 255, 0.12);
-    color: #1890ff;
+    color: var(--primary-color, #1890ff);
     flex: 0 0 auto;
   }
 

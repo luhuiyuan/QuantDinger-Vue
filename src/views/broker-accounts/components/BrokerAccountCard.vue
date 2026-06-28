@@ -126,7 +126,7 @@ export default {
 }
 .metric-card.positive .metric-value { color: #389e0d; }
 .metric-card.negative .metric-value { color: #cf1322; }
-.metric-card.accent .metric-value { color: #1890ff; }
+.metric-card.accent .metric-value { color: var(--primary-color, #1890ff); }
 .metric-sub { margin-top: 4px; font-size: 11px; color: #8c8c8c; }
 .account-grid.theme-dark {
   .metric-card {
@@ -134,8 +134,8 @@ export default {
     border-color: #30363d;
 
     &.accent {
-      background: linear-gradient(165deg, rgba(24, 144, 255, 0.14) 0%, #171b20 100%);
-      border-color: rgba(88, 166, 255, 0.45);
+      background: linear-gradient(165deg, color-mix(in srgb, var(--primary-color, #1890ff) 14%, transparent) 0%, #171b20 100%);
+      border-color: color-mix(in srgb, var(--primary-color, #1890ff) 45%, transparent);
     }
 
     &.positive {

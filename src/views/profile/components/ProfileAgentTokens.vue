@@ -542,12 +542,12 @@ export default {
       color: rgba(255, 255, 255, 0.62);
 
       &:hover {
-        color: #40a9ff;
+        color: var(--primary-color-hover, #40a9ff);
       }
     }
 
     ::v-deep .ant-tabs-tab-active {
-      color: #40a9ff;
+      color: var(--primary-color-hover, #40a9ff);
       background: rgba(24, 144, 255, 0.12);
     }
 
@@ -558,8 +558,8 @@ export default {
 
       &:hover,
       &:focus {
-        border-color: #40a9ff;
-        color: #40a9ff;
+        border-color: var(--primary-color-hover, #40a9ff);
+        color: var(--primary-color-hover, #40a9ff);
       }
     }
 
@@ -611,7 +611,7 @@ export default {
     }
 
     ::v-deep .ant-pagination-item-active {
-      border-color: #1890ff;
+      border-color: var(--primary-color, #1890ff);
       background: rgba(24, 144, 255, 0.16);
 
       a {
