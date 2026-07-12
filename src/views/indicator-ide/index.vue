@@ -3,25 +3,26 @@
     <!-- Main split panels -->
     <div class="ide-main">
       <div
-        v-show="!codeDrawerVisible"
         class="ide-code-rail"
+        :class="{ 'is-open': codeDrawerVisible }"
         role="button"
         tabindex="0"
-        @click="codeDrawerVisible = true"
-        @keyup.enter="codeDrawerVisible = true"
+        :title="codeDrawerVisible ? $t('indicatorIde.hideCode') : $t('indicatorIde.showCode')"
+        @click="toggleCodeDrawer"
+        @keyup.enter="toggleCodeDrawer"
       >
         <a-icon type="code" class="ide-code-rail__icon" />
+        <a-icon :type="codeDrawerVisible ? 'double-left' : 'double-right'" class="ide-code-rail__arrow" />
         <span class="ide-code-rail__label">{{ $t('indicatorIde.codeRailLabel') }}</span>
       </div>
       <!-- Left panel (collapsible drawer) -->
       <div v-show="codeDrawerVisible" ref="editorFullscreenEl" class="ide-left" :class="{ 'ide-panel--fullscreen': editorFullscreen }">
-        <!-- Code Editor (collapsible) -->
-        <div class="code-panel" :class="{ collapsed: !codePanelExpanded }">
-          <div class="panel-title" @click="codePanelExpanded = !codePanelExpanded" style="cursor: pointer;">
+        <!-- Code Editor -->
+        <div class="code-panel">
+          <div class="panel-title">
             <div class="panel-title__leading">
               <a-icon type="code" />
-              <a-tag v-if="codeDirty && !selectedIndicatorIsPurchased" color="orange" size="small">{{ $t('indicatorIde.modified') }}</a-tag>
-              <a-tag v-if="selectedIndicatorIsPurchased" color="purple" size="small">{{ $t('indicatorIde.purchasedReadOnlyTag') }}</a-tag>
+              <a-tag v-if="codeDirty && !selectedIndicatorCodeHidden" color="orange" size="small">{{ $t('indicatorIde.modified') }}</a-tag>
             </div>
             <div class="panel-title__trailing">
               <div class="panel-title-actions" @click.stop>
@@ -29,10 +30,10 @@
                   <a-tooltip :title="$t('dashboard.indicator.create')">
                     <a-button size="small" :loading="creatingIndicator" @click="handleCreateIndicator"><a-icon type="plus" /></a-button>
                   </a-tooltip>
-                  <a-tooltip :title="selectedIndicatorIsPurchased ? $t('indicatorIde.deleteBlockedPurchased') : $t('dashboard.indicator.action.delete')">
+                  <a-tooltip :title="$t('dashboard.indicator.action.delete')">
                     <a-button
                       size="small"
-                      :disabled="!selectedIndicatorId || selectedIndicatorIsPurchased"
+                      :disabled="!selectedIndicatorId"
                       :loading="deletingIndicator"
                       @click="handleDeleteIndicator"
                     ><a-icon type="delete" /></a-button>
@@ -40,11 +41,8 @@
                   <a-tooltip :title="selectedIndicatorIsPurchased ? $t('indicatorIde.publishBlockedPurchased') : $t('dashboard.indicator.action.publish')">
                     <a-button size="small" :disabled="!selectedIndicatorId || selectedIndicatorIsPurchased" @click="handlePublishIndicator"><a-icon type="cloud-upload" /></a-button>
                   </a-tooltip>
-                  <a-tooltip :title="$t('dashboard.indicator.action.createStrategy')">
-                    <a-button size="small" :disabled="!selectedIndicatorId" @click="handleCreateStrategyFromIndicator"><a-icon type="deployment-unit" /></a-button>
-                  </a-tooltip>
                   <a-tooltip :title="$t('indicatorIde.saveAsNew')">
-                    <a-button size="small" :disabled="!userId || !currentCode" @click="openSaveAsIndicatorModal"><a-icon type="copy" /></a-button>
+                    <a-button size="small" :disabled="!userId || selectedIndicatorCodeHidden || !currentCode" @click="openSaveAsIndicatorModal"><a-icon type="copy" /></a-button>
                   </a-tooltip>
                   <a-tooltip :title="editorFullscreen ? $t('indicatorIde.exitFullscreen') : $t('indicatorIde.fullscreenEditor')">
                     <a-button size="small" @click="toggleEditorFullscreen"><a-icon :type="editorFullscreen ? 'fullscreen-exit' : 'fullscreen'" /></a-button>
@@ -62,23 +60,22 @@
                     <a-button size="small" :disabled="!selectedIndicatorId" @click="openCodeVersionDrawer"><a-icon type="history" /></a-button>
                   </a-tooltip>
                 </div>
-                <a-tooltip :title="selectedIndicatorIsPurchased ? $t('indicatorIde.saveBlockedPurchased') : $t('indicatorIde.saveShortcutHint')">
+                <a-tooltip :title="selectedIndicatorCodeHidden ? $t('indicatorIde.saveBlockedHiddenCode') : $t('indicatorIde.saveShortcutHint')">
                   <a-button
                     class="ide-save-button"
                     type="primary"
                     size="small"
                     :loading="savingIndicator"
-                    :disabled="!selectedIndicatorId || !codeDirty || selectedIndicatorIsPurchased"
+                    :disabled="!selectedIndicatorId || !codeDirty || selectedIndicatorCodeHidden"
                     @click="saveIndicator"
                   >
                     {{ $t('indicatorIde.save') }}
                   </a-button>
                 </a-tooltip>
               </div>
-              <a-icon :type="codePanelExpanded ? 'up' : 'down'" class="panel-title-chevron" />
             </div>
           </div>
-          <div v-show="codePanelExpanded" class="code-panel-body">
+          <div class="code-panel-body">
             <div class="ide-guide-bar">
               <a-icon type="book" />
               <span>{{ $t('indicatorIde.devGuideTooltip') }}</span>
@@ -86,18 +83,13 @@
                 {{ $t('indicatorIde.devGuide') }} <a-icon type="arrow-right" />
               </a>
             </div>
-            <a-alert
-              v-if="showPurchasedMarketHint"
-              type="info"
-              show-icon
-              closable
-              class="ide-purchased-hint"
-              :message="$t('indicatorIde.purchasedIndicatorHintTitle')"
-              :description="$t('indicatorIde.purchasedIndicatorHintDesc')"
-              @close="dismissPurchasedMarketHint"
-            />
             <div class="code-editor-wrapper">
               <div ref="codeEditor" class="code-editor-area"></div>
+              <div v-if="selectedIndicatorCodeHidden" class="code-hidden-mask">
+                <a-icon type="lock" />
+                <strong>{{ $t('indicatorIde.hiddenCodeTitle') }}</strong>
+                <span>{{ $t('indicatorIde.hiddenCodeDesc') }}</span>
+              </div>
               <transition name="fade">
                 <div
                   v-if="aiGenerating"
@@ -192,7 +184,7 @@
                   class="ai-prompt-input"
                   :placeholder="$t('indicatorIde.aiPromptPlaceholder')"
                   :rows="6"
-                  :disabled="aiGenerating || selectedIndicatorIsPurchased"
+                  :disabled="aiGenerating || selectedIndicatorCodeHidden"
                   style="resize: vertical;"
                   @pressEnter="handleAIGenerateEnterKey"
                 />
@@ -201,29 +193,20 @@
                   size="small"
                   block
                   :loading="aiGenerating"
-                  :disabled="selectedIndicatorIsPurchased"
+                  :disabled="selectedIndicatorCodeHidden"
                   @click="handleAIGenerate"
                   style="margin-top: 8px;"
                 >
                   <a-icon v-if="!aiGenerating" type="robot" />
                   {{ aiGenerating ? $t('indicatorIde.generating') : $t('indicatorIde.generateCode') }}
                 </a-button>
-                <div class="ai-helper-links">
-                  <a @click.prevent="goToIndicatorMarket">{{ $t('indicatorIde.goIndicatorMarket') }}</a>
-                </div>
               </div>
             </div>
           </div>
         </div>
-        <div class="ide-code-drawer-handle" @click.stop="codeDrawerVisible = false">
-          <a-icon type="double-left" />
-          <span>{{ $t('indicatorIde.hideCode') }}</span>
-        </div>
       </div>
 
       <div class="ide-right ide-right--workspace">
-        <a-tabs v-model="ideWorkspaceTab" type="card" size="small" class="ide-workspace-tabs ide-workspace-tabs--pill" :animated="false">
-          <a-tab-pane key="chart" :tab="$t('indicatorIde.workspaceTabChart')">
             <div class="ide-workspace-pane ide-workspace-pane--chart">
               <div
                 ref="chartFullscreenEl"
@@ -236,15 +219,32 @@
                       <div class="chart-panel-toolbar-top">
                         <span class="chart-panel-toolbar-title">{{ $t('indicatorIde.chartWindow') }}</span>
                         <div class="chart-panel-toolbar-top-actions">
-                          <a-tooltip :title="codeDrawerVisible ? $t('indicatorIde.hideCode') : $t('indicatorIde.showCode')">
-                            <a-button
-                              size="small"
-                              class="chart-panel-icon-btn"
-                              :type="codeDrawerVisible ? 'default' : 'primary'"
-                              @click="codeDrawerVisible = !codeDrawerVisible"
-                            >
-                              <a-icon type="code" />
-                            </a-button>
+                          <a-button
+                            size="small"
+                            class="chart-panel-action-btn chart-panel-signal-alert-btn"
+                            :disabled="!selectedIndicatorId"
+                            @click="openSignalAlertModal"
+                          >
+                            <a-icon type="bell" />
+                            <span>通知</span>
+                            <em>{{ runningSignalAlertCount }}</em>
+                          </a-button>
+                          <a-tooltip
+                            placement="bottom"
+                            :title="selectedIndicatorCodeHidden ? $t('indicatorIde.aiConvertHiddenBlocked') : $t('indicatorIde.aiConvertToStrategy')"
+                          >
+                            <span class="chart-panel-action-wrap">
+                              <a-button
+                                size="small"
+                                type="primary"
+                                class="chart-panel-action-btn chart-panel-convert-strategy-btn"
+                                :disabled="!selectedIndicatorId || selectedIndicatorCodeHidden"
+                                @click="handleCreateStrategyFromIndicator"
+                              >
+                                <a-icon type="deployment-unit" />
+                                <span>{{ $t('indicatorIde.aiConvertToStrategy') }}</span>
+                              </a-button>
+                            </span>
                           </a-tooltip>
                           <a-tooltip placement="bottomLeft">
                             <template slot="title">
@@ -266,6 +266,20 @@
                         </div>
                       </div>
                       <div class="chart-panel-toolbar-controls">
+                        <div class="ide-toolbar-group ide-toolbar-group--params">
+                          <span class="ide-toolbar-label">{{ $t('indicatorIde.paramPanel.shortTitle') }}</span>
+                          <a-button
+                            size="small"
+                            class="ide-param-trigger"
+                            :type="currentIndicatorParamSpecs.length ? 'primary' : 'default'"
+                            :disabled="!selectedIndicatorId"
+                            @click="openIndicatorParamsDrawer"
+                          >
+                            <a-icon type="sliders" />
+                            <span>{{ $t('indicatorIde.paramPanel.button') }}</span>
+                            <em>{{ currentIndicatorParamSpecs.length }}</em>
+                          </a-button>
+                        </div>
                         <div class="ide-toolbar-group ide-toolbar-group--watchlist">
                           <span class="ide-toolbar-label">{{ $t('indicatorIde.toolbar.watchlist') }}</span>
                           <a-select
@@ -282,8 +296,8 @@
                           >
                             <a-select-option
                               v-for="w in watchlist"
-                              :key="`${w.market}:${w.symbol}`"
-                              :value="`${w.market}:${w.symbol}`"
+                              :key="watchlistContextKey(w)"
+                              :value="watchlistContextKey(w)"
                             >
                               <span class="wl-opt-tag" :class="'wl-mkt-' + (w.market || '').toLowerCase()">{{ marketLabel(w.market) }}</span>
                               <strong class="wl-opt-symbol">{{ w.symbol }}</strong>
@@ -295,6 +309,32 @@
                               </div>
                             </a-select-option>
                           </a-select>
+                        </div>
+                        <div v-if="market === 'Crypto'" class="ide-toolbar-group ide-toolbar-group--venue">
+                          <span class="ide-toolbar-label">{{ $t('marketContext.source') }}</span>
+                          <div class="ide-market-context-controls">
+                            <a-select
+                              v-model="cryptoExchangeId"
+                              size="small"
+                              class="ide-toolbar-select ide-toolbar-select--exchange"
+                              :get-popup-container="chartToolbarGetPopupContainer"
+                              @change="handleCryptoExchangeChange"
+                            >
+                              <a-select-option v-for="exchangeId in cryptoExchangeIds" :key="exchangeId" :value="exchangeId">
+                                {{ exchangeId.toUpperCase() }}
+                              </a-select-option>
+                            </a-select>
+                            <a-select
+                              v-model="cryptoMarketType"
+                              size="small"
+                              class="ide-toolbar-select ide-toolbar-select--market-type"
+                              :get-popup-container="chartToolbarGetPopupContainer"
+                              @change="handleCryptoMarketTypeChange"
+                            >
+                              <a-select-option value="spot">{{ $t('marketContext.spot') }}</a-select-option>
+                              <a-select-option value="swap">{{ $t('marketContext.swap') }}</a-select-option>
+                            </a-select>
+                          </div>
                         </div>
                         <div class="ide-toolbar-group ide-toolbar-group--tf">
                           <span class="ide-toolbar-label">{{ $t('indicatorIde.toolbar.timeframe') }}</span>
@@ -350,7 +390,7 @@
                                     class="ide-indicator-name"
                                     :class="{ active: Number(selectedIndicatorId) === Number(ind.id) }"
                                     @click="selectEditorIndicator(ind.id)"
-                                  >{{ ind.name || ('Indicator #' + ind.id) }}</span>
+                                  >{{ indicatorDisplayName(ind) }}</span>
                                   <a-tag
                                     v-if="Number(ind.is_buy) === 1"
                                     color="purple"
@@ -368,6 +408,9 @@
                         ref="klineChart"
                         :symbol="symbol"
                         :market="market"
+                        :exchange-id="cryptoExchangeId"
+                        :market-type="cryptoMarketType"
+                        :instrument-id="currentInstrumentId"
                         :timeframe="timeframe"
                         :theme="chartTheme"
                         :activeIndicators="activeIndicators"
@@ -398,7 +441,9 @@
                         :preset-side="qtSide"
                         :preset-price="qtPrice"
                         source="indicator"
-                        market-type="swap"
+                        :market="market"
+                        symbol-locked
+                        :market-type="market === 'Crypto' ? cryptoMarketType : 'spot'"
                         :overlay-get-container="ideQtOverlayGetContainer"
                         @order-success="onQuickTradeSuccess"
                         @update:symbol="handleQuickTradeSymbolChange"
@@ -408,970 +453,6 @@
                 </div>
               </div>
             </div>
-          </a-tab-pane>
-          <a-tab-pane key="backtest" :tab="$t('indicatorIde.workspaceTabBacktest')">
-            <div class="ide-backtest-scroll-mount">
-              <div class="ide-workspace-pane ide-workspace-pane--backtest">
-                <!--
-                  Mirrored toolbar (watchlist / timeframe / indicator picker).
-                  Bound to the SAME v-models the chart tab uses, so flipping
-                  any control here is reflected on the chart tab and vice
-                  versa (the user reported wanting to tweak symbol / TF /
-                  indicators while reading backtest results without losing
-                  context by jumping tabs).
-                -->
-                <div class="backtest-panel-toolbar">
-                  <div class="chart-panel-toolbar-controls">
-                    <div class="ide-toolbar-group ide-toolbar-group--watchlist">
-                      <span class="ide-toolbar-label">{{ $t('indicatorIde.toolbar.watchlist') }}</span>
-                      <a-select
-                        v-model="selectedWatchlistKey"
-                        class="ide-toolbar-select ide-toolbar-select--watchlist chart-panel-watchlist-select"
-                        :placeholder="$t('backtest-center.config.watchlistPlaceholder')"
-                        size="small"
-                        show-search
-                        allow-clear
-                        :filter-option="filterWatchlistOption"
-                        :dropdown-class-name="isDarkTheme ? 'ide-watchlist-dropdown ide-watchlist-dropdown--dark' : 'ide-watchlist-dropdown'"
-                        :get-popup-container="chartToolbarGetPopupContainer"
-                        @change="handleWatchlistChange"
-                      >
-                        <a-select-option
-                          v-for="w in watchlist"
-                          :key="`bt-${w.market}:${w.symbol}`"
-                          :value="`${w.market}:${w.symbol}`"
-                        >
-                          <span class="wl-opt-tag" :class="'wl-mkt-' + (w.market || '').toLowerCase()">{{ marketLabel(w.market) }}</span>
-                          <strong class="wl-opt-symbol">{{ w.symbol }}</strong>
-                          <span v-if="w.name" class="wl-opt-name">{{ w.name }}</span>
-                        </a-select-option>
-                        <a-select-option key="bt-__add__" value="__add__" class="add-option">
-                          <div class="ide-watchlist-add-row">
-                            <a-icon type="plus" /> {{ $t('backtest-center.config.addSymbol') }}
-                          </div>
-                        </a-select-option>
-                      </a-select>
-                    </div>
-                    <div class="ide-toolbar-group ide-toolbar-group--tf">
-                      <span class="ide-toolbar-label">{{ $t('indicatorIde.toolbar.timeframe') }}</span>
-                      <a-radio-group
-                        v-model="timeframe"
-                        button-style="solid"
-                        size="small"
-                        class="tf-group ide-tf-seg ide-tf-seg--backtest"
-                      >
-                        <a-radio-button value="1m">1m</a-radio-button>
-                        <a-radio-button value="5m">5m</a-radio-button>
-                        <a-radio-button value="15m">15m</a-radio-button>
-                        <a-radio-button value="30m">30m</a-radio-button>
-                        <a-radio-button value="1H">1H</a-radio-button>
-                        <a-radio-button value="4H">4H</a-radio-button>
-                        <a-radio-button value="1D">1D</a-radio-button>
-                        <a-radio-button value="1W">1W</a-radio-button>
-                      </a-radio-group>
-                    </div>
-                    <div class="ide-toolbar-group ide-toolbar-group--indicator">
-                      <span class="ide-toolbar-label">{{ $t('indicatorIde.toolbar.indicator') }}</span>
-                      <a-dropdown
-                        :trigger="['click']"
-                        placement="bottomLeft"
-                        :visible="backtestIndicatorDropdownVisible"
-                        :get-popup-container="chartToolbarGetPopupContainer"
-                        @visibleChange="onBacktestIndicatorDropdownVisibleChange"
-                        :overlay-class-name="isDarkTheme ? 'ide-indicator-multiselect-dropdown ide-indicator-multiselect-dropdown--dark' : 'ide-indicator-multiselect-dropdown'"
-                      >
-                        <a-button
-                          size="small"
-                          class="ide-toolbar-select ide-toolbar-select--indicator ide-indicator-multiselect-trigger"
-                          :loading="loadingIndicators"
-                        >
-                          <span class="ide-indicator-trigger-text">{{ indicatorToolbarSummary }}</span>
-                          <a-icon type="down" />
-                        </a-button>
-                        <div slot="overlay" class="ide-indicator-overlay" @mousedown.stop @click.stop>
-                          <div class="ide-indicator-overlay-hint">{{ $t('indicatorIde.chartPickHint') }}</div>
-                          <a-spin v-if="loadingIndicators" size="small" style="padding: 12px;" />
-                          <div v-else-if="!indicators.length" class="ide-indicator-overlay-empty">{{ $t('indicatorIde.noIndicatorsYet') }}</div>
-                          <div v-else class="ide-indicator-overlay-list">
-                            <div
-                              v-for="ind in indicators"
-                              :key="'bt-ind-row-' + ind.id"
-                              class="ide-indicator-row"
-                            >
-                              <a-checkbox
-                                :checked="(chartVisibleIndicatorIds || []).some(x => Number(x) === Number(ind.id))"
-                                @change="e => onChartIndicatorCheckChange(ind.id, e.target.checked)"
-                              />
-                              <span
-                                class="ide-indicator-name"
-                                :class="{ active: Number(selectedIndicatorId) === Number(ind.id) }"
-                                @click="selectEditorIndicator(ind.id)"
-                              >{{ ind.name || ('Indicator #' + ind.id) }}</span>
-                              <a-tag
-                                v-if="Number(ind.is_buy) === 1"
-                                color="purple"
-                                class="ide-indicator-purchased-tag"
-                              >{{ $t('indicatorIde.purchasedBadge') }}</a-tag>
-                            </div>
-                          </div>
-                        </div>
-                      </a-dropdown>
-                    </div>
-                  </div>
-                </div>
-                <div class="result-panel">
-                  <div class="params-card">
-                    <div class="params-card-header" @click="paramsPanelExpanded = !paramsPanelExpanded">
-                      <div class="params-card-title">
-                        <a-icon type="control" />
-                        <span>{{ $t('indicatorIde.backtestParameters') }}</span>
-                      </div>
-                      <div class="params-card-actions" @click.stop>
-                        <a-tooltip :title="$t('indicatorIde.history')">
-                          <a-button
-                            size="small"
-                            :disabled="!selectedIndicatorId"
-                            @click="showHistoryDrawer = true; historyIndicatorId = selectedIndicatorId"
-                          >
-                            <a-icon type="history" />
-                          </a-button>
-                        </a-tooltip>
-                        <a-button
-                          type="primary"
-                          size="small"
-                          :loading="running"
-                          :disabled="!canRunBacktest"
-                          @click="runBacktest"
-                        >
-                          <a-icon v-if="!running" type="thunderbolt" />
-                          {{ $t('indicatorIde.runBacktest') }}
-                        </a-button>
-                        <a-icon :type="paramsPanelExpanded ? 'up' : 'down'" @click="paramsPanelExpanded = !paramsPanelExpanded" />
-                      </div>
-                    </div>
-                    <div v-show="paramsPanelExpanded" class="params-scroll params-scroll--right">
-                      <div class="params-layout">
-                        <div class="params-row-three">
-                          <div class="param-section param-section--top">
-                            <div class="param-label">{{ $t('indicatorIde.dateRange') }}</div>
-                            <div class="date-presets">
-                              <a-button
-                                v-for="p in filteredDatePresets"
-                                :key="p.key"
-                                size="small"
-                                :type="datePreset === p.key ? 'primary' : 'default'"
-                                @click="applyDatePreset(p)"
-                              >{{ p.label }}</a-button>
-                            </div>
-                            <a-row :gutter="8" style="margin-top: 6px;">
-                              <a-col :span="12">
-                                <a-date-picker v-model="startDate" :placeholder="$t('indicatorIde.start')" style="width: 100%" size="small" />
-                              </a-col>
-                              <a-col :span="12">
-                                <a-date-picker v-model="endDate" :placeholder="$t('indicatorIde.end')" style="width: 100%" size="small" />
-                              </a-col>
-                            </a-row>
-                          </div>
-
-                          <div class="param-section param-section--top">
-                            <div class="param-label">{{ $t('indicatorIde.capital') }}</div>
-                            <a-row :gutter="8">
-                              <a-col :span="12">
-                                <div class="field-label">{{ $t('indicatorIde.initialCapital') }}</div>
-                                <a-input-number
-                                  v-model="initialCapital"
-                                  :min="1000"
-                                  :step="10000"
-                                  :precision="2"
-                                  size="small"
-                                  style="width: 100%"
-                                  :formatter="v => `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')"
-                                  :parser="v => v.replace(/\$\s?|(,*)/g, '')"
-                                />
-                              </a-col>
-                              <a-col :span="12">
-                                <div class="field-label">{{ $t('indicatorIde.leverage') }}</div>
-                                <a-input-number
-                                  v-model="leverage"
-                                  :min="1"
-                                  :max="125"
-                                  :step="1"
-                                  :precision="0"
-                                  size="small"
-                                  style="width: 100%"
-                                  :formatter="v => `${v}x`"
-                                  :parser="v => v.replace('x', '')"
-                                />
-                              </a-col>
-                            </a-row>
-                            <a-row :gutter="8" style="margin-top: 6px;">
-                              <a-col :span="12">
-                                <div class="field-label">{{ $t('indicatorIde.commission') }}</div>
-                                <a-input-number
-                                  v-model="commission"
-                                  :min="0"
-                                  :max="10"
-                                  :step="0.01"
-                                  :precision="4"
-                                  size="small"
-                                  style="width: 100%"
-                                />
-                              </a-col>
-                              <a-col :span="12">
-                                <div class="field-label">{{ $t('indicatorIde.slippage') }}</div>
-                                <a-input-number
-                                  v-model="slippage"
-                                  :min="0"
-                                  :max="10"
-                                  :step="0.01"
-                                  :precision="4"
-                                  size="small"
-                                  style="width: 100%"
-                                />
-                              </a-col>
-                            </a-row>
-                            <a-row :gutter="8" style="margin-top: 6px;">
-                              <a-col :span="12">
-                                <div class="field-label">
-                                  <a-tooltip :title="$t('indicatorIde.fundingRateHint')">
-                                    {{ $t('indicatorIde.fundingRateAnnual') }} <a-icon type="info-circle" />
-                                  </a-tooltip>
-                                </div>
-                                <a-input-number
-                                  v-model="fundingRateAnnual"
-                                  :min="-100"
-                                  :max="100"
-                                  :step="0.01"
-                                  :precision="4"
-                                  size="small"
-                                  style="width: 100%"
-                                />
-                              </a-col>
-                              <a-col :span="12">
-                                <div class="field-label">{{ $t('indicatorIde.fundingIntervalHours') }}</div>
-                                <a-input-number
-                                  v-model="fundingIntervalHours"
-                                  :min="1"
-                                  :max="168"
-                                  :step="1"
-                                  :precision="0"
-                                  size="small"
-                                  style="width: 100%"
-                                />
-                              </a-col>
-                            </a-row>
-                          </div>
-
-                          <div class="param-section param-section--top">
-                            <div class="strict-mode-card" :class="{ 'strict-mode-card--on': strictMode }">
-                              <div class="strict-mode-card__head">
-                                <div class="strict-mode-card__title">
-                                  <span>{{ $t('indicatorIde.strictModeLabel') }}</span>
-                                  <a-tag size="small" :color="strictMode ? 'blue' : 'orange'">
-                                    {{ strictMode ? $t('indicatorIde.strictModeOnShort') : $t('indicatorIde.strictModeOffShort') }}
-                                  </a-tag>
-                                </div>
-                                <a-switch v-model="strictMode" size="small" />
-                              </div>
-                              <p class="strict-mode-card__hint">
-                                {{ strictMode ? $t('indicatorIde.strictModeOnHint') : $t('indicatorIde.strictModeOffHint') }}
-                              </p>
-                            </div>
-                            <div class="strict-mode-direction">
-                              <div class="param-label">{{ $t('indicatorIde.direction') }}</div>
-                              <a-radio-group v-model="tradeDirection" class="direction-radio-group">
-                                <a-radio-button value="long">
-                                  <a-icon type="arrow-up" /> {{ $t('indicatorIde.long') }}
-                                </a-radio-button>
-                                <a-radio-button value="short">
-                                  <a-icon type="arrow-down" /> {{ $t('indicatorIde.short') }}
-                                </a-radio-button>
-                                <a-radio-button value="both">
-                                  <a-icon type="swap" /> {{ $t('indicatorIde.both') }}
-                                </a-radio-button>
-                              </a-radio-group>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div v-if="strategyDirectivesSummary.length" class="params-row-full">
-                          <div class="param-section strategy-directives-card">
-                            <div class="strategy-directives-header">
-                              <span class="param-label" style="margin: 0;">
-                                <a-icon type="lock" /> {{ $t('indicatorIde.strategyDirectives.title') }}
-                              </span>
-                              <a-tooltip :title="$t('indicatorIde.strategyDirectives.editHint')">
-                                <a class="strategy-directives-jump" @click="jumpToStrategyDirectiveLine()">
-                                  <a-icon type="edit" /> {{ $t('indicatorIde.strategyDirectives.editAction') }}
-                                </a>
-                              </a-tooltip>
-                            </div>
-
-                            <div v-if="!strategyDirectivesSummary.length" class="strategy-directives-empty">
-                              {{ $t('indicatorIde.strategyDirectives.empty') }}
-                            </div>
-                            <div v-else class="strategy-directives-list">
-                              <div
-                                v-for="item in strategyDirectivesSummary"
-                                :key="item.key"
-                                class="strategy-directive-row"
-                                :class="{ 'is-set': item.isSet }"
-                                @click="jumpToStrategyDirectiveLine(item.key)"
-                              >
-                                <span class="strategy-directive-label">{{ item.label }}</span>
-                                <span class="strategy-directive-value" :class="{ 'is-empty': !item.isSet }">{{ item.display }}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="result-split-workbench">
-                    <section class="result-split-panel result-split-panel--backtest">
-                      <div class="workbench-panel-header">
-                        <div class="workbench-panel-title">
-                          <a-icon type="bar-chart" />
-                          <span>{{ $t('indicatorIde.resultOverviewTitle') }}</span>
-                        </div>
-                        <div v-if="hasResult" class="workbench-panel-meta">{{ symbol }} / {{ timeframe }}</div>
-                      </div>
-                      <div class="workbench-panel-body">
-                        <!-- Running state -->
-                        <div v-if="running" class="result-running">
-                          <a-spin size="large" />
-                          <div class="running-time">{{ fmtElapsed(elapsedSec) }}</div>
-                          <div class="running-tip">{{ $t('indicatorIde.runningBacktest') }}</div>
-                        </div>
-
-                        <!-- Empty state -->
-                        <div v-else-if="!hasResult" class="result-empty">
-                          <a-icon type="bar-chart" style="font-size: 48px; color: #d9d9d9;" />
-                          <p>{{ $t('indicatorIde.emptyHint') }}</p>
-                        </div>
-
-                        <!-- Results -->
-                        <div v-else class="result-data result-data--workbench">
-                          <div class="backtest-workbench">
-                            <div class="backtest-workbench-main">
-                              <div class="backtest-overview-head">
-                                <div>
-                                  <div class="backtest-overview-kicker">{{ symbol }} / {{ timeframe }}</div>
-                                  <div class="backtest-overview-title">{{ backtestInsight }}</div>
-                                </div>
-                              </div>
-
-                              <div class="metrics-grid metrics-grid--workbench">
-                                <div v-for="m in metricCards" :key="m.label" :class="['metric-card', m.cls]">
-                                  <div class="metric-label">{{ m.label }}</div>
-                                  <div class="metric-value">{{ m.value }}</div>
-                                </div>
-                              </div>
-
-                              <div v-if="backtestDiagnostics.length" class="backtest-quality-strip">
-                                <span class="backtest-quality-strip__title">
-                                  <a-icon type="safety-certificate" />
-                                  {{ $t('indicatorIde.resultDiagnostics') }}
-                                </span>
-                                <span
-                                  v-for="item in backtestDiagnostics"
-                                  :key="item.key"
-                                  :class="['backtest-quality-chip', 'backtest-quality-chip--' + item.tone]"
-                                  :title="item.desc"
-                                >
-                                  <a-icon :type="item.icon" />
-                                  <span>{{ item.title }}</span>
-                                  <strong>{{ item.value }}</strong>
-                                </span>
-                              </div>
-
-                              <div class="eq-section eq-section--hero">
-                                <div class="eq-title">
-                                  <a-icon type="area-chart" style="margin-right: 6px;" />
-                                  {{ $t('indicatorIde.equityCurve') }}
-                                </div>
-                                <div ref="eqChart" class="equity-chart equity-chart--large"></div>
-                              </div>
-
-                              <div class="trades-section trades-section--workbench">
-                                <div class="trades-title">
-                                  <a-icon type="swap" style="margin-right: 6px;" />
-                                  {{ $t('indicatorIde.trades') }}
-                                  <span class="trades-count">({{ pairedTrades.length }})</span>
-                                </div>
-                                <a-table
-                                  class="trades-table"
-                                  :columns="tradeColumns"
-                                  :dataSource="pairedTrades"
-                                  :pagination="{ pageSize: 8, size: 'small' }"
-                                  size="small"
-                                  :scroll="{ x: 980 }"
-                                  rowKey="id"
-                                >
-                                  <template slot="type" slot-scope="text">
-                                    <a-tag :color="text === 'long' ? 'green' : 'red'" style="margin: 0;">{{ text.toUpperCase() }}</a-tag>
-                                  </template>
-                                  <template slot="exitTag" slot-scope="text, record">
-                                    <a-tag
-                                      v-if="record"
-                                      :color="exitTagColor(record)"
-                                      style="margin: 0;"
-                                    >{{ exitTagLabel(record) }}</a-tag>
-                                  </template>
-                                  <template slot="price" slot-scope="text">
-                                    <span style="font-variant-numeric: tabular-nums;">{{ fmtPrice(text) }}</span>
-                                  </template>
-                                  <template slot="profit" slot-scope="text">
-                                    <span :style="{ color: text > 0 ? '#52c41a' : text < 0 ? '#f5222d' : '#666', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }">{{ fmtMoney(text) }}</span>
-                                  </template>
-                                  <template slot="money" slot-scope="text">
-                                    <span style="font-weight: 600; font-variant-numeric: tabular-nums;">{{ fmtMoney(text) }}</span>
-                                  </template>
-                                </a-table>
-                              </div>
-                            </div>
-
-                          </div>
-                        </div>
-                      </div>
-                    </section>
-
-                    <section class="result-split-panel result-split-panel--optimizer">
-                      <div class="workbench-panel-header">
-                        <div class="workbench-panel-title">
-                          <a-icon type="experiment" />
-                          <span>{{ $t('indicatorIde.tuningLaunchTitle') }}</span>
-                        </div>
-                        <div class="workbench-panel-meta">{{ $t('indicatorIde.tuningLaunchDesc') }}</div>
-                      </div>
-                      <div class="workbench-panel-body">
-                        <div v-if="!experimentRunning" class="ide-tuning-launch">
-                          <div class="optimizer-workflow">
-                            <div class="optimizer-workflow-step">
-                              <div class="optimizer-step-index">1</div>
-                              <div>
-                                <div class="optimizer-step-title">{{ $t('indicatorIde.optimizeStepMethod') }}</div>
-                                <div class="optimizer-step-desc">{{ activeTuneMethodOption ? activeTuneMethodOption.hint : $t('indicatorIde.optimizeStepMethodDesc') }}</div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div class="ide-tuning-method-cards ide-tuning-method-cards--single">
-                            <div class="ide-tuning-method-card">
-                              <div class="ide-tune-pills ide-tune-pills--five">
-                                <button
-                                  v-for="opt in tuneMethodOptions"
-                                  :key="opt.value"
-                                  type="button"
-                                  class="ide-tune-pill"
-                                  :class="['ide-tune-pill--' + opt.value, { active: structuredTuneMethod === opt.value }]"
-                                  :disabled="experimentRunning"
-                                  @click="structuredTuneMethod = opt.value"
-                                >
-                                  <a-tooltip :title="opt.hint" placement="top">
-                                    <span class="ide-tune-pill-inner">
-                                      <a-icon :type="opt.icon" />
-                                      <span class="ide-tune-pill-label">{{ opt.label }}</span>
-                                    </span>
-                                  </a-tooltip>
-                                </button>
-                              </div>
-                              <div v-if="structuredTuneMethod !== 'ai'" class="ide-tune-dimensions">
-                                <div class="ide-tune-dimensions-summary">
-                                  <span class="ide-tune-dimensions-summary-label">
-                                    <a-icon type="appstore" />
-                                    {{ $t('indicatorIde.sweepDimensionsTitle') }}
-                                  </span>
-                                  <span class="ide-tune-dimensions-summary-stats">
-                                    <span class="ide-tune-dim-stat">
-                                      <span class="ide-tune-dim-stat-num">{{ experimentEnabledSweepDimensions.length }}</span>
-                                      <span class="ide-tune-dim-stat-sep">/</span>
-                                      <span class="ide-tune-dim-stat-total">{{ experimentSweepDimensions.length }}</span>
-                                      <span class="ide-tune-dim-stat-cap">{{ $t('indicatorIde.sweepDimEnabledLabel') }}</span>
-                                    </span>
-                                    <span class="ide-tune-dim-stat ide-tune-dim-stat--cartesian">
-                                      <span class="ide-tune-dim-stat-cap">{{ $t('indicatorIde.sweepCartesianLabel') }}</span>
-                                      <span class="ide-tune-dim-stat-num">{{ experimentCartesianSize === Infinity ? 'Infinity' : experimentCartesianSize.toLocaleString() }}</span>
-                                    </span>
-                                    <span class="ide-tune-dim-stat ide-tune-dim-stat--budget">
-                                      <span class="ide-tune-dim-stat-cap">{{ $t('indicatorIde.sweepBudgetLabel') }}</span>
-                                      <span class="ide-tune-dim-stat-num">48</span>
-                                    </span>
-                                  </span>
-                                </div>
-                                <div v-if="experimentSweepDimensions.length === 0" class="ide-tune-dimensions-empty">
-                                  {{ $t('indicatorIde.sweepDimensionsEmpty') }}
-                                </div>
-                                <div v-else class="ide-tune-dimensions-list">
-                                  <label
-                                    v-for="d in experimentSweepDimensions"
-                                    :key="d.key"
-                                    class="ide-tune-dim-row"
-                                    :class="['ide-tune-dim-row--' + d.source, { 'is-disabled': !d.enabled }]"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      class="ide-tune-dim-check"
-                                      :checked="d.enabled"
-                                      :disabled="experimentRunning"
-                                      @change="toggleSweepDimension(d.key)"
-                                    >
-                                    <span class="ide-tune-dim-label">{{ d.label }}</span>
-                                    <span class="ide-tune-dim-badge" :class="'ide-tune-dim-badge--' + d.source">
-                                      {{ $t('indicatorIde.sweepSource_' + d.source) }}
-                                    </span>
-                                    <span class="ide-tune-dim-count">x{{ d.values.length }}</span>
-                                    <span class="ide-tune-dim-values">{{ formatSweepValues(d.values) }}</span>
-                                  </label>
-                                </div>
-                                <div class="ide-tune-dimensions-tip">
-                                  <a-icon type="bulb" />
-                                  <span v-html="$t('indicatorIde.sweepDimensionsTip')"></span>
-                                </div>
-                              </div>
-
-                              <div v-if="structuredTuneMethod === 'ai'" class="ide-tune-ai-feature-list">
-                                <div class="ide-tune-ai-feature"><a-icon type="rocket" /><span>{{ $t('indicatorIde.aiTuneFeature1') }}</span></div>
-                                <div class="ide-tune-ai-feature"><a-icon type="bulb" /><span>{{ $t('indicatorIde.aiTuneFeature2') }}</span></div>
-                                <div class="ide-tune-ai-feature"><a-icon type="safety" /><span>{{ $t('indicatorIde.aiTuneFeature3') }}</span></div>
-                              </div>
-
-                              <div class="ide-tune-method-meta" :class="{ 'ide-tune-method-meta--ai': structuredTuneMethod === 'ai' }">
-                                <span class="ide-tune-method-meta-hint">
-                                  <template v-if="structuredTuneMethod === 'ai'">{{ $t('indicatorIde.aiTuneCta') }}</template>
-                                  <template v-else>{{ activeTuneMethodOption ? activeTuneMethodOption.hint : '' }}</template>
-                                </span>
-                                <a-button
-                                  type="primary"
-                                  :ghost="structuredTuneMethod !== 'ai'"
-                                  size="small"
-                                  :class="['ide-tune-run-btn', { 'ide-tune-run-btn--ai': structuredTuneMethod === 'ai' }]"
-                                  :loading="experimentRunning && (structuredTuneMethod === 'ai' ? experimentRunKind === 'llm' : experimentRunKind === 'structured')"
-                                  :disabled="experimentRunning"
-                                  @click="handleRunCurrentMode"
-                                >
-                                  <a-icon type="thunderbolt" />
-                                  {{ $t('indicatorIde.runTune') }}
-                                </a-button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <!-- Running state with real-time progress -->
-                        <div v-if="experimentRunning" class="experiment-panel">
-                          <div class="experiment-progress-bar">
-                            <div class="experiment-progress-header">
-                              <a-spin size="small" />
-                              <span v-if="experimentRunKind === 'structured'">{{ $t('indicatorIde.structuredTuneRunning') }}</span>
-                              <span v-else>
-                                {{ $t('indicatorIde.aiOptimizing') }}
-                                <template v-if="experimentCurrentRound > 0">
-                                  &mdash; {{ $t('indicatorIde.round') }} {{ experimentCurrentRound }}/{{ experimentMaxRounds }}
-                                </template>
-                              </span>
-                              <span class="running-time">{{ fmtElapsed(elapsedSec) }}</span>
-                            </div>
-                            <div v-if="experimentRunKind === 'llm' && experimentLiveHint" class="experiment-live-hint">{{ experimentLiveHint }}</div>
-                            <a-progress
-                              v-if="experimentRunKind === 'structured'"
-                              :percent="35"
-                              status="active"
-                              :show-info="false"
-                              size="small"
-                              strokeColor="var(--primary-color, #1890ff)"
-                            />
-                            <a-progress
-                              v-else
-                              :percent="experimentProgressPct"
-                              status="active"
-                              :show-info="false"
-                              size="small"
-                              strokeColor="var(--primary-color, #1890ff)"
-                            />
-                            <div v-if="experimentRoundScores.length" class="experiment-round-scores">
-                              <span v-for="(rs, idx) in experimentRoundScores" :key="idx" class="experiment-round-badge" :class="{ best: rs === experimentGlobalBestScoreLive }">
-                                R{{ idx + 1 }}: {{ rs.toFixed(1) }}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <!-- Results -->
-                        <div v-else-if="hasExperimentResult" class="experiment-panel">
-                          <!-- Round progress indicators -->
-                          <div class="experiment-round-row">
-                            <div v-for="(rd, idx) in experimentRoundsInfo" :key="idx" class="experiment-round-card" :class="{ best: rd.globalBestScore === rd.bestScore && rd.bestScore > 0 }">
-                              <div class="experiment-round-num">R{{ rd.round }}</div>
-                              <div class="experiment-round-detail">
-                                <div class="experiment-round-score">{{ rd.bestScore.toFixed(1) }}</div>
-                                <div class="experiment-round-meta">{{ rd.candidateCount }} {{ $t('indicatorIde.candidates') }} &middot; {{ rd.elapsed }}s</div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <!-- Hero: regime + best score -->
-                          <div class="experiment-hero">
-                            <div class="experiment-hero-main">
-                              <div class="experiment-kicker">{{ $t('indicatorIde.marketRegime') }}</div>
-                              <div class="experiment-regime-title">
-                                {{ experimentRegimeLabel }}
-                                <a-tag color="blue">{{ experimentRegimeConfidence }}</a-tag>
-                              </div>
-                              <div class="experiment-hint">{{ experimentPromptHint }}</div>
-                              <div class="experiment-family-tags">
-                                <a-tag v-for="family in experimentPreferredFamilies" :key="family.key" color="purple">{{ family.label }}</a-tag>
-                              </div>
-                              <div v-if="experimentTopWeights.length" class="experiment-weights-row">
-                                <span class="experiment-weights-label">{{ $t('indicatorIde.scoringProfile') }}:</span>
-                                <a-tooltip v-for="w in experimentTopWeights" :key="w.key" :title="`${w.label} ${(w.value * 100).toFixed(0)}%`">
-                                  <a-tag size="small" color="cyan">{{ w.label }} {{ (w.value * 100).toFixed(0) }}%</a-tag>
-                                </a-tooltip>
-                              </div>
-                            </div>
-                            <div class="experiment-best-score">
-                              <div class="experiment-kicker">{{ $t('indicatorIde.bestStrategyOutput') }}</div>
-                              <div class="experiment-score">{{ experimentBestScore }}</div>
-                              <div class="experiment-grade">{{ experimentBestGrade }}</div>
-                            </div>
-                          </div>
-
-                          <a-alert
-                            v-if="experimentOosMeta && experimentOosMeta.enabled"
-                            type="warning"
-                            show-icon
-                            class="experiment-oos-banner"
-                            :message="$t('indicatorIde.oosBannerSimple', {
-                              trainStart: experimentOosMeta.trainStart,
-                              trainEnd: experimentOosMeta.trainEnd,
-                              oosStart: experimentOosMeta.oosStart,
-                              oosEnd: experimentOosMeta.oosEnd
-                            })"
-                          />
-
-                          <!-- Best candidate card -->
-                          <div
-                            v-if="experimentBest"
-                            class="experiment-best-card"
-                            :class="{ 'is-overfit': experimentBestOverfit }">
-                            <div class="experiment-section-title">
-                              <a-icon type="trophy" style="margin-right: 6px;" />
-                              {{ $t('indicatorIde.bestStrategyOutput') }}
-                              <span v-if="experimentBest.name" style="font-weight: 400; margin-left: 8px; font-size: 12px; opacity: 0.65;">{{ experimentBest.name }}</span>
-                            </div>
-                            <div v-if="experimentBest.reasoning" class="experiment-reasoning">{{ experimentBest.reasoning }}</div>
-                            <a-alert
-                              v-if="experimentBestOverfit"
-                              type="error"
-                              show-icon
-                              style="margin-bottom: 10px;"
-                              :message="$t('indicatorIde.oosOverfitWarning', { degrade: experimentBestDegradePct })" />
-                            <div class="experiment-best-dual">
-                              <div class="experiment-best-panel">
-                                <div class="experiment-best-panel-header">
-                                  <a-tag color="blue">{{ $t('indicatorIde.isBadge') }}</a-tag>
-                                  <span class="experiment-best-panel-title">{{ $t('indicatorIde.isPanelTitle') }}</span>
-                                  <span v-if="experimentOosMeta && experimentOosMeta.enabled" class="experiment-best-panel-range">
-                                    {{ experimentOosMeta.trainStart }} ~ {{ experimentOosMeta.trainEnd }}
-                                  </span>
-                                </div>
-                                <div class="experiment-best-summary">
-                                  <div class="experiment-best-metric">
-                                    <span>{{ $t('indicatorIde.totalReturn') }}</span>
-                                    <strong>{{ experimentBestSummary.totalReturn }}</strong>
-                                  </div>
-                                  <div class="experiment-best-metric">
-                                    <span>{{ $t('indicatorIde.maxDrawdown') }}</span>
-                                    <strong>{{ experimentBestSummary.maxDrawdown }}</strong>
-                                  </div>
-                                  <div class="experiment-best-metric">
-                                    <span>{{ $t('indicatorIde.sharpeRatio') }}</span>
-                                    <strong>{{ experimentBestSummary.sharpeRatio }}</strong>
-                                  </div>
-                                  <div class="experiment-best-metric">
-                                    <span>{{ $t('indicatorIde.tradeCount') }}</span>
-                                    <strong>{{ experimentBestSummary.totalTrades }}</strong>
-                                  </div>
-                                </div>
-                              </div>
-                              <div
-                                class="experiment-best-panel"
-                                :class="{ 'panel-overfit': experimentBestOverfit, 'panel-disabled': !experimentBestOosSummary }">
-                                <div class="experiment-best-panel-header">
-                                  <a-tag :color="experimentBestOverfit ? 'red' : 'orange'">{{ $t('indicatorIde.oosBadge') }}</a-tag>
-                                  <span class="experiment-best-panel-title">{{ $t('indicatorIde.oosPanelTitle') }}</span>
-                                  <span v-if="experimentOosMeta && experimentOosMeta.enabled" class="experiment-best-panel-range">
-                                    {{ experimentOosMeta.oosStart }} ~ {{ experimentOosMeta.oosEnd }}
-                                  </span>
-                                  <span v-if="experimentBest.oosDegradation != null" class="experiment-best-degrade">
-                                    {{ $t('indicatorIde.oosDegradation') }} {{ experimentBestDegradePct }}%
-                                  </span>
-                                </div>
-                                <div v-if="experimentBestOosSummary" class="experiment-best-summary">
-                                  <div class="experiment-best-metric">
-                                    <span>{{ $t('indicatorIde.totalReturn') }}</span>
-                                    <strong>{{ experimentBestOosSummary.totalReturn }}</strong>
-                                  </div>
-                                  <div class="experiment-best-metric">
-                                    <span>{{ $t('indicatorIde.maxDrawdown') }}</span>
-                                    <strong>{{ experimentBestOosSummary.maxDrawdown }}</strong>
-                                  </div>
-                                  <div class="experiment-best-metric">
-                                    <span>{{ $t('indicatorIde.sharpeRatio') }}</span>
-                                    <strong>{{ experimentBestOosSummary.sharpeRatio }}</strong>
-                                  </div>
-                                  <div class="experiment-best-metric">
-                                    <span>{{ $t('indicatorIde.tradeCount') }}</span>
-                                    <strong>{{ experimentBestOosSummary.totalTrades }}</strong>
-                                  </div>
-                                </div>
-                                <div v-else class="experiment-best-oos-na">
-                                  {{ experimentBestOosUnavailableText }}
-                                </div>
-                              </div>
-                            </div>
-                            <div class="experiment-best-actions">
-                              <a-button type="primary" @click="applyBestExperimentCandidate">
-                                <a-icon type="check" />
-                                {{ $t('indicatorIde.applyBestParams') }}
-                              </a-button>
-                            </div>
-                          </div>
-
-                          <!-- Top candidates -->
-                          <div class="experiment-candidate-grid">
-                            <div
-                              v-for="candidate in experimentCandidateCards"
-                              :key="candidate.name"
-                              class="experiment-candidate-card"
-                              :class="{ active: experimentSelectedCandidate && experimentSelectedCandidate.name === candidate.name }"
-                              @click="selectExperimentCandidate(candidate)"
-                            >
-                              <div class="experiment-candidate-header">
-                                <div>
-                                  <div class="experiment-candidate-name">{{ candidate.name }}</div>
-                                  <div class="experiment-candidate-source">{{ formatExperimentSource(candidate.source) }}</div>
-                                </div>
-                                <a-tag :color="experimentGradeColor((candidate.score || {}).grade)">
-                                  {{ ((candidate.score || {}).grade || 'C') }}
-                                </a-tag>
-                              </div>
-                              <div class="experiment-candidate-score">{{ (((candidate.score || {}).overallScore || 0)).toFixed(1) }}</div>
-                              <div class="experiment-candidate-stats">
-                                <span>{{ fmtPct((candidate.result || {}).totalReturn) }}</span>
-                                <span>{{ (((candidate.result || {}).sharpeRatio || 0)).toFixed(2) }}</span>
-                              </div>
-                              <div
-                                v-if="candidate.oosScore"
-                                class="experiment-candidate-oos"
-                                :class="{ 'is-overfit': candidate.oosOverfit }">
-                                <span>OOS {{ ((candidate.oosScore.overallScore || 0)).toFixed(1) }}</span>
-                                <span v-if="candidate.oosDegradation != null">-{{ ((candidate.oosDegradation || 0) * 100).toFixed(1) }}%</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div v-if="experimentHasAnalytics" class="experiment-lab">
-                            <div class="experiment-lab-head">
-                              <div>
-                                <div class="experiment-section-title">
-                                  <a-icon type="fund" style="margin-right: 6px;" />
-                                  {{ $t('indicatorIde.optimizationLab') }}
-                                </div>
-                                <div class="experiment-lab-subtitle">{{ $t('indicatorIde.optimizationLabHint') }}</div>
-                              </div>
-                              <a-tag color="blue">{{ $t('indicatorIde.analyticsDataSource') }}</a-tag>
-                            </div>
-                            <div class="experiment-audit-grid">
-                              <div v-for="card in experimentDataAuditCards" :key="card.key" class="experiment-audit-card">
-                                <a-icon :type="card.icon" />
-                                <div>
-                                  <span>{{ card.label }}</span>
-                                  <strong>{{ card.value }}</strong>
-                                  <small>{{ card.hint }}</small>
-                                </div>
-                              </div>
-                            </div>
-                            <div class="experiment-analytics experiment-analytics--lab">
-                              <div class="experiment-analytics-card experiment-analytics-card--wide">
-                                <div class="experiment-analytics-head">
-                                  <a-icon type="line-chart" />
-                                  <span class="experiment-analytics-title">{{ $t('indicatorIde.analyticsConvergence') }}</span>
-                                  <span class="experiment-analytics-sub">{{ $t('indicatorIde.analyticsConvergenceHint') }}</span>
-                                </div>
-                                <div ref="experimentConvergenceChart" class="experiment-analytics-chart"></div>
-                              </div>
-                              <div class="experiment-analytics-card">
-                                <div class="experiment-analytics-head">
-                                  <a-icon type="cluster" />
-                                  <span class="experiment-analytics-title">{{ $t('indicatorIde.analyticsOosMatrix') }}</span>
-                                  <span class="experiment-analytics-sub">{{ $t('indicatorIde.analyticsOosMatrixHint') }}</span>
-                                </div>
-                                <div ref="experimentOosMatrixChart" class="experiment-analytics-chart"></div>
-                              </div>
-                              <div class="experiment-analytics-card">
-                                <div class="experiment-analytics-head">
-                                  <a-icon type="sliders" />
-                                  <span class="experiment-analytics-title">{{ $t('indicatorIde.analyticsParamSensitivity') }}</span>
-                                  <span class="experiment-analytics-sub">{{ $t('indicatorIde.analyticsParamSensitivityHint') }}</span>
-                                </div>
-                                <div ref="experimentParamSensitivityChart" class="experiment-analytics-chart"></div>
-                              </div>
-                              <div class="experiment-analytics-card">
-                                <div class="experiment-analytics-head">
-                                  <a-icon type="dot-chart" />
-                                  <span class="experiment-analytics-title">{{ $t('indicatorIde.analyticsRiskReturn') }}</span>
-                                  <span class="experiment-analytics-sub">{{ $t('indicatorIde.analyticsRiskReturnHint') }}</span>
-                                </div>
-                                <div ref="experimentScatterChart" class="experiment-analytics-chart"></div>
-                              </div>
-                              <div class="experiment-analytics-card">
-                                <div class="experiment-analytics-head">
-                                  <a-icon type="radar-chart" />
-                                  <span class="experiment-analytics-title">{{ $t('indicatorIde.analyticsRadar') }}</span>
-                                  <span class="experiment-analytics-sub">{{ $t('indicatorIde.analyticsRadarHint') }}</span>
-                                </div>
-                                <div ref="experimentRadarChart" class="experiment-analytics-chart"></div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <!-- Selected candidate detail -->
-                          <div v-if="experimentSelectedCandidate" class="experiment-detail-card">
-                            <div class="experiment-detail-header">
-                              <div>
-                                <div class="experiment-section-title">{{ experimentSelectedCandidate.name }}</div>
-                                <div class="experiment-detail-source">{{ formatExperimentSource(experimentSelectedCandidate.source) }}</div>
-                                <div v-if="experimentSelectedCandidate.reasoning" class="experiment-reasoning">{{ experimentSelectedCandidate.reasoning }}</div>
-                              </div>
-                              <div class="experiment-detail-actions">
-                                <a-button size="small" @click="applyExperimentCandidate(experimentSelectedCandidate)">
-                                  <a-icon type="check" /> {{ $t('indicatorIde.applyThisCandidate') }}
-                                </a-button>
-                                <a-button size="small" type="primary" @click="runBacktestWithExperimentCandidate(experimentSelectedCandidate)">
-                                  <a-icon type="thunderbolt" /> {{ $t('indicatorIde.backtestThisCandidate') }}
-                                </a-button>
-                              </div>
-                            </div>
-                            <div class="experiment-detail-metrics">
-                              <div v-for="item in experimentSelectedSummary" :key="item.label" class="experiment-detail-metric">
-                                <span>{{ item.label }}</span>
-                                <strong>{{ item.value }}</strong>
-                              </div>
-                            </div>
-                            <div v-if="experimentSelectedChangedEntries.length" class="experiment-detail-block">
-                              <div class="experiment-detail-block-title">{{ $t('indicatorIde.tuningChangesTitle') }}</div>
-                              <div class="experiment-detail-block-hint">{{ $t('indicatorIde.tuningChangesHint') }}</div>
-                              <div class="experiment-change-list">
-                                <div v-for="item in experimentSelectedChangedEntries" :key="item.key" class="experiment-change-item">
-                                  <span class="experiment-change-name">{{ item.label }}</span>
-                                  <span class="experiment-change-values">
-                                    <span class="experiment-change-before">{{ item.fromLabel }}</span>
-                                    <span class="experiment-change-arrow">-&gt;</span>
-                                    <span class="experiment-change-after">{{ item.toLabel }}</span>
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <div v-else-if="experimentSelectedChangeEntries.length" class="experiment-detail-block">
-                              <div class="experiment-detail-block-title">{{ $t('indicatorIde.tuningChangesTitle') }}</div>
-                              <div class="experiment-detail-block-hint">{{ $t('indicatorIde.tuningChangesAlreadyApplied') }}</div>
-                            </div>
-                            <div v-if="experimentSelectedScoreComponents.length" class="experiment-detail-block">
-                              <div class="experiment-detail-block-title">{{ $t('indicatorIde.scoreBreakdown') }}</div>
-                              <div class="experiment-component-grid">
-                                <div v-for="item in experimentSelectedScoreComponents" :key="item.key" class="experiment-component-card">
-                                  <span>{{ item.label }}</span>
-                                  <strong>{{ item.value }}</strong>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <!-- Ranking table -->
-                          <div class="experiment-ranking-card">
-                            <div class="experiment-section-title">
-                              <a-icon type="ordered-list" style="margin-right: 6px;" />
-                              {{ $t('indicatorIde.strategyRanking') }}
-                            </div>
-                            <a-table
-                              :columns="experimentColumns"
-                              :dataSource="experimentAdjustedRankedStrategies"
-                              :pagination="{ pageSize: 5, size: 'small' }"
-                              size="small"
-                              rowKey="name"
-                              :scroll="{ x: 760 }"
-                              :customRow="experimentRankingRowProps"
-                              :rowClassName="experimentRankingRowClassName"
-                            >
-                              <template slot="experimentName" slot-scope="text, record">
-                                <div>
-                                  <div class="exp-table-name">{{ text }}</div>
-                                  <div class="exp-table-source">{{ formatExperimentSource(record.source) }}</div>
-                                </div>
-                              </template>
-                              <template slot="experimentScore" slot-scope="text, record">
-                                <span class="exp-table-score">{{ ((record.score || {}).overallScore || 0).toFixed(2) }}</span>
-                              </template>
-                              <template slot="experimentGrade" slot-scope="text, record">
-                                <a-tag :color="experimentGradeColor((record.score || {}).grade)">
-                                  {{ (record.score || {}).grade || 'C' }}
-                                </a-tag>
-                              </template>
-                              <template slot="experimentReturn" slot-scope="text, record">
-                                <span :style="{ color: (((record.result || {}).totalReturn || 0) >= 0) ? '#52c41a' : '#f5222d', fontWeight: 600 }">
-                                  {{ fmtPct((record.result || {}).totalReturn) }}
-                                </span>
-                              </template>
-                              <template slot="experimentDrawdown" slot-scope="text, record">
-                                <span>{{ fmtPct((record.result || {}).maxDrawdown) }}</span>
-                              </template>
-                              <template slot="experimentSharpe" slot-scope="text, record">
-                                <span>{{ (((record.result || {}).sharpeRatio || 0)).toFixed(2) }}</span>
-                              </template>
-                              <template slot="experimentTrades" slot-scope="text, record">
-                                <span>{{ (record.result || {}).totalTrades || 0 }}</span>
-                              </template>
-                            </a-table>
-                            <div class="experiment-ranking-actions">
-                              <a-button
-                                size="small"
-                                type="primary"
-                                :disabled="!experimentSelectedCandidateCanApply"
-                                @click.stop="applyExperimentCandidate(experimentSelectedCandidate)"
-                              >
-                                <a-icon type="check" />
-                                {{ $t('strategyCenter.backtest.applyTuneParams') }}
-                              </a-button>
-                            </div>
-                          </div>
-                          <div v-if="lastAppliedExperimentChanges.length" class="experiment-detail-card">
-                            <div class="experiment-section-title">
-                              <a-icon type="check-circle" style="margin-right: 6px;" />
-                              {{ $t('indicatorIde.lastAppliedParamsTitle') }}
-                              <span v-if="lastAppliedExperimentCandidateName" style="font-weight: 400; margin-left: 8px; font-size: 12px; opacity: 0.65;">
-                                {{ $t('indicatorIde.lastAppliedParamsFrom', { name: lastAppliedExperimentCandidateName }) }}
-                              </span>
-                            </div>
-                            <div class="experiment-change-list experiment-change-list--applied">
-                              <div v-for="item in lastAppliedExperimentChanges" :key="`applied-${item.key}`" class="experiment-change-item">
-                                <span class="experiment-change-name">{{ item.label }}</span>
-                                <span class="experiment-change-values">
-                                  <span class="experiment-change-before">{{ item.fromLabel }}</span>
-                                  <span class="experiment-change-arrow">-&gt;</span>
-                                  <span class="experiment-change-after">{{ item.toLabel }}</span>
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </section>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </a-tab-pane>
-        </a-tabs>
       </div>
 
     </div>
@@ -1394,6 +475,17 @@
           :tab="$t('dashboard.indicator.market.' + m)"
         ></a-tab-pane>
       </a-tabs>
+      <div v-if="addMarketTab === 'Crypto'" class="ide-add-source-row">
+        <a-select v-model="cryptoExchangeId" style="width: 50%;" @change="onAddSourceChange">
+          <a-select-option v-for="exchangeId in cryptoExchangeIds" :key="exchangeId" :value="exchangeId">
+            {{ exchangeId.toUpperCase() }}
+          </a-select-option>
+        </a-select>
+        <a-select v-model="cryptoMarketType" style="width: 50%;" @change="onAddSourceChange">
+          <a-select-option value="spot">{{ $t('marketContext.spot') }}</a-select-option>
+          <a-select-option value="swap">{{ $t('marketContext.swap') }}</a-select-option>
+        </a-select>
+      </div>
       <a-input-search
         v-model="addSearchKeyword"
         :placeholder="$t('backtest-center.config.symbolPlaceholder')"
@@ -1427,18 +519,267 @@
       </div>
     </a-modal>
 
-    <!-- History drawer + run viewer -->
-    <backtest-history-drawer
-      :visible="showHistoryDrawer"
-      :userId="userId"
-      :indicatorId="historyIndicatorId"
-      :strategyId="null"
-      runType="indicator"
-      :isMobile="false"
-      :isDark="isDarkTheme"
-      @cancel="showHistoryDrawer = false"
-      @view="applyBacktestRunToIde"
-    />
+    <a-modal
+      :title="$t('indicatorIde.paramPanel.title')"
+      :visible="paramDrawerVisible"
+      :width="760"
+      :footer="null"
+      centered
+      :get-container="ideModalGetContainer"
+      :wrap-class-name="isDarkTheme ? 'ide-modal-wrap ide-modal-wrap--dark ide-param-modal-wrap' : 'ide-modal-wrap ide-param-modal-wrap'"
+      @cancel="paramDrawerVisible = false"
+    >
+      <div class="ide-param-drawer">
+        <div class="ide-param-drawer__hero">
+          <div>
+            <span>{{ $t('indicatorIde.paramPanel.currentIndicator') }}</span>
+            <strong>{{ selectedIndicatorDisplayName }}</strong>
+          </div>
+          <a-tag :color="selectedIndicatorCodeHidden ? 'gold' : 'green'">
+            {{ selectedIndicatorCodeHidden ? $t('indicatorIde.paramPanel.hiddenSource') : $t('indicatorIde.paramPanel.visibleSource') }}
+          </a-tag>
+        </div>
+
+        <a-empty
+          v-if="!currentIndicatorParamSpecs.length"
+          class="ide-param-empty"
+          :description="$t('indicatorIde.paramPanel.noParams')"
+        />
+
+        <div v-else class="ide-param-list">
+          <div
+            v-for="spec in currentIndicatorParamSpecs"
+            :key="spec.name"
+            class="ide-param-item"
+          >
+            <div class="ide-param-item__head">
+              <div>
+                <strong>{{ spec.label || spec.name }}</strong>
+                <code>{{ spec.name }}</code>
+              </div>
+              <a-tag size="small">{{ spec.type }}</a-tag>
+            </div>
+            <p v-if="spec.description" class="ide-param-item__desc">{{ spec.description }}</p>
+
+            <a-switch
+              v-if="spec.type === 'bool'"
+              :checked="!!indicatorParamDraft[spec.name]"
+              @change="val => onIndicatorParamDraftChange(spec, val)"
+            />
+            <a-select
+              v-else-if="spec.values && spec.values.length"
+              :value="indicatorParamDraft[spec.name]"
+              size="small"
+              class="ide-param-item__control"
+              @change="val => onIndicatorParamDraftChange(spec, val)"
+            >
+              <a-select-option
+                v-for="opt in spec.values"
+                :key="String(opt)"
+                :value="opt"
+              >{{ opt }}</a-select-option>
+            </a-select>
+            <a-input-number
+              v-else-if="spec.type === 'int' || spec.type === 'float'"
+              :value="indicatorParamDraft[spec.name]"
+              :min="spec.min"
+              :max="spec.max"
+              :step="spec.step || (spec.type === 'int' ? 1 : 0.1)"
+              :precision="spec.type === 'int' ? 0 : undefined"
+              class="ide-param-item__control"
+              size="small"
+              @change="val => onIndicatorParamDraftChange(spec, val)"
+            />
+            <a-input
+              v-else
+              :value="indicatorParamDraft[spec.name]"
+              class="ide-param-item__control"
+              size="small"
+              @change="e => onIndicatorParamDraftChange(spec, e.target.value)"
+            />
+
+            <div class="ide-param-item__meta">
+              <span>{{ $t('indicatorIde.paramPanel.defaultValue') }}: <b>{{ formatIndicatorParamValue(spec.defaultValue) }}</b></span>
+              <span v-if="spec.rangeText">{{ spec.rangeText }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ide-param-drawer__footer">
+          <a-button size="small" @click="resetIndicatorParamsToDeclared">
+            <a-icon type="reload" />
+            {{ $t('indicatorIde.paramPanel.reset') }}
+          </a-button>
+          <a-button
+            size="small"
+            :disabled="!currentIndicatorParamSpecs.length"
+            @click="saveIndicatorParamDefaults"
+          >
+            <a-icon type="save" />
+            {{ $t('indicatorIde.paramPanel.saveDefault') }}
+          </a-button>
+          <a-tooltip :title="selectedIndicatorCodeHidden ? $t('indicatorIde.paramPanel.writeBlockedHidden') : $t('indicatorIde.paramPanel.writeBackHint')">
+            <a-button
+              size="small"
+              :disabled="!currentIndicatorParamSpecs.length || selectedIndicatorCodeHidden"
+              @click="writeIndicatorParamsToCode"
+            >
+              <a-icon type="edit" />
+              {{ $t('indicatorIde.paramPanel.writeBack') }}
+            </a-button>
+          </a-tooltip>
+          <a-button
+            type="primary"
+            size="small"
+            :disabled="!currentIndicatorParamSpecs.length"
+            @click="applyIndicatorParams"
+          >
+            <a-icon type="play-circle" />
+            {{ $t('indicatorIde.paramPanel.apply') }}
+          </a-button>
+        </div>
+      </div>
+    </a-modal>
+
+    <a-modal
+      title="信号通知"
+      :visible="signalAlertModalVisible"
+      :width="880"
+      :footer="null"
+      centered
+      :get-container="ideModalGetContainer"
+      :wrap-class-name="isDarkTheme ? 'ide-modal-wrap ide-modal-wrap--dark ide-signal-alert-modal-wrap' : 'ide-modal-wrap ide-signal-alert-modal-wrap'"
+      @cancel="closeSignalAlertModal"
+    >
+      <div class="ide-signal-alert-modal">
+        <a-tabs v-model="signalAlertActiveTab" class="ide-signal-alert-tabs">
+          <a-tab-pane key="create" :tab="signalAlertEditingId ? '编辑条件' : '设置推送条件'">
+            <div class="signal-alert-current-card">
+              <div>
+                <span>当前指标</span>
+                <strong>{{ selectedIndicatorDisplayName }}</strong>
+              </div>
+              <a-tag :color="selectedIndicatorCodeHidden ? 'gold' : 'green'">
+                {{ selectedIndicatorCodeHidden ? '源码隐藏' : '源码可见' }}
+              </a-tag>
+            </div>
+
+            <div class="signal-alert-form-grid">
+              <div class="signal-alert-field signal-alert-field--wide">
+                <label>选择标的</label>
+                <a-select
+                  v-model="signalAlertForm.watchlistKey"
+                  size="small"
+                  show-search
+                  :filter-option="filterWatchlistOption"
+                  :get-popup-container="ideModalGetContainer"
+                  @change="onSignalAlertWatchlistChange"
+                >
+                  <a-select-option
+                    v-for="w in signalAlertWatchlistOptions"
+                    :key="`${w.market}:${w.symbol}`"
+                    :value="`${w.market}:${w.symbol}`"
+                  >
+                    <span class="wl-opt-tag" :class="'wl-mkt-' + (w.market || '').toLowerCase()">{{ marketLabel(w.market) }}</span>
+                    <strong class="wl-opt-symbol">{{ w.symbol }}</strong>
+                    <span v-if="w.name" class="wl-opt-name">{{ w.name }}</span>
+                  </a-select-option>
+                </a-select>
+              </div>
+              <div class="signal-alert-field">
+                <label>K线周期</label>
+                <a-select v-model="signalAlertForm.timeframe" size="small" :get-popup-container="ideModalGetContainer">
+                  <a-select-option v-for="tf in signalAlertTimeframes" :key="tf" :value="tf">{{ tf }}</a-select-option>
+                </a-select>
+              </div>
+            </div>
+
+            <div class="signal-alert-block">
+              <div class="signal-alert-block__head">
+                <strong>触发信号</strong>
+                <span>从指标代码的 output.signals 中识别；选择“全部信号”可监听任意信号。</span>
+              </div>
+              <a-checkbox-group v-model="signalAlertForm.signalKeys" class="signal-alert-check-grid">
+                <a-checkbox
+                  v-for="opt in signalAlertSignalOptions"
+                  :key="opt.key"
+                  :value="opt.key"
+                >{{ opt.label }}</a-checkbox>
+              </a-checkbox-group>
+            </div>
+
+            <div class="signal-alert-block">
+              <div class="signal-alert-block__head">
+                <strong>通知方式</strong>
+                <span>站内通知会进入顶部铃铛；外部渠道需填写对应目标。</span>
+              </div>
+              <a-checkbox-group v-model="signalAlertForm.channels" class="signal-alert-channel-row">
+                <a-checkbox value="browser">站内</a-checkbox>
+                <a-checkbox value="email">邮件</a-checkbox>
+                <a-checkbox value="telegram">Telegram</a-checkbox>
+                <a-checkbox value="webhook">Webhook</a-checkbox>
+              </a-checkbox-group>
+              <div v-if="signalAlertForm.channels.includes('email')" class="signal-alert-target-row">
+                <a-input v-model="signalAlertForm.email" size="small" placeholder="接收邮箱" />
+              </div>
+              <div v-if="signalAlertForm.channels.includes('telegram')" class="signal-alert-target-row signal-alert-target-row--split">
+                <a-input v-model="signalAlertForm.telegramChatId" size="small" placeholder="Telegram Chat ID" />
+                <a-input v-model="signalAlertForm.telegramBotToken" size="small" placeholder="Bot Token（可选，留空则使用系统配置）" />
+              </div>
+              <div v-if="signalAlertForm.channels.includes('webhook')" class="signal-alert-target-row">
+                <a-input v-model="signalAlertForm.webhookUrl" size="small" placeholder="Webhook URL" />
+              </div>
+            </div>
+
+            <div class="signal-alert-actions">
+              <a-button size="small" @click="resetSignalAlertForm">重置</a-button>
+              <a-button size="small" type="primary" :loading="signalAlertSaving" @click="submitSignalAlertTask">
+                <a-icon type="check" />
+                {{ signalAlertEditingId ? '保存修改' : '创建任务' }}
+              </a-button>
+            </div>
+          </a-tab-pane>
+          <a-tab-pane key="tasks" tab="进行中任务">
+            <a-spin :spinning="signalAlertLoading">
+              <a-empty v-if="!signalAlertTasks.length" description="暂无信号通知任务" />
+              <div v-else class="signal-alert-task-list">
+                <div
+                  v-for="task in signalAlertTasks"
+                  :key="task.id"
+                  class="signal-alert-task-card"
+                  :class="{ paused: task.status === 'paused' }"
+                >
+                  <div class="signal-alert-task-card__main">
+                    <div class="signal-alert-task-card__title">
+                      <strong>{{ task.indicator_name || selectedIndicatorDisplayName }}</strong>
+                      <a-tag :color="task.status === 'running' ? 'green' : 'orange'">{{ task.status === 'running' ? '运行中' : '已暂停' }}</a-tag>
+                    </div>
+                    <div class="signal-alert-task-card__meta">
+                      <span>{{ task.market }} · {{ task.symbol }} · {{ task.timeframe }}</span>
+                      <span>触发 {{ task.trigger_count || 0 }} 次</span>
+                      <span v-if="task.last_error" class="danger">错误：{{ task.last_error }}</span>
+                    </div>
+                    <div class="signal-alert-task-card__chips">
+                      <a-tag v-for="key in (task.signal_keys || [])" :key="key">{{ signalAlertKeyLabel(key) }}</a-tag>
+                      <a-tag v-for="ch in (task.channels || [])" :key="ch" color="blue">{{ signalAlertChannelLabel(ch) }}</a-tag>
+                    </div>
+                  </div>
+                  <div class="signal-alert-task-card__actions">
+                    <a-button size="small" @click="editSignalAlertTask(task)">编辑</a-button>
+                    <a-button size="small" @click="toggleSignalAlertTask(task)">
+                      {{ task.status === 'running' ? '暂停' : '恢复' }}
+                    </a-button>
+                    <a-button size="small" @click="testSignalAlertTask(task)">测试</a-button>
+                    <a-button size="small" type="danger" ghost @click="deleteSignalAlertTask(task)">删除</a-button>
+                  </div>
+                </div>
+              </div>
+            </a-spin>
+          </a-tab-pane>
+        </a-tabs>
+      </div>
+    </a-modal>
+
     <a-drawer
       :title="$t('indicatorIde.codeVersionHistory')"
       :visible="showCodeVersionDrawer"
@@ -1448,7 +789,7 @@
       @close="showCodeVersionDrawer = false"
     >
       <div class="code-version-toolbar">
-        <span>{{ selectedIndicatorObj ? selectedIndicatorObj.name : '' }}</span>
+        <span>{{ selectedIndicatorDisplayName }}</span>
         <a-button size="small" icon="reload" :loading="codeVersionLoading" @click="loadCodeVersions">
           {{ $t('dashboard.indicator.backtest.historyRefresh') }}
         </a-button>
@@ -1482,44 +823,78 @@
     <a-modal
       :title="publishIndicator && publishIndicator.publish_to_community ? $t('dashboard.indicator.publish.editTitle') : $t('dashboard.indicator.publish.title')"
       :visible="showPublishModal"
+      :width="620"
       :confirmLoading="publishing"
       :okText="publishIndicator && publishIndicator.publish_to_community ? $t('dashboard.indicator.publish.update') : $t('dashboard.indicator.publish.confirm')"
       :cancelText="$t('dashboard.indicator.editor.cancel')"
       :get-container="ideModalGetContainer"
-      :wrap-class-name="isDarkTheme ? 'ide-modal-wrap ide-modal-wrap--dark' : 'ide-modal-wrap'"
+      :wrap-class-name="isDarkTheme ? 'ide-modal-wrap ide-modal-wrap--dark ide-publish-modal-wrap' : 'ide-modal-wrap ide-publish-modal-wrap'"
       @ok="handleConfirmPublish"
       @cancel="showPublishModal = false; publishIndicator = null"
     >
-      <a-alert
-        type="info"
-        show-icon
-        style="margin-bottom: 16px;"
-        :message="$t('dashboard.indicator.publish.hint')"
-      />
-      <div class="publish-form">
-        <div class="field-label">{{ $t('dashboard.indicator.publish.pricingType') }}</div>
-        <a-radio-group v-model="publishPricingType">
-          <a-radio value="free">{{ $t('dashboard.indicator.publish.free') }}</a-radio>
-          <a-radio value="paid">{{ $t('dashboard.indicator.publish.paid') }}</a-radio>
-        </a-radio-group>
-        <div v-if="publishPricingType === 'paid'" style="margin-top: 12px;">
-          <div class="field-label">{{ $t('dashboard.indicator.publish.price') }}</div>
-          <a-input-number v-model="publishPrice" :min="0" :precision="2" style="width: 100%" />
-          <div style="margin-top: 10px;">
-            <a-switch v-model="publishVipFree" />
-            <span style="margin-left: 8px;">{{ $t('dashboard.indicator.publish.vipFree') }}</span>
+      <div class="publish-form publish-market-form">
+        <div class="publish-summary-card">
+          <div class="publish-summary-icon">
+            <a-icon type="shop" />
           </div>
-          <div class="publish-hint">{{ $t('dashboard.indicator.publish.vipFreeHint') }}</div>
+          <div class="publish-summary-main">
+            <div class="publish-summary-label">{{ $t('dashboard.indicator.publish.title') }}</div>
+            <div class="publish-summary-name">{{ publishIndicator && publishIndicator.name }}</div>
+          </div>
+          <a-tag class="publish-summary-tag" color="red">{{ $t('community.title') }}</a-tag>
         </div>
-        <div style="margin-top: 12px;">
-          <div class="field-label">{{ $t('dashboard.indicator.publish.description') }}</div>
+
+        <div class="publish-note">
+          <a-icon type="info-circle" />
+          <span>{{ $t('dashboard.indicator.publish.hint') }}</span>
+        </div>
+
+        <div class="publish-section">
+          <div class="publish-section-title">{{ $t('dashboard.indicator.publish.pricingType') }}</div>
+          <a-radio-group v-model="publishPricingType" class="publish-pricing-group">
+            <a-radio-button value="free">
+              <a-icon type="gift" />
+              {{ $t('dashboard.indicator.publish.free') }}
+            </a-radio-button>
+            <a-radio-button value="paid">
+              <a-icon type="pay-circle" />
+              {{ $t('dashboard.indicator.publish.paid') }}
+            </a-radio-button>
+          </a-radio-group>
+          <div v-if="publishPricingType === 'paid'" class="publish-price-box">
+            <div class="field-label">{{ $t('dashboard.indicator.publish.price') }}</div>
+            <a-input-number v-model="publishPrice" :min="0" :precision="2" class="publish-price-input" />
+          </div>
+        </div>
+
+        <div class="publish-option-grid">
+          <div class="publish-option-card" :class="{ active: publishVipFree }">
+            <div class="publish-option-head">
+              <span>{{ $t('dashboard.indicator.publish.vipFree') }}</span>
+              <a-switch v-model="publishVipFree" />
+            </div>
+            <div class="publish-hint">{{ $t('dashboard.indicator.publish.vipFreeHint') }}</div>
+          </div>
+          <div class="publish-option-card" :class="{ active: publishCodeHidden }">
+            <div class="publish-option-head">
+              <span>{{ $t('dashboard.indicator.publish.hideCode') }}</span>
+              <a-switch v-model="publishCodeHidden" />
+            </div>
+            <div class="publish-hint">{{ $t('dashboard.indicator.publish.hideCodeHint') }}</div>
+          </div>
+        </div>
+
+        <div class="publish-section">
+          <div class="publish-section-title">{{ $t('dashboard.indicator.publish.description') }}</div>
           <a-textarea
             v-model="publishDescription"
             :rows="4"
+            class="publish-description-input"
             :placeholder="$t('dashboard.indicator.publish.descriptionPlaceholder')"
           />
         </div>
-        <div v-if="publishIndicator && publishIndicator.publish_to_community" style="margin-top: 16px;">
+
+        <div v-if="publishIndicator && publishIndicator.publish_to_community" class="publish-unpublish-row">
           <a-button type="danger" ghost @click="handleUnpublish" :loading="unpublishing">
             {{ $t('dashboard.indicator.publish.unpublish') }}
           </a-button>
@@ -1565,10 +940,10 @@ import request from '@/utils/request'
 import { formatBacktestTime } from '@/utils/userTime'
 import { resolveExperimentIndicatorParams } from '@/utils/experimentOverrides'
 import { loadEnabledMarketOptions, firstMarketValue } from '@/utils/marketModules'
+import { CRYPTO_EXCHANGE_IDS, marketContextKey } from '@/utils/marketContext'
 import { getUserInfo } from '@/api/login'
 import { getWatchlist, addWatchlist, searchSymbols } from '@/api/market'
 import KlineChart from '@/views/indicator-analysis/components/KlineChart.vue'
-import BacktestHistoryDrawer from '@/views/indicator-analysis/components/BacktestHistoryDrawer.vue'
 import QuickTradePanel from '@/components/QuickTradePanel/QuickTradePanel'
 import { Modal } from 'ant-design-vue'
 import message from 'ant-design-vue/es/message'
@@ -1593,11 +968,6 @@ const DATE_PRESETS = [
   { key: '3y', label: '3Y', days: 1095 }
 ]
 
-function purchasedMarketHintStorageKey (userId) {
-  const u = userId != null && userId !== '' ? String(userId) : '0'
-  return `qd_ide_purchased_market_hint_dismissed_${u}`
-}
-
 function strategyDirectivesAlertStorageKey (userId) {
   const u = userId != null && userId !== '' ? String(userId) : '0'
   return `qd_ide_strategy_directives_alert_dismissed_${u}`
@@ -1608,10 +978,15 @@ function ideUiCacheStorageKey (userId) {
   return `qd_ide_ui_cache_v1_${u}`
 }
 
+function indicatorParamDefaultsStorageKey (userId) {
+  const u = userId != null && userId !== '' ? String(userId) : '0'
+  return `qd_indicator_param_defaults_v1_${u}`
+}
+
 export default {
   name: 'IndicatorIDE',
   mixins: [baseMixin],
-  components: { KlineChart, BacktestHistoryDrawer, QuickTradePanel },
+  components: { KlineChart, QuickTradePanel },
   data () {
     return {
       userId: null,
@@ -1632,15 +1007,16 @@ export default {
       codeDrawerVisible: true,
       codePanelExpanded: true,
       paramsPanelExpanded: true,
-      purchasedMarketHintDismissed: false,
 
       strategyDirectivesAlertDismissed: false,
-
-      ideWorkspaceTab: 'chart',
 
       market: 'Crypto',
       symbol: 'BTC/USDT',
       timeframe: '1D',
+      cryptoExchangeId: 'binance',
+      cryptoMarketType: 'spot',
+      currentInstrumentId: '',
+      cryptoExchangeIds: CRYPTO_EXCHANGE_IDS,
       watchlist: [],
       selectedWatchlistKey: 'Crypto:BTC/USDT',
 
@@ -1673,6 +1049,29 @@ export default {
       activeIndicators: [],
       chartIndicatorRunning: true,
       quickTradeDrawerVisible: false,
+      paramDrawerVisible: false,
+      indicatorParamOverrides: {},
+      indicatorParamDraft: {},
+      signalAlertModalVisible: false,
+      signalAlertActiveTab: 'create',
+      signalAlertLoading: false,
+      signalAlertSaving: false,
+      signalAlertTasks: [],
+      signalAlertEditingId: null,
+      signalAlertTimeframes: ['1m', '5m', '15m', '30m', '1H', '4H', '1D', '1W'],
+      signalAlertForm: {
+        watchlistKey: 'Crypto:BTC/USDT',
+        market: 'Crypto',
+        symbol: 'BTC/USDT',
+        symbolName: 'Bitcoin',
+        timeframe: '1D',
+        signalKeys: ['any'],
+        channels: ['browser'],
+        email: '',
+        telegramChatId: '',
+        telegramBotToken: '',
+        webhookUrl: ''
+      },
 
       // AI generation
       aiPanelExpanded: true,
@@ -1682,12 +1081,12 @@ export default {
       ideAiTipIndex: 0,
       ideAiTipTimer: null,
       ideAiTips: [
-        'Analyzing the request and building indicator logic...',
-        'AI can add @strategy directives for risk, entry sizing, and execution behavior.',
-        'Generated indicators can be backtested with one click.',
-        'Live strategies carry the current code and parsed strategy configuration.',
-        'Use @param to declare tunable parameters for smart optimization.',
-        'Signal debouncing helps avoid repeated entries and improves stability.'
+        'Understanding your intent and mapping it to chart-only indicator logic...',
+        'Periods, thresholds, switches, and visual preferences should be exposed with @param.',
+        'Signals are generated as one-bar events by default so alerts do not repeat.',
+        'Persistent regimes belong in plots, lamp rows, or sparse layers rather than repeated markers.',
+        'Indicator code stays visual-only; backtest and live execution belong to Script Strategy.',
+        'The generated output is checked for length alignment, sandbox safety, and stable pandas usage.'
       ],
       codeQualityHints: [],
       codeQualityLoading: false,
@@ -1731,6 +1130,7 @@ export default {
       publishPrice: 10,
       publishDescription: '',
       publishVipFree: false,
+      publishCodeHidden: false,
 
       showAddModal: false,
       addingStock: false,
@@ -1804,22 +1204,13 @@ export default {
           ? this.$t('indicatorIde.strategyDirectives.on') || 'On'
           : this.$t('indicatorIde.strategyDirectives.off') || 'Off'
       }
-      const fmtDirection = (rawValue) => {
-        const v = String(rawValue || '').toLowerCase()
-        if (v === 'long') return this.$t('indicatorIde.long') || 'Long'
-        if (v === 'short') return this.$t('indicatorIde.short') || 'Short'
-        if (v === 'both') return this.$t('indicatorIde.both') || 'Both'
-        return rawValue || notSet
-      }
-
       const fields = [
         { key: 'stopLossPct', formatter: fmtPct },
         { key: 'takeProfitPct', formatter: fmtPct },
         { key: 'entryPct', formatter: fmtPct },
         { key: 'trailingEnabled', formatter: fmtBool },
         { key: 'trailingStopPct', formatter: fmtPct },
-        { key: 'trailingActivationPct', formatter: fmtPct },
-        { key: 'tradeDirection', formatter: fmtDirection }
+        { key: 'trailingActivationPct', formatter: fmtPct }
       ]
       return fields.map(({ key, formatter }) => {
         const isSet = Object.prototype.hasOwnProperty.call(raw, key) && raw[key] != null && raw[key] !== ''
@@ -1848,6 +1239,42 @@ export default {
       const o = this.selectedIndicatorObj
       if (!o) return false
       return Number(o.is_buy) === 1
+    },
+    selectedIndicatorCodeHidden () {
+      const o = this.selectedIndicatorObj
+      if (!o) return false
+      return this.isIndicatorCodeHidden(o)
+    },
+    selectedIndicatorParamCode () {
+      const ind = this.selectedIndicatorObj
+      if (!ind) return ''
+      return this.getIndicatorExecutableCode(ind, undefined)
+    },
+    currentIndicatorParamSpecs () {
+      return this.parseIndicatorParamSpecs(this.selectedIndicatorParamCode || '')
+    },
+    currentIndicatorParamValues () {
+      const ind = this.selectedIndicatorObj
+      if (!ind) return {}
+      return this.resolveIndicatorRuntimeParams(ind, this.selectedIndicatorParamCode)
+    },
+    selectedIndicatorDisplayName () {
+      return this.indicatorDisplayName(this.selectedIndicatorObj)
+    },
+    runningSignalAlertCount () {
+      return (this.signalAlertTasks || []).filter(item => item && item.status === 'running').length
+    },
+    signalAlertWatchlistOptions () {
+      const list = Array.isArray(this.watchlist) ? [...this.watchlist] : []
+      const currentKey = `${this.market}:${this.symbol}`
+      const exists = list.some(w => `${w.market}:${w.symbol}` === currentKey)
+      if (!exists && this.symbol) {
+        list.unshift({ market: this.market, symbol: this.symbol, name: this.qtSymbol === this.symbol ? '' : this.qtSymbol })
+      }
+      return list
+    },
+    signalAlertSignalOptions () {
+      return this.extractSignalAlertOptions(this.selectedIndicatorParamCode || this.currentCode)
     },
     tfMaxDays () {
       return TF_MAX_DAYS[this.timeframe] || 3650
@@ -2389,15 +1816,13 @@ export default {
       return !this.chartVisibleIndicatorIds.some((rawId) => {
         const id = Number(rawId)
         const ind = this.indicators.find(i => Number(i.id) === id)
-        const code = Number(this.selectedIndicatorId) === id
-          ? (this.currentCode || (ind && ind.code) || '')
-          : ((ind && ind.code) || '')
+        const code = this.getIndicatorExecutableCode(ind)
         return code && String(code).trim()
       })
     },
     indicatorToolbarSummary () {
       const ed = this.selectedIndicatorObj
-      const edLabel = ed ? (ed.name || ('#' + ed.id)) : '--'
+      const edLabel = this.indicatorDisplayName(ed)
       const n = (this.chartVisibleIndicatorIds && this.chartVisibleIndicatorIds.length) || 0
       if (!this.indicators.length) return this.$t('indicatorIde.noIndicatorsYet')
       if (!n) return `${edLabel} · ${this.$t('indicatorIde.indicatorPickPlaceholder')}`
@@ -2449,9 +1874,6 @@ export default {
         { title: this.$t('indicatorIde.balance'), dataIndex: 'balance', scopedSlots: { customRender: 'money' }, width: 130 }
       ]
     },
-    showPurchasedMarketHint () {
-      return this.selectedIndicatorIsPurchased && !this.purchasedMarketHintDismissed
-    },
     showBacktestMarkerLegend () {
       return this.shouldShowBacktestMarkersOnChart()
     }
@@ -2459,12 +1881,13 @@ export default {
   created: async function () {
     await this.loadMarketModules()
     await this.loadUserId()
-    this.loadPurchasedMarketHintDismissed()
+    this.loadIndicatorParamDefaults()
     this.loadStrategyDirectivesAlertDismissed()
     await this.loadIndicators()
     await this.loadWatchlist()
     this.restoreIdeUiState()
     this.autoSelectFirstIndicator()
+    this.loadSignalAlertTasks()
     this.applyCopilotDraft()
   },
   mounted () {
@@ -2517,6 +1940,9 @@ export default {
     } catch (_) {}
   },
   methods: {
+    toggleCodeDrawer () {
+      this.codeDrawerVisible = !this.codeDrawerVisible
+    },
     async loadMarketModules () {
       const options = await loadEnabledMarketOptions({ includeFeatures: ['research'] })
       this.ideAddMarketKeys = options.map(item => item.value)
@@ -2531,7 +1957,9 @@ export default {
       const q = this.$route && this.$route.query ? this.$route.query : {}
       const targetTab = String(q.tab || '').toLowerCase()
       if (targetTab === 'backtest') {
-        this.ideWorkspaceTab = 'backtest'
+        const nextQuery = { ...q }
+        delete nextQuery.tab
+        this.$router.replace({ path: '/indicator-ide', query: nextQuery }).catch(() => {})
       }
       let prompt = ''
       let code = ''
@@ -2584,23 +2012,6 @@ export default {
       }
     },
 
-    loadPurchasedMarketHintDismissed () {
-      try {
-        const raw = storage.get(purchasedMarketHintStorageKey(this.userId))
-        this.purchasedMarketHintDismissed =
-          raw === true || raw === 1 || raw === '1' || raw === 'true'
-      } catch (_) {
-        this.purchasedMarketHintDismissed = false
-      }
-    },
-
-    dismissPurchasedMarketHint () {
-      this.purchasedMarketHintDismissed = true
-      try {
-        storage.set(purchasedMarketHintStorageKey(this.userId), '1')
-      } catch (_) { /* ignore quota */ }
-    },
-
     loadStrategyDirectivesAlertDismissed () {
       try {
         const raw = storage.get(strategyDirectivesAlertStorageKey(this.userId))
@@ -2619,7 +2030,7 @@ export default {
     },
 
     openStrategyDirectivesDocs () {
-      const url = 'https://github.com/brokermr810/QuantDinger/blob/main/docs/STRATEGY_DEV_GUIDE.md#41-fixed-stop-loss-take-profit-and-entry-sizing-in-indicatorstrategy'
+      const url = 'https://github.com/brokermr810/QuantDinger/blob/main/docs/INDICATOR_DEV_GUIDE_CN.md'
       try {
         window.open(url, '_blank', 'noopener')
       } catch (_) { /* ignore */ }
@@ -2687,8 +2098,17 @@ export default {
         if (s.market && s.symbol) {
           this.market = String(s.market)
           this.symbol = String(s.symbol)
+          this.cryptoExchangeId = String(s.exchange_id || s.exchangeId || this.cryptoExchangeId)
+          this.cryptoMarketType = String(s.market_type || s.marketType || this.cryptoMarketType)
+          this.currentInstrumentId = String(s.instrument_id || s.instrumentId || '')
           this.qtSymbol = this.symbol
-          this.selectedWatchlistKey = `${this.market}:${this.symbol}`
+          this.selectedWatchlistKey = marketContextKey({
+            market: this.market,
+            symbol: this.symbol,
+            exchange_id: this.cryptoExchangeId,
+            market_type: this.cryptoMarketType,
+            instrument_id: this.currentInstrumentId
+          })
         } else if (s.selectedWatchlistKey && typeof s.selectedWatchlistKey === 'string') {
           const [m, sym] = s.selectedWatchlistKey.split(':')
           if (m && sym) {
@@ -2738,6 +2158,9 @@ export default {
         const payload = {
           market: this.market,
           symbol: this.symbol,
+          exchange_id: this.cryptoExchangeId,
+          market_type: this.cryptoMarketType,
+          instrument_id: this.currentInstrumentId,
           timeframe: this.timeframe,
           selectedIndicatorId: this.selectedIndicatorId,
           chartVisibleIndicatorIds: this.chartVisibleIndicatorIds,
@@ -2784,7 +2207,21 @@ export default {
       } finally {
         this.loadingIndicators = false
         this.pruneChartVisibleIndicatorIds()
+        this.applyIndicatorRouteSelection()
       }
+    },
+    applyIndicatorRouteSelection () {
+      const query = this.$route && this.$route.query ? this.$route.query : {}
+      const raw = query.indicator_id || query.indicatorId
+      if (!raw) return
+      const targetId = Number(raw)
+      if (!targetId || !this.indicators.some(item => Number(item.id) === targetId)) return
+      if (Number(this.selectedIndicatorId) === targetId) return
+      this.selectedIndicatorId = targetId
+      if (!this.chartVisibleIndicatorIds.some(id => Number(id) === targetId)) {
+        this.chartVisibleIndicatorIds = [targetId]
+      }
+      this.onIndicatorChange(targetId)
     },
     pruneChartVisibleIndicatorIds () {
       const set = new Set(this.indicators.map(i => Number(i.id)))
@@ -2800,10 +2237,13 @@ export default {
     },
 
     reconcileIdeMarketFromWatchlist () {
+      if (this.market && this.symbol) {
+        this.selectedWatchlistKey = marketContextKey({ market: this.market, symbol: this.symbol })
+      }
       const key = this.selectedWatchlistKey
       if (!key || key === '__add__') return
       const row = (this.watchlist || []).find(
-        w => w && w.market && w.symbol && `${w.market}:${w.symbol}` === key
+        w => w && w.market && w.symbol && this.watchlistContextKey(w) === key
       )
       if (row) {
         this.market = String(row.market)
@@ -2822,16 +2262,12 @@ export default {
       }
     },
     ensureChartReady () {
-      this.reconcileIdeMarketFromWatchlist()
       this.$nextTick(() => {
         setTimeout(() => {
           const chart = this.$refs.klineChart
           if (!chart || !this.symbol) return
           if (!chart.chartRef && typeof chart.initChart === 'function') {
             chart.initChart()
-          }
-          if (typeof chart.loadKlineData === 'function') {
-            chart.loadKlineData()
           }
           if (this.selectedIndicatorId) {
             this.syncSelectedIndicatorToChart()
@@ -2883,9 +2319,411 @@ export default {
     },
     applyCodeMirrorReadOnly () {
       if (!this.cmInstance) return
-      const ro = this.selectedIndicatorIsPurchased
+      const ro = this.selectedIndicatorCodeHidden
       this.cmInstance.setOption('readOnly', ro)
       this.cmInstance.refresh()
+    },
+    castIndicatorParamValue (value, type) {
+      const t = String(type || '').toLowerCase()
+      if (t === 'bool') {
+        return ['true', '1', 'yes', 'on'].includes(String(value).toLowerCase())
+      }
+      if (t === 'int') {
+        const n = Number(value)
+        return Number.isFinite(n) ? Math.round(n) : 0
+      }
+      if (t === 'float') {
+        const n = Number(value)
+        return Number.isFinite(n) ? n : 0
+      }
+      return value == null ? '' : String(value)
+    },
+    parseIndicatorParamSpecs (code) {
+      if (!code || typeof code !== 'string') return []
+      const paramRe = /^\s*#\s*@param\s+(\w+)\s+(int|float|bool|str|string)\s+(\S+)\s*(.*)$/i
+      const rangeRe = /(?:^|\s)range\s*=\s*(-?\d+(?:\.\d+)?)\s*:\s*(-?\d+(?:\.\d+)?)\s*:\s*(-?\d+(?:\.\d+)?)/i
+      const valuesRe = /(?:^|\s)values\s*=\s*([^\s]+)/i
+      const out = []
+      for (const rawLine of code.split('\n')) {
+        const m = rawLine.match(paramRe)
+        if (!m) continue
+        const name = m[1]
+        const type = String(m[2] || '').toLowerCase().replace('string', 'str')
+        const rawDefault = m[3]
+        const rest = String(m[4] || '').trim()
+        const rangeMatch = rest.match(rangeRe)
+        const valuesMatch = rest.match(valuesRe)
+        const values = valuesMatch
+          ? valuesMatch[1].split(',').map(v => v.trim()).filter(Boolean).map(v => this.castIndicatorParamValue(v, type))
+          : null
+        let min
+        let max
+        let step
+        if (rangeMatch) {
+          min = Number(rangeMatch[1])
+          max = Number(rangeMatch[2])
+          step = Number(rangeMatch[3])
+        }
+        const description = rest
+          .replace(rangeRe, '')
+          .replace(valuesRe, '')
+          .trim()
+        out.push({
+          name,
+          type,
+          defaultValue: this.castIndicatorParamValue(rawDefault, type),
+          rawDefault,
+          description,
+          label: description ? description.replace(/[，,。.;；:：].*$/, '').trim() : name,
+          values,
+          min: Number.isFinite(min) ? min : undefined,
+          max: Number.isFinite(max) ? max : undefined,
+          step: Number.isFinite(step) && step > 0 ? step : undefined,
+          rangeText: Number.isFinite(min) && Number.isFinite(max)
+            ? `${this.$t('indicatorIde.paramPanel.range')}: ${min} - ${max}${Number.isFinite(step) ? ` / ${step}` : ''}`
+            : ''
+        })
+      }
+      return out
+    },
+    normalizeIndicatorParamMap (params, specs = this.currentIndicatorParamSpecs) {
+      const out = {}
+      for (const spec of specs || []) {
+        const hasValue = params && Object.prototype.hasOwnProperty.call(params, spec.name)
+        out[spec.name] = this.castIndicatorParamValue(hasValue ? params[spec.name] : spec.defaultValue, spec.type)
+      }
+      return out
+    },
+    loadIndicatorParamDefaults () {
+      if (!this.userId) return
+      try {
+        const raw = storage.get(indicatorParamDefaultsStorageKey(this.userId))
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+        this.indicatorParamOverrides = parsed && typeof parsed === 'object' ? parsed : {}
+      } catch (_) {
+        this.indicatorParamOverrides = {}
+      }
+    },
+    persistIndicatorParamDefaults () {
+      if (!this.userId) return
+      try {
+        storage.set(indicatorParamDefaultsStorageKey(this.userId), JSON.stringify(this.indicatorParamOverrides || {}))
+      } catch (_) { /* ignore quota */ }
+    },
+    resolveIndicatorRuntimeParams (indicator, code) {
+      if (!indicator) return {}
+      const specs = this.parseIndicatorParamSpecs(code || this.getIndicatorExecutableCode(indicator, undefined) || '')
+      const defaults = {}
+      specs.forEach(spec => { defaults[spec.name] = spec.defaultValue })
+      const id = indicator.id != null ? String(indicator.id) : ''
+      const saved = id && this.indicatorParamOverrides && this.indicatorParamOverrides[id]
+        ? this.indicatorParamOverrides[id]
+        : {}
+      return this.normalizeIndicatorParamMap({ ...defaults, ...saved }, specs)
+    },
+    resetIndicatorParamDraft (preferCurrent = true) {
+      const source = preferCurrent ? this.currentIndicatorParamValues : {}
+      this.indicatorParamDraft = this.normalizeIndicatorParamMap(source)
+    },
+    openIndicatorParamsDrawer () {
+      this.resetIndicatorParamDraft(true)
+      this.paramDrawerVisible = true
+    },
+    onIndicatorParamDraftChange (spec, value) {
+      const next = {
+        ...this.indicatorParamDraft,
+        [spec.name]: this.castIndicatorParamValue(value, spec.type)
+      }
+      this.indicatorParamDraft = this.normalizeIndicatorParamMap(next)
+    },
+    applyIndicatorParams () {
+      if (!this.selectedIndicatorObj || !this.currentIndicatorParamSpecs.length) return
+      const id = String(this.selectedIndicatorObj.id)
+      const next = this.normalizeIndicatorParamMap(this.indicatorParamDraft)
+      this.$set(this.indicatorParamOverrides, id, next)
+      this.syncSelectedIndicatorToChart()
+      this.$message.success(this.$t('indicatorIde.paramPanel.applySuccess'))
+    },
+    saveIndicatorParamDefaults () {
+      if (!this.selectedIndicatorObj || !this.currentIndicatorParamSpecs.length) return
+      const id = String(this.selectedIndicatorObj.id)
+      const next = this.normalizeIndicatorParamMap(this.indicatorParamDraft)
+      this.$set(this.indicatorParamOverrides, id, next)
+      this.persistIndicatorParamDefaults()
+      this.syncSelectedIndicatorToChart()
+      this.$message.success(this.$t('indicatorIde.paramPanel.saveSuccess'))
+    },
+    resetIndicatorParamsToDeclared () {
+      if (!this.selectedIndicatorObj) return
+      const id = String(this.selectedIndicatorObj.id)
+      const defaults = this.normalizeIndicatorParamMap({})
+      this.indicatorParamDraft = defaults
+      this.$delete(this.indicatorParamOverrides, id)
+      this.persistIndicatorParamDefaults()
+      this.syncSelectedIndicatorToChart()
+    },
+    writeIndicatorParamsToCode () {
+      if (this.selectedIndicatorCodeHidden || !this.currentIndicatorParamSpecs.length) return
+      const nextCode = this.applyIndicatorParamsToCode(this.currentCode || '', this.normalizeIndicatorParamMap(this.indicatorParamDraft))
+      if (nextCode === this.currentCode) {
+        this.$message.info(this.$t('indicatorIde.applyCandidateNoChanges'))
+        return
+      }
+      this.currentCode = nextCode
+      this.codeDirty = true
+      if (this.cmInstance) this.cmInstance.setValue(nextCode)
+      this.syncSelectedIndicatorToChart(nextCode)
+      this.$message.success(this.$t('indicatorIde.paramPanel.writeSuccess'))
+    },
+    formatIndicatorParamValue (value) {
+      if (typeof value === 'boolean') return value ? 'true' : 'false'
+      if (value == null || value === '') return '--'
+      return String(value)
+    },
+    extractSignalAlertOptions (code) {
+      const raw = String(code || '')
+      const options = [{ key: 'any', label: '全部信号' }]
+      const seen = new Set(options.map(item => item.key))
+      const add = (key, label) => {
+        const k = String(key || '').trim()
+        if (!k || seen.has(k)) return
+        seen.add(k)
+        options.push({ key: k, label })
+      }
+      const typeRe = /["']type["']\s*:\s*["']([^"']+)["']/g
+      let m
+      while ((m = typeRe.exec(raw))) {
+        const type = String(m[1] || '').trim()
+        if (type) add(`type:${type.toLowerCase()}`, `${type} 类信号`)
+      }
+      const textRe = /["']text["']\s*:\s*["']([^"']+)["']/g
+      while ((m = textRe.exec(raw))) {
+        const text = String(m[1] || '').trim()
+        if (text) add(`text:${text.toLowerCase()}`, text)
+      }
+      const textDataLiteralRe = /["']textData["']\s*:\s*\[([^\]]{0,500})\]/g
+      while ((m = textDataLiteralRe.exec(raw))) {
+        const body = String(m[1] || '')
+        const valueRe = /["']([^"']+)["']/g
+        let vm
+        while ((vm = valueRe.exec(body))) {
+          const text = String(vm[1] || '').trim()
+          if (text) add(`text:${text.toLowerCase()}`, text)
+        }
+      }
+      if (options.length === 1) {
+        add('type:buy', '买入/做多信号')
+        add('type:sell', '卖出/离场信号')
+        add('type:warning', '观察/提醒信号')
+      }
+      return options
+    },
+    signalAlertKeyLabel (key) {
+      const found = this.signalAlertSignalOptions.find(item => item.key === key)
+      if (found) return found.label
+      const raw = String(key || '')
+      if (raw === 'any') return '全部信号'
+      return raw.replace(/^type:/, '类型：').replace(/^text:/, '文本：')
+    },
+    signalAlertChannelLabel (channel) {
+      const map = { browser: '站内', email: '邮件', telegram: 'Telegram', webhook: 'Webhook' }
+      return map[channel] || channel
+    },
+    resetSignalAlertForm () {
+      const ind = this.selectedIndicatorObj || {}
+      const current = this.signalAlertWatchlistOptions.find(w => `${w.market}:${w.symbol}` === `${this.market}:${this.symbol}`) || {}
+      this.signalAlertEditingId = null
+      this.signalAlertForm = {
+        watchlistKey: `${this.market}:${this.symbol}`,
+        market: this.market,
+        symbol: this.symbol,
+        symbolName: current.name || '',
+        timeframe: this.timeframe,
+        signalKeys: ['any'],
+        channels: ['browser'],
+        email: '',
+        telegramChatId: '',
+        telegramBotToken: '',
+        webhookUrl: ''
+      }
+      if (!ind.id) return
+      const opts = this.signalAlertSignalOptions
+      if (opts && opts.length === 2 && opts[1].key !== 'any') {
+        this.signalAlertForm.signalKeys = [opts[1].key]
+      }
+    },
+    openSignalAlertModal () {
+      if (!this.selectedIndicatorId) {
+        this.$message.warning('请先选择指标')
+        return
+      }
+      this.resetSignalAlertForm()
+      this.signalAlertActiveTab = 'create'
+      this.signalAlertModalVisible = true
+      this.loadSignalAlertTasks()
+    },
+    closeSignalAlertModal () {
+      this.signalAlertModalVisible = false
+      this.signalAlertEditingId = null
+    },
+    onSignalAlertWatchlistChange (value) {
+      const [market, ...symbolParts] = String(value || '').split(':')
+      const symbol = symbolParts.join(':')
+      const item = this.signalAlertWatchlistOptions.find(w => `${w.market}:${w.symbol}` === value) || {}
+      this.signalAlertForm.market = market || this.market
+      this.signalAlertForm.symbol = symbol || this.symbol
+      this.signalAlertForm.symbolName = item.name || ''
+    },
+    buildSignalAlertPayload () {
+      const form = this.signalAlertForm || {}
+      const params = this.currentIndicatorParamValues || {}
+      return {
+        indicator_id: this.selectedIndicatorId,
+        indicator_name: this.selectedIndicatorDisplayName,
+        market: form.market || this.market,
+        symbol: form.symbol || this.symbol,
+        symbol_name: form.symbolName || '',
+        timeframe: form.timeframe || this.timeframe,
+        signal_keys: Array.isArray(form.signalKeys) && form.signalKeys.length ? form.signalKeys : ['any'],
+        channels: Array.isArray(form.channels) && form.channels.length ? form.channels : ['browser'],
+        targets: {
+          email: form.email || '',
+          telegram_chat_id: form.telegramChatId || '',
+          telegram_bot_token: form.telegramBotToken || '',
+          webhook_url: form.webhookUrl || ''
+        },
+        params
+      }
+    },
+    async loadSignalAlertTasks () {
+      this.signalAlertLoading = true
+      try {
+        const res = await request({
+          url: '/api/indicator/signal-alerts',
+          method: 'get'
+        })
+        if (res && res.code === 1) {
+          this.signalAlertTasks = Array.isArray(res.data) ? res.data : []
+        } else {
+          this.$message.error((res && res.msg) || '信号通知任务加载失败')
+        }
+      } catch (e) {
+        this.$message.error((e && e.message) || '信号通知任务加载失败')
+      } finally {
+        this.signalAlertLoading = false
+      }
+    },
+    async submitSignalAlertTask () {
+      if (!this.selectedIndicatorId) return
+      const payload = this.buildSignalAlertPayload()
+      if (!payload.symbol) {
+        this.$message.warning('请选择标的')
+        return
+      }
+      if (payload.channels.includes('webhook') && !payload.targets.webhook_url) {
+        this.$message.warning('请填写 Webhook URL')
+        return
+      }
+      this.signalAlertSaving = true
+      try {
+        const res = await request({
+          url: this.signalAlertEditingId
+            ? `/api/indicator/signal-alerts/${this.signalAlertEditingId}`
+            : '/api/indicator/signal-alerts',
+          method: this.signalAlertEditingId ? 'put' : 'post',
+          data: payload
+        })
+        if (res && res.code === 1) {
+          this.$message.success(this.signalAlertEditingId ? '信号通知已更新' : '信号通知已创建')
+          this.signalAlertEditingId = null
+          this.signalAlertActiveTab = 'tasks'
+          await this.loadSignalAlertTasks()
+        } else {
+          this.$message.error((res && res.msg) || '保存信号通知失败')
+        }
+      } catch (e) {
+        this.$message.error((e && e.message) || '保存信号通知失败')
+      } finally {
+        this.signalAlertSaving = false
+      }
+    },
+    editSignalAlertTask (task) {
+      if (!task) return
+      this.signalAlertEditingId = task.id
+      const key = `${task.market}:${task.symbol}`
+      this.signalAlertForm = {
+        watchlistKey: key,
+        market: task.market || this.market,
+        symbol: task.symbol || this.symbol,
+        symbolName: task.symbol_name || '',
+        timeframe: task.timeframe || this.timeframe,
+        signalKeys: Array.isArray(task.signal_keys) && task.signal_keys.length ? [...task.signal_keys] : ['any'],
+        channels: Array.isArray(task.channels) && task.channels.length ? [...task.channels] : ['browser'],
+        email: (task.targets && task.targets.email) || '',
+        telegramChatId: (task.targets && task.targets.telegram_chat_id) || '',
+        telegramBotToken: (task.targets && task.targets.telegram_bot_token) || '',
+        webhookUrl: (task.targets && task.targets.webhook_url) || ''
+      }
+      this.signalAlertActiveTab = 'create'
+    },
+    async toggleSignalAlertTask (task) {
+      if (!task || !task.id) return
+      const action = task.status === 'running' ? 'pause' : 'resume'
+      try {
+        const res = await request({
+          url: `/api/indicator/signal-alerts/${task.id}/${action}`,
+          method: 'post'
+        })
+        if (res && res.code === 1) {
+          this.$message.success(action === 'pause' ? '已暂停' : '已恢复')
+          await this.loadSignalAlertTasks()
+        } else {
+          this.$message.error((res && res.msg) || '操作失败')
+        }
+      } catch (e) {
+        this.$message.error((e && e.message) || '操作失败')
+      }
+    },
+    async testSignalAlertTask (task) {
+      if (!task || !task.id) return
+      try {
+        const res = await request({
+          url: `/api/indicator/signal-alerts/${task.id}/test`,
+          method: 'post'
+        })
+        if (res && res.code === 1) {
+          const triggered = res.data && res.data.triggered
+          this.$message.info(triggered ? '测试执行完成，已发现信号' : '测试执行完成，当前最新K线未发现所选信号')
+          await this.loadSignalAlertTasks()
+        } else {
+          this.$message.error((res && res.msg) || '测试失败')
+        }
+      } catch (e) {
+        this.$message.error((e && e.message) || '测试失败')
+      }
+    },
+    deleteSignalAlertTask (task) {
+      if (!task || !task.id) return
+      Modal.confirm({
+        title: '删除信号通知任务？',
+        content: `${task.symbol || ''} ${task.timeframe || ''} 的通知任务将停止。`,
+        okText: '删除',
+        cancelText: this.$t('dashboard.indicator.editor.cancel'),
+        okType: 'danger',
+        getContainer: () => this.resolveIdeFullscreenMountNode() || document.body,
+        onOk: async () => {
+          const res = await request({
+            url: `/api/indicator/signal-alerts/${task.id}`,
+            method: 'delete'
+          })
+          if (res && res.code === 1) {
+            this.$message.success('已删除')
+            await this.loadSignalAlertTasks()
+          } else {
+            this.$message.error((res && res.msg) || '删除失败')
+          }
+        }
+      })
     },
     onIndicatorChange (id) {
       this.invalidateBacktestMarkersOnContextChange()
@@ -2896,8 +2734,9 @@ export default {
         if (this.cmInstance) {
           this.cmInstance.setValue(this.currentCode)
         }
-        this.syncSelectedIndicatorToChart(ind.code || '')
+        this.syncSelectedIndicatorToChart()
         this.syncTradeUiFromStrategyCode(ind.code || '', { silent: true })
+        this.resetIndicatorParamDraft(true)
       } else {
         this.currentCode = ''
         this.codeDirty = false
@@ -2906,8 +2745,49 @@ export default {
           this.cmInstance.setValue('')
         }
         this.syncSelectedIndicatorToChart()
+        this.indicatorParamDraft = {}
       }
       this.$nextTick(() => this.applyCodeMirrorReadOnly())
+    },
+    isIndicatorCodeHidden (indicator) {
+      const o = indicator || {}
+      return Number(o.code_hidden || 0) === 1 || (Number(o.is_buy || 0) === 1 && Number(o.is_encrypted || 0) === 1)
+    },
+    getIndicatorExecutableCode (indicator, codeOverride) {
+      const ind = indicator || {}
+      if (this.isIndicatorCodeHidden(ind)) {
+        return String(ind.runtime_code || ind.runtimeCode || ind.run_code || '')
+      }
+      if (typeof codeOverride === 'string') return codeOverride
+      if (Number(this.selectedIndicatorId) === Number(ind.id)) {
+        return this.currentCode || ind.code || ''
+      }
+      return ind.code || ''
+    },
+    extractIndicatorNameFromCode (code) {
+      const raw = String(code || '')
+      if (!raw.trim()) return ''
+      const assignment = raw.match(/^\s*my_indicator_name\s*=\s*(['"])(.*?)\1\s*$/m)
+      if (assignment && assignment[2] && assignment[2].trim()) {
+        return assignment[2].trim()
+      }
+      const outputName = raw.match(/['"]name['"]\s*:\s*(['"])(.*?)\1/)
+      if (outputName && outputName[2] && outputName[2].trim()) {
+        return outputName[2].trim()
+      }
+      return ''
+    },
+    indicatorDisplayName (indicator) {
+      const ind = indicator || {}
+      if (!ind.id && !ind.name) return '--'
+      const code = this.getIndicatorExecutableCode(ind, undefined)
+      const codeName = this.extractIndicatorNameFromCode(code)
+      return codeName || ind.name || (`Indicator #${ind.id}`)
+    },
+    resolveIndicatorNameForSave (indicator, code) {
+      const ind = indicator || {}
+      const codeName = this.extractIndicatorNameFromCode(code)
+      return codeName || ind.name || (ind.id ? `Indicator #${ind.id}` : 'New Indicator')
     },
     isIdePythonActiveItem (item) {
       if (!item) return false
@@ -2922,6 +2802,7 @@ export default {
       const code = codeForChart != null ? codeForChart : (ind.code || '')
       if (!code || !String(code).trim() || !chart || typeof chart.executePythonStrategy !== 'function') return null
       const chartId = `ide-py-${ind.id}`
+      const runtimeParams = this.resolveIndicatorRuntimeParams(ind, code)
       return {
         ...ind,
         id: chartId,
@@ -2929,9 +2810,9 @@ export default {
         originalId: ind.id,
         type: 'python',
         code,
-        params: {},
+        params: runtimeParams,
         calculate: async (klineData, params = {}) => {
-          return chart.executePythonStrategy(code, klineData, params, {
+          return chart.executePythonStrategy(code, klineData, { ...runtimeParams, ...(params || {}) }, {
             ...ind,
             originalId: ind.id,
             id: ind.id,
@@ -2951,9 +2832,7 @@ export default {
           seen.add(id)
           const ind = this.indicators.find(i => Number(i.id) === id)
           if (!ind) continue
-          const code = Number(this.selectedIndicatorId) === id
-            ? (typeof codeOverride === 'string' ? codeOverride : (this.currentCode || ind.code || ''))
-            : (ind.code || '')
+          const code = this.getIndicatorExecutableCode(ind, Number(this.selectedIndicatorId) === id ? codeOverride : undefined)
           const built = this.buildIdePythonIndicatorForChart(ind, code)
           if (built) pythonBlocks.push(built)
         }
@@ -3233,8 +3112,8 @@ export default {
     },
     saveIndicatorFromShortcut () {
       if (!this.selectedIndicatorId || !this.userId) return
-      if (this.selectedIndicatorIsPurchased) {
-        this.$message.warning(this.$t('indicatorIde.saveBlockedPurchased'))
+      if (this.selectedIndicatorCodeHidden) {
+        this.$message.warning(this.$t('indicatorIde.saveBlockedHiddenCode'))
         return
       }
       if (!this.codeDirty) {
@@ -3247,8 +3126,13 @@ export default {
     async saveIndicator () {
       if (!this.selectedIndicatorId || !this.userId) return
       if (this.savingIndicator) return
+      if (this.selectedIndicatorCodeHidden) {
+        this.$message.warning(this.$t('indicatorIde.saveBlockedHiddenCode'))
+        return
+      }
       const indicator = this.selectedIndicatorObj || {}
       const code = this.cmInstance ? this.cmInstance.getValue() : this.currentCode
+      const nextName = this.resolveIndicatorNameForSave(indicator, code)
       this.savingIndicator = true
       try {
         const res = await request({
@@ -3257,7 +3141,7 @@ export default {
           data: {
             id: this.selectedIndicatorId,
             code,
-            name: indicator.name || '',
+            name: nextName,
             description: indicator.description || '',
             userid: this.userId
           }
@@ -3267,13 +3151,16 @@ export default {
           this.codeDirty = false
           this.$message.success(this.$t('indicatorIde.saved'))
           const ind = this.indicators.find(i => i.id === this.selectedIndicatorId)
-          if (ind) ind.code = code
+          if (ind) {
+            ind.code = code
+            ind.name = nextName
+          }
           this.syncSelectedIndicatorToChart(code)
           if (this.showCodeVersionDrawer) this.loadCodeVersions()
         } else {
           const m = (res && res.msg) || ''
-          if (m === 'indicator_purchased_readonly') {
-            this.$message.warning(this.$t('indicatorIde.saveBlockedPurchased'))
+          if (m === 'purchased_asset_cannot_publish') {
+            this.$message.warning(this.$t('indicatorIde.publishBlockedPurchased'))
           } else {
             this.$message.error(m || this.$t('indicatorIde.saveFailed'))
           }
@@ -3281,8 +3168,8 @@ export default {
       } catch (e) {
         const data = e && e.response && e.response.data
         const m = (data && data.msg) || ''
-        if (m === 'indicator_purchased_readonly') {
-          this.$message.warning(this.$t('indicatorIde.saveBlockedPurchased'))
+        if (m === 'purchased_asset_cannot_publish') {
+          this.$message.warning(this.$t('indicatorIde.publishBlockedPurchased'))
         } else {
           this.$message.error((e && e.message) || this.$t('indicatorIde.saveFailed'))
         }
@@ -3387,10 +3274,6 @@ export default {
 
     handleDeleteIndicator () {
       if (!this.selectedIndicatorId || !this.userId) return
-      if (this.selectedIndicatorIsPurchased) {
-        this.$message.warning(this.$t('indicatorIde.deleteBlockedPurchased'))
-        return
-      }
       const ind = this.selectedIndicatorObj
       const name = (ind && ind.name) || ('#' + this.selectedIndicatorId)
       const h = this.$createElement
@@ -3576,7 +3459,7 @@ export default {
     },
     resolveBacktestMarketType () {
       const market = String(this.market || '').toLowerCase()
-      if (market !== 'crypto') return 'spot'
+      if (market === 'crypto') return 'swap'
       return 'spot'
     },
     /**
@@ -3709,26 +3592,7 @@ export default {
       return `${head.join(', ')}, ... ${tail}`
     },
     buildExperimentBase () {
-      if (!this.currentCode) return null
-      this.reconcileIdeMarketFromWatchlist()
-      const pct = v => Number(v || 0) / 100
-      return {
-        indicatorCode: this.currentCode,
-        indicatorId: this.selectedIndicatorId,
-        market: this.market,
-        symbol: this.symbol,
-        timeframe: this.timeframe,
-        startDate: this.startDate.format('YYYY-MM-DD'),
-        endDate: this.endDate.format('YYYY-MM-DD'),
-        initialCapital: this.initialCapital,
-        commission: pct(this.commission),
-        slippage: pct(this.slippage),
-        leverage: this.leverage,
-        tradeDirection: this.tradeDirection,
-        strategyConfig: this.buildBacktestStrategyConfig(),
-        strictMode: this.strictMode,
-        runType: 'strategy_indicator'
-      }
+      return null
     },
     buildExperimentPayload () {
       const base = this.buildExperimentBase()
@@ -3873,6 +3737,10 @@ export default {
       return this.handleRunStructuredTune()
     },
     async handleRunAIExperiment () {
+      if (this.selectedIndicatorCodeHidden) {
+        this.$message.warning(this.$t('indicatorIde.hiddenCodeCannotOptimize'))
+        return
+      }
       if (!this.currentCode || !this.symbol || !this.startDate || !this.endDate) {
         this.$message.warning(this.$t('indicatorIde.aiExperimentNeedBacktestParams'))
         return
@@ -3924,6 +3792,10 @@ export default {
       }
     },
     async handleRunStructuredTune () {
+      if (this.selectedIndicatorCodeHidden) {
+        this.$message.warning(this.$t('indicatorIde.hiddenCodeCannotOptimize'))
+        return
+      }
       if (!this.currentCode || !this.symbol || !this.startDate || !this.endDate) {
         this.$message.warning(this.$t('indicatorIde.aiExperimentNeedBacktestParams'))
         return
@@ -3979,16 +3851,12 @@ export default {
     _strategyAnnotationKeysSet () {
       return new Set([
         'stopLossPct', 'takeProfitPct', 'entryPct',
-        'trailingEnabled', 'trailingStopPct', 'trailingActivationPct', 'tradeDirection'
+        'trailingEnabled', 'trailingStopPct', 'trailingActivationPct'
       ])
     },
     formatStrategyAnnotationValue (key, value) {
       if (value === null || value === undefined) return null
       if (key === 'trailingEnabled') return value ? 'true' : 'false'
-      if (key === 'tradeDirection') {
-        const t = String(value).toLowerCase()
-        return ['long', 'short', 'both'].includes(t) ? t : 'long'
-      }
       const n = Number(value)
       if (!Number.isFinite(n)) return String(value)
       let s = n.toFixed(8).replace(/\.?0+$/, '')
@@ -4004,8 +3872,7 @@ export default {
         'strategyConfig.position.entryPct': 'entryPct',
         'strategyConfig.risk.trailing.pct': 'trailingStopPct',
         'strategyConfig.risk.trailing.activationPct': 'trailingActivationPct',
-        'strategyConfig.risk.trailing.enabled': 'trailingEnabled',
-        'strategyConfig.tradeDirection': 'tradeDirection'
+        'strategyConfig.risk.trailing.enabled': 'trailingEnabled'
       }
       const norm = k => String(k || '').replace(/strategy_config\./gi, 'strategyConfig.')
       Object.keys(overrides).forEach(k => {
@@ -4015,18 +3882,10 @@ export default {
           out.leverage = Number(overrides[k])
           return
         }
-        if (k === 'tradeDirection') {
-          out.tradeDirection = String(overrides[k] || '').toLowerCase()
-          return
-        }
         const ann = pathToAnn[norm(k)]
         if (ann) {
           const v = overrides[k]
-          out[ann] = ann === 'trailingEnabled'
-            ? !!v
-            : ann === 'tradeDirection'
-              ? String(v || '').toLowerCase()
-              : v
+          out[ann] = ann === 'trailingEnabled' ? !!v : v
         }
       })
       const rp = overrides.riskParams
@@ -4046,13 +3905,11 @@ export default {
     },
     buildCurrentExperimentComparableState (code) {
       const strategyConfig = this.strategyConfigFromCode(code || '')
-      const rawStrategy = this.parseStrategyAnnotationRaw(code || '')
       const indicatorParamsRaw = this.parseIndicatorParamRaw(code || '')
       const indicatorParams = {}
       Object.keys(indicatorParamsRaw).forEach(name => {
         indicatorParams[name] = this.normalizeIndicatorParamValue(indicatorParamsRaw[name])
       })
-      const tradeDirection = String(rawStrategy.tradeDirection || this.tradeDirection || 'long').toLowerCase()
       return {
         stopLossPct: (((strategyConfig || {}).risk || {}).stopLossPct),
         takeProfitPct: (((strategyConfig || {}).risk || {}).takeProfitPct),
@@ -4060,7 +3917,6 @@ export default {
         trailingEnabled: ((((strategyConfig || {}).risk || {}).trailing || {}).enabled),
         trailingStopPct: ((((strategyConfig || {}).risk || {}).trailing || {}).pct),
         trailingActivationPct: ((((strategyConfig || {}).risk || {}).trailing || {}).activationPct),
-        tradeDirection: ['long', 'short', 'both'].includes(tradeDirection) ? tradeDirection : 'long',
         leverage: Number(this.leverage || 1),
         indicatorParams
       }
@@ -4083,7 +3939,6 @@ export default {
         if (typeof value === 'number' && Number.isFinite(value)) return Number(value.toFixed(8)).toString()
         return String(value)
       }
-      if (key === 'tradeDirection') return String(value)
       return this.formatExperimentOverrideValue(key, value)
     },
     buildExperimentChangeEntries (candidate, code = this.currentCode || '') {
@@ -4305,6 +4160,7 @@ export default {
         ? Number(candidate.snapshot.leverage || 1)
         : Number(this.leverage || 1)
       const code = this.currentCode || indicator.code || ''
+      const codeHidden = this.selectedIndicatorCodeHidden
       return {
         version: 'indicator-ide-strategy-draft-v1',
         createdAt: new Date().toISOString(),
@@ -4313,7 +4169,8 @@ export default {
           id: indicator.id || null,
           name: indicator.name || '',
           description: indicator.description || '',
-          code
+          code: codeHidden ? '' : code,
+          codeHidden
         },
         market: this.market,
         symbol: this.symbol,
@@ -4349,12 +4206,14 @@ export default {
     navigateToTradingAssistantWithDraft (candidate = null, options = {}) {
       const indicator = this.selectedIndicatorObj
       if (!indicator) return
-      this.syncTradeUiFromStrategyCode(this.currentCode || indicator.code || '', { silent: true })
+      if (!this.selectedIndicatorCodeHidden) {
+        this.syncTradeUiFromStrategyCode(this.currentCode || indicator.code || '', { silent: true })
+      }
       const draft = this.buildStrategyCreationDraft(candidate, options)
       const draftKey = this.persistStrategyCreationDraft(draft)
       const snapshot = candidate && candidate.snapshot ? candidate.snapshot : null
       this.$router.push({
-        path: '/strategy-live',
+        path: '/strategy-center',
         query: {
           mode: 'create',
           source: options.source || 'indicator_ide',
@@ -4370,8 +4229,7 @@ export default {
           draft_version: draft.version,
           candidate_name: candidate ? (candidate.name || '') : '',
           candidate_score: candidate && candidate.score ? String(candidate.score.overallScore || '') : '',
-          strategy_config: snapshot ? encodeURIComponent(JSON.stringify(snapshot.strategy_config || {})) : '',
-          indicator_code: draft.indicator && draft.indicator.code ? encodeURIComponent(draft.indicator.code) : ''
+          strategy_config: snapshot ? encodeURIComponent(JSON.stringify(snapshot.strategy_config || {})) : ''
         }
       })
     },
@@ -4603,70 +4461,8 @@ export default {
     },
 
     // ===== Backtest =====
-    async runBacktest (options = {}) {
-      if (!this.canRunBacktest) return
-      this.reconcileIdeMarketFromWatchlist()
-      this.running = true
-      this.hasResult = false
-      this.ideWorkspaceTab = 'backtest'
-      this.elapsedSec = 0
-      clearInterval(this.elapsedTimer)
-      this.elapsedTimer = setInterval(() => { this.elapsedSec++ }, 1000)
-      // Caller can pin the window to the training segment so the candidate's
-      // headline IS metric is reproducible bar-for-bar. Without override
-      // we use the user's form dates (full window, including any 30% OOS).
-      const override = options.dateRangeOverride || null
-      const startStr = override && override.start ? override.start : this.startDate.format('YYYY-MM-DD')
-      const endStr = override && override.end ? override.end : this.endDate.format('YYYY-MM-DD')
-      this.lastBacktestRangeLabel = override && override.label ? override.label : 'full'
-      try {
-        const response = await request({
-          url: '/api/indicator/backtest',
-          method: 'post',
-          data: {
-            userid: this.userId || 1,
-            indicatorId: this.selectedIndicatorId,
-            indicatorCode: this.currentCode || '',
-            symbol: this.symbol,
-            market: this.market,
-            timeframe: this.timeframe,
-            startDate: startStr,
-            endDate: endStr,
-            initialCapital: this.initialCapital,
-            commission: Number(this.commission || 0) / 100,
-            slippage: Number(this.slippage || 0) / 100,
-            leverage: this.leverage,
-            marketType: this.resolveBacktestMarketType(),
-            tradeDirection: this.tradeDirection,
-            strategyConfig: this.buildBacktestStrategyConfig(),
-            strictMode: this.strictMode,
-            persist: true
-          },
-          timeout: 600000
-        })
-        if (response.code === 1 && response.data) {
-          if (response.data.runId) this.backtestRunId = response.data.runId
-          this.result = response.data.result || response.data
-          this.hasResult = true
-          this.backtestMarkersVisible = true
-          this.stampBacktestMarkerContext()
-          this.$nextTick(() => {
-            setTimeout(() => {
-              this.renderEquityChart()
-              this.renderBacktestSignals()
-            }, 400)
-          })
-          this.$message.success(this.$t('indicatorIde.backtestComplete'))
-        } else {
-          this.$message.error(response.msg || this.$t('indicatorIde.backtestFailed'))
-        }
-      } catch (e) {
-        const backendMsg = e && e.response && e.response.data && (e.response.data.msg || e.response.data.message)
-        this.$message.error(e.backendMessage || e.message || backendMsg || this.$t('indicatorIde.backtestFailed'))
-      } finally {
-        this.running = false
-        clearInterval(this.elapsedTimer)
-      }
+    async runBacktest () {
+      this.$message.info(this.$t('indicatorIde.indicatorBacktestRemoved'))
     },
 
     // ===== Render backtest buy/sell signals on K-line chart =====
@@ -4858,8 +4654,8 @@ export default {
       if (e.ctrlKey || e.metaKey) this.handleAIGenerate()
     },
     async handleAIGenerate () {
-      if (this.selectedIndicatorIsPurchased) {
-        this.$message.warning(this.$t('indicatorIde.aiGenBlockedPurchased'))
+      if (this.selectedIndicatorCodeHidden) {
+        this.$message.warning(this.$t('indicatorIde.saveBlockedHiddenCode'))
         return
       }
       if (!this.aiPrompt || !this.aiPrompt.trim()) {
@@ -4879,7 +4675,21 @@ export default {
         const url = '/api/indicator/aiGenerate'
         const token = storage.get(ACCESS_TOKEN)
         const lang = (this.$i18n && this.$i18n.locale) || 'en-US'
-        const requestBody = { prompt: this.aiPrompt.trim() }
+        const paramDefaults = this.parseIndicatorParamRaw(existingCode || this.currentCode || '')
+        const requestBody = {
+          prompt: this.aiPrompt.trim(),
+          source: 'indicator_ide',
+          context: {
+            source: 'indicator_ide',
+            market: this.market || '',
+            symbol: this.symbol || '',
+            timeframe: this.timeframe || '',
+            indicatorId: this.selectedIndicatorId || '',
+            indicatorName: this.selectedIndicatorDisplayName || '',
+            indicatorDescription: (this.selectedIndicatorObj && this.selectedIndicatorObj.description) || '',
+            paramDefaults
+          }
+        }
         if (existingCode.trim()) requestBody.existingCode = existingCode.trim()
 
         const response = await fetch(url, {
@@ -5046,6 +4856,21 @@ export default {
       const msg = this.$t(key, h.params || {})
       return msg === key ? String(h.code) : msg
     },
+    async requestCodeQualityHints (code) {
+      const c = (code != null ? String(code) : '').trim()
+      if (!c) {
+        return []
+      }
+      const res = await request({
+        url: '/api/indicator/codeQualityHints',
+        method: 'post',
+        data: { code: c }
+      })
+      if (res && res.code === 1 && res.data && Array.isArray(res.data.hints)) {
+        return res.data.hints
+      }
+      throw new Error((res && res.msg) || 'Code quality check failed')
+    },
     async fetchCodeQualityHints (code) {
       const c = (code != null ? String(code) : '').trim()
       if (!c) {
@@ -5054,21 +4879,48 @@ export default {
       }
       this.codeQualityLoading = true
       try {
-        const res = await request({
-          url: '/api/indicator/codeQualityHints',
-          method: 'post',
-          data: { code: c }
-        })
-        if (res && res.code === 1 && res.data && Array.isArray(res.data.hints)) {
-          this.codeQualityHints = res.data.hints
-        } else {
-          this.codeQualityHints = []
-        }
+        this.codeQualityHints = await this.requestCodeQualityHints(c)
       } catch (e) {
         this.codeQualityHints = []
       } finally {
         this.codeQualityLoading = false
       }
+    },
+    async ensureCodeQualityBeforePublish (code, options = {}) {
+      const c = (code != null ? String(code) : '').trim()
+      if (!c) {
+        this.codeQualityHints = [{ severity: 'error', code: 'EMPTY_CODE', params: {} }]
+        this.codeDrawerVisible = true
+        this.codePanelExpanded = true
+        this.$message.error(this.$t('indicatorIde.publishQualityBlockedWithReason', { reason: this.formatQualityHint(this.codeQualityHints[0]) }))
+        return false
+      }
+      this.codeQualityLoading = true
+      try {
+        this.codeQualityHints = await this.requestCodeQualityHints(c)
+      } catch (e) {
+        this.$message.error(this.$t('indicatorIde.publishQualityCheckFailed') + (e && e.message ? `: ${e.message}` : ''))
+        return false
+      } finally {
+        this.codeQualityLoading = false
+      }
+      const blockers = (this.codeQualityHints || []).filter(h => {
+        const severity = String((h && h.severity) || '').toLowerCase()
+        return severity === 'error' || severity === 'fatal'
+      })
+      if (blockers.length) {
+        this.codeDrawerVisible = true
+        this.codePanelExpanded = true
+        const reason = this.formatQualityHint(blockers[0])
+        this.$message.error(reason
+          ? this.$t('indicatorIde.publishQualityBlockedWithReason', { reason })
+          : this.$t('indicatorIde.publishQualityBlocked'))
+        return false
+      }
+      if (!options.silentSuccess) {
+        this.$message.success(this.$t('indicatorIde.publishQualityPassed'))
+      }
+      return true
     },
     async runCodeQualityCheck () {
       const code = this.cmInstance ? (this.cmInstance.getValue() || '') : (this.currentCode || '')
@@ -5090,48 +4942,28 @@ export default {
       return c.trim()
     },
 
-    syncTradeUiFromStrategyCode (code, opts = {}) {
-      const silent = !!(opts && opts.silent)
-      const raw = this.parseStrategyAnnotationRaw(code || '')
-      if (!Object.keys(raw).length) return
-      let applied = 0
-      const td = String(raw.tradeDirection || '').toLowerCase()
-      if (td && ['long', 'short', 'both'].includes(td)) {
-        this.tradeDirection = td
-        applied++
-      }
-      if (applied > 0 && !silent) {
-        this.$message.info(this.$t('indicatorIde.strategyAnnotationsApplied', { count: applied }))
-      }
+    syncTradeUiFromStrategyCode () {
+      // Runtime trade settings are owned by the backtest/live panels, not code annotations.
     },
 
     // ===== AI Optimize =====
     async handleAIOptimize () {
-      if (!this.hasResult || !this.currentCode) return
-      this.aiOptimizing = true
-      this.codeDrawerVisible = true
-      this.codePanelExpanded = true
-      this.aiPanelExpanded = true
-
-      const r = this.result || {}
-      const metricsText = [
-        `Total Return: ${this.fmtPct(r.totalReturn)}`,
-        `Max Drawdown: ${this.fmtPct(r.maxDrawdown)}`,
-        `Sharpe: ${(r.sharpeRatio || 0).toFixed(2)}`,
-        `Win Rate: ${this.fmtPct(r.winRate)}`,
-        `Profit Factor: ${(r.profitFactor || 0).toFixed(2)}`,
-        `Total Trades: ${r.totalTrades || 0}`
-      ].join(', ')
-
-      this.aiPrompt = `Based on these backtest results (${metricsText}), optimize the parameters in my indicator code to improve risk-adjusted returns. Keep the same strategy logic but suggest better parameter values.`
-      this.$nextTick(() => { this.aiOptimizing = false })
+      this.$message.info(this.$t('indicatorIde.indicatorBacktestRemoved'))
     },
 
     // ===== Quick Trade =====
+    isQuickTradeMarketSupported () {
+      return ['Crypto', 'USStock'].includes(this.market)
+    },
     toggleQuickTradeDrawer () {
-      if (!this.quickTradeDrawerVisible && this.market !== 'Crypto') {
-        this.$message.warning(this.$t('quickTrade.cryptoOnly'))
+      if (!this.quickTradeDrawerVisible && !this.isQuickTradeMarketSupported()) {
+        this.$message.warning(this.$t('quickTrade.unsupportedMarket'))
         return
+      }
+      if (!this.quickTradeDrawerVisible) {
+        this.qtSymbol = this.symbol || ''
+        this.qtSide = ''
+        this.qtPrice = 0
       }
       this.quickTradeDrawerVisible = !this.quickTradeDrawerVisible
     },
@@ -5139,8 +4971,8 @@ export default {
       this.quickTradeDrawerVisible = false
     },
     openQuickTrade () {
-      if (this.market !== 'Crypto') {
-        this.$message.warning(this.$t('quickTrade.cryptoOnly'))
+      if (!this.isQuickTradeMarketSupported()) {
+        this.$message.warning(this.$t('quickTrade.unsupportedMarket'))
         return
       }
       this.qtSymbol = this.symbol || ''
@@ -5154,36 +4986,37 @@ export default {
       this.$message.success(this.$t('quickTrade.orderSuccess'))
     },
     handleQuickTradeSymbolChange (newSymbol) {
-      if (newSymbol && this.market === 'Crypto') {
+      if (newSymbol) {
         this.qtSymbol = newSymbol
       }
-    },
-    goToIndicatorMarket () {
-      this.$router.push('/indicator-community')
     },
     buildNewIndicatorStarterCode () {
       const label = moment().format('YYYY-MM-DD HH:mm')
       return (
         `my_indicator_name = "New Indicator ${label}"\n` +
-        'my_indicator_description = "Edit # @strategy lines below to control risk and position; leverage stays in the backtest panel."\n\n' +
-        '# ===== Strategy defaults (single source of truth) =====\n' +
-        '# @strategy stopLossPct 0.03            # Hard stop-loss (3%)\n' +
-        '# @strategy takeProfitPct 0.06          # Take-profit (6%)\n' +
-        '# @strategy entryPct 1.0                # Use 100% of available capital per entry\n' +
-        '# @strategy trailingEnabled false       # Set true to enable trailing stop\n' +
-        '# @strategy trailingStopPct 0.02        # Trailing distance (2%)\n' +
-        '# @strategy trailingActivationPct 0.03  # Activate trailing after +3% in profit\n' +
-        '# @strategy tradeDirection long         # long | short | both\n\n' +
+        'my_indicator_description = "Chart-only indicator. Convert it to a script strategy before backtesting or live trading."\n\n' +
+        '# @param fast_period int 10 Fast EMA period\n' +
+        '# @param slow_period int 30 Slow EMA period\n\n' +
         'df = df.copy()\n' +
-        "df['open_long'] = False\n" +
-        "df['close_long'] = False\n" +
-        "df['open_short'] = False\n" +
-        "df['close_short'] = False\n\n" +
+        'fast_period = int(params.get(\'fast_period\', 10))\n' +
+        'slow_period = int(params.get(\'slow_period\', 30))\n\n' +
+        'ema_fast = df[\'close\'].ewm(span=fast_period, adjust=False).mean()\n' +
+        'ema_slow = df[\'close\'].ewm(span=slow_period, adjust=False).mean()\n\n' +
+        'golden = (ema_fast > ema_slow) & (ema_fast.shift(1) <= ema_slow.shift(1))\n' +
+        'death = (ema_fast < ema_slow) & (ema_fast.shift(1) >= ema_slow.shift(1))\n' +
+        'buy_marks = [df[\'low\'].iloc[i] * 0.995 if bool(golden.fillna(False).iloc[i]) else None for i in range(len(df))]\n' +
+        'sell_marks = [df[\'high\'].iloc[i] * 1.005 if bool(death.fillna(False).iloc[i]) else None for i in range(len(df))]\n\n' +
         'output = {\n' +
-        "  'name': my_indicator_name,\n" +
-        "  'plots': [],\n" +
-        "  'signals': [],\n" +
-        "  'layers': []\n" +
+        '  \'name\': my_indicator_name,\n' +
+        '  \'plots\': [\n' +
+        '    {\'name\': \'EMA Fast\', \'data\': ema_fast.fillna(0).tolist(), \'color\': \'#52c41a\', \'overlay\': True},\n' +
+        '    {\'name\': \'EMA Slow\', \'data\': ema_slow.fillna(0).tolist(), \'color\': \'#1890ff\', \'overlay\': True}\n' +
+        '  ],\n' +
+        '  \'signals\': [\n' +
+        '    {\'type\': \'buy\', \'text\': \'Golden\', \'data\': buy_marks, \'color\': \'#52c41a\'},\n' +
+        '    {\'type\': \'sell\', \'text\': \'Death\', \'data\': sell_marks, \'color\': \'#ff4d4f\'}\n' +
+        '  ],\n' +
+        '  \'layers\': []\n' +
         '}\n'
       )
     },
@@ -5261,41 +5094,148 @@ export default {
         this.$message.warning(this.$t('indicatorIde.publishBlockedPurchased'))
         return
       }
+      if (this.selectedIndicatorCodeHidden) {
+        this.$message.warning(this.$t('indicatorIde.saveBlockedHiddenCode'))
+        return
+      }
+      const indicator = this.selectedIndicatorObj || {}
+      const code = this.cmInstance ? this.cmInstance.getValue() : (this.currentCode || indicator.code || '')
+      if (!indicator.publish_to_community) {
+        const qualityOk = await this.ensureCodeQualityBeforePublish(code)
+        if (!qualityOk) return
+      }
       if (this.codeDirty) {
         await this.saveIndicator()
       }
-      const indicator = this.selectedIndicatorObj || {}
-      this.publishIndicator = { ...indicator, code: this.currentCode || indicator.code || '' }
+      const name = this.resolveIndicatorNameForSave(indicator, code)
+      this.publishIndicator = { ...indicator, name, code }
       this.publishPricingType = indicator.pricing_type || 'free'
       this.publishPrice = indicator.price || 10
       this.publishDescription = indicator.description || ''
       this.publishVipFree = !!indicator.vip_free
+      this.publishCodeHidden = !!indicator.is_encrypted
       this.showPublishModal = true
     },
+    buildIndicatorToStrategyPrompt () {
+      const indicator = this.selectedIndicatorObj || {}
+      const codeHidden = this.selectedIndicatorCodeHidden
+      const code = codeHidden ? '' : String(this.currentCode || indicator.code || '').trim()
+      const target = [this.market, this.symbol].filter(Boolean).join(':') || this.symbol || ''
+      const description = String(indicator.description || '').trim()
+      const params = this.parseIndicatorParamRaw(code || '')
+      const paramText = Object.keys(params || {}).length
+        ? JSON.stringify(params, null, 2)
+        : ''
+      const lines = [
+        `请把当前 QuantDinger 指标转写成可回测、可实盘的 Python ScriptStrategy 策略。`,
+        target ? `目标标的：${target}` : '',
+        `指标名称：${indicator.name || '未命名指标'}`,
+        description ? `指标说明：${description}` : '',
+        '',
+        '边界规则：',
+        '- 生成策略代码，不要生成图表指标代码。',
+        '- 标的、投入金额、交易类型、杠杆倍数、交易方向由策略页/回测页/实盘页表单配置，代码里不要硬编码。',
+        '- 手续费、滑点、资金费率等属于回测系统配置，代码里不要硬编码。',
+        '- K线周期、入场、出场、止盈、止损、移动止盈、加仓/减仓、仓位管理由策略代码自己清晰实现。',
+        '- 使用 QuantDinger ScriptStrategy 风格，明确 open_long/open_short、add/reduce、close、风控和日志。',
+        '- 如果原指标只提供视觉信号，请把视觉信号转成明确的交易条件，并解释保守默认值。',
+        '',
+        paramText ? `指标参数：\n${paramText}` : '',
+        code
+          ? `指标源码：\n\`\`\`python\n${code}\n\`\`\``
+          : '指标源码不可见：请只根据指标名称、说明和可见图表行为做保守转写，不要尝试还原隐藏源码。'
+      ]
+      return lines.filter(Boolean).join('\n')
+    },
+    buildIndicatorToStrategyContext () {
+      const indicator = this.selectedIndicatorObj || {}
+      const code = String(this.cmInstance ? this.cmInstance.getValue() : (this.currentCode || indicator.code || '')).trim()
+      const params = this.parseIndicatorParamRaw(code || '')
+      return {
+        indicatorId: indicator.id || this.selectedIndicatorId || '',
+        name: this.resolveIndicatorNameForSave(indicator, code),
+        description: String(indicator.description || '').trim(),
+        code,
+        params,
+        market: this.market || '',
+        symbol: this.symbol || '',
+        exchange_id: this.market === 'Crypto' ? this.cryptoExchangeId : '',
+        market_type: this.market === 'Crypto' ? this.cryptoMarketType : 'spot',
+        instrument_id: this.currentInstrumentId || '',
+        timeframe: this.timeframe || '',
+        codeHidden: !!this.selectedIndicatorCodeHidden
+      }
+    },
     handleCreateStrategyFromIndicator () {
-      this.navigateToTradingAssistantWithDraft(null, { source: 'indicator_ide' })
+      const indicator = this.selectedIndicatorObj
+      if (!indicator) {
+        this.$message.warning(this.$t('indicatorIde.selectIndicatorFirst') || 'Please select an indicator first.')
+        return
+      }
+      if (this.selectedIndicatorCodeHidden) {
+        this.$message.warning(this.$t('indicatorIde.aiConvertHiddenBlocked'))
+        return
+      }
+      const context = this.buildIndicatorToStrategyContext()
+      if (!context.code) {
+        this.$message.warning(this.$t('indicatorIde.codeRequired') || 'Please write indicator code first.')
+        return
+      }
+      const storageKey = `qd_indicator_to_strategy_${Date.now()}`
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(context))
+      } catch (_) {}
+      this.$router.push({
+        path: '/strategy-ide',
+        query: {
+          tab: 'script',
+          convert: 'indicator',
+          convert_key: storageKey,
+          market: this.market || '',
+          symbol: this.symbol || '',
+          exchange_id: this.market === 'Crypto' ? this.cryptoExchangeId : '',
+          market_type: this.market === 'Crypto' ? this.cryptoMarketType : 'spot',
+          timeframe: this.timeframe || '',
+          source_indicator_id: String(indicator.id || '')
+        }
+      })
     },
     async handleConfirmPublish () {
       if (!this.userId || !this.publishIndicator) return
+      const code = this.cmInstance ? this.cmInstance.getValue() : (this.currentCode || this.publishIndicator.code || '')
+      const name = this.resolveIndicatorNameForSave(this.publishIndicator, code)
       this.publishing = true
       try {
+        const qualityOk = await this.ensureCodeQualityBeforePublish(code, { silentSuccess: true })
+        if (!qualityOk) return
         const res = await request({
           url: '/api/indicator/saveIndicator',
           method: 'post',
           data: {
             userid: this.userId,
             id: this.publishIndicator.id,
-            code: this.currentCode || this.publishIndicator.code,
-            name: this.publishIndicator.name,
+            code,
+            name,
             description: this.publishDescription,
             publishToCommunity: true,
             pricingType: this.publishPricingType,
             price: this.publishPricingType === 'paid' ? this.publishPrice : 0,
-            vipFree: this.publishPricingType === 'paid' ? this.publishVipFree : false
+            vipFree: this.publishPricingType === 'paid' ? this.publishVipFree : false,
+            codeHidden: this.publishCodeHidden
           }
         })
         if (res && res.code === 1) {
           this.$message.success(this.$t('dashboard.indicator.publish.success'))
+          const ind = this.indicators.find(i => Number(i.id) === Number(this.publishIndicator.id))
+          if (ind) {
+            ind.name = name
+            ind.code = code
+            ind.description = this.publishDescription
+            ind.pricing_type = this.publishPricingType
+            ind.price = this.publishPricingType === 'paid' ? this.publishPrice : 0
+            ind.vip_free = this.publishPricingType === 'paid' ? this.publishVipFree : false
+            ind.is_encrypted = this.publishCodeHidden ? 1 : 0
+          }
           this.showPublishModal = false
           this.publishIndicator = null
           await this.loadIndicators()
@@ -6020,6 +5960,9 @@ export default {
     },
 
     // ===== Watchlist =====
+    watchlistContextKey (item) {
+      return marketContextKey(item)
+    },
     filterWatchlistOption (input, option) {
       const val = (option.componentOptions.propsData.value || '').toLowerCase()
       if (val === '__add__') return true
@@ -6033,7 +5976,7 @@ export default {
       }
       if (val) {
         const row = (this.watchlist || []).find(
-          w => w && w.market && w.symbol && `${w.market}:${w.symbol}` === val
+          w => w && w.market && w.symbol && this.watchlistContextKey(w) === val
         )
         if (row) {
           this.market = String(row.market)
@@ -6061,6 +6004,14 @@ export default {
       const t = this.$t(key)
       return t !== key ? t : m
     },
+    handleCryptoExchangeChange (value) {
+      this.cryptoExchangeId = String(value || '')
+      this.currentInstrumentId = ''
+    },
+    handleCryptoMarketTypeChange (value) {
+      this.cryptoMarketType = String(value || 'spot')
+      this.currentInstrumentId = ''
+    },
 
     // ===== Add symbol modal =====
     onAddMarketTabChange () {
@@ -6068,6 +6019,12 @@ export default {
       this.addSearchResults = []
       this.addSelectedItem = null
       this.addSearched = false
+    },
+    onAddSourceChange () {
+      this.addSearchResults = []
+      this.addSelectedItem = null
+      this.addSearched = false
+      if (this.addSearchKeyword) this.doAddSearch()
     },
     onAddSearchInput () {
       clearTimeout(this.addSearchTimer)
@@ -6078,7 +6035,13 @@ export default {
       if (!this.addSearchKeyword) return
       this.addSearching = true
       try {
-        const res = await searchSymbols({ market: this.addMarketTab, keyword: this.addSearchKeyword, limit: 20 })
+        const res = await searchSymbols({
+          market: this.addMarketTab,
+          keyword: this.addSearchKeyword,
+          limit: 20,
+          exchange_id: this.addMarketTab === 'Crypto' ? this.cryptoExchangeId : undefined,
+          market_type: this.addMarketTab === 'Crypto' ? this.cryptoMarketType : undefined
+        })
         if (res && res.data && Array.isArray(res.data)) {
           this.addSearchResults = res.data
         } else {
@@ -6103,10 +6066,22 @@ export default {
       this.addingStock = true
       try {
         const mkt = item.market || this.addMarketTab
-        await addWatchlist({ userid: this.userId, market: mkt, symbol: item.symbol, name: item.name || '' })
+        await addWatchlist({
+          userid: this.userId,
+          market: mkt,
+          symbol: item.symbol,
+          name: item.name || '',
+          exchange_id: item.exchange_id || (mkt === 'Crypto' ? this.cryptoExchangeId : ''),
+          market_type: item.market_type || (mkt === 'Crypto' ? this.cryptoMarketType : 'spot'),
+          instrument_id: item.instrument_id || '',
+          settle_currency: item.settle_currency || ''
+        })
         this.$message.success(this.$t('backtest-center.config.addSuccess'))
         await this.loadWatchlist()
-        this.selectedWatchlistKey = `${mkt}:${item.symbol}`
+        this.selectedWatchlistKey = marketContextKey({
+          market: mkt,
+          symbol: item.symbol
+        })
         this.market = mkt
         this.symbol = item.symbol
         this.showAddModal = false
@@ -6217,12 +6192,14 @@ export default {
       if (ty === 'liquidation') return 'liquidation'
       if (ty === 'open_long' || ty === 'buy') return 'openLong'
       if (ty === 'add_long') return 'addLong'
+      if (ty === 'reduce_long') return 'reduceLong'
       if (ty === 'close_long_stop') return 'closeLongStop'
       if (ty === 'close_long_profit') return 'closeLongProfit'
       if (ty === 'close_long_trailing') return 'closeLongTrailing'
       if (ty === 'close_long') return 'closeLong'
       if (ty === 'open_short' || ty === 'sell') return 'openShort'
       if (ty === 'add_short') return 'addShort'
+      if (ty === 'reduce_short') return 'reduceShort'
       if (ty === 'close_short_stop') return 'closeShortStop'
       if (ty === 'close_short_profit') return 'closeShortProfit'
       if (ty === 'close_short_trailing') return 'closeShortTrailing'
@@ -6230,23 +6207,28 @@ export default {
       return 'other'
     },
     backtestTradeMarkerMeta (trade) {
-      const ty = String((trade && trade.type) || '').toLowerCase().replace(/-/g, '_')
+      let ty = String((trade && trade.type) || '').toLowerCase().replace(/-/g, '_')
+      const reason = String((trade && trade.reason) || '').toLowerCase()
+      if (reason === 'reduce_position' && ty === 'close_long') ty = 'reduce_long'
+      if (reason === 'reduce_position' && ty === 'close_short') ty = 'reduce_short'
       const actionKey = this.backtestMarkerActionKey(ty)
       const fillLabel = this.$t(`indicatorIde.backtestMarkerAction.${actionKey}`)
       const signalPrefix = this.$t('indicatorIde.backtestMarkerSignalPrefix')
       const signalLabel = `${signalPrefix}${fillLabel}`
-      const isBuy = ty.startsWith('open_long') || ty === 'buy' || ty === 'add_long' || ty === 'close_short'
+      const isBuy = ty.startsWith('open_long') || ty === 'buy' || ty === 'add_long' || ty === 'close_short' || ty === 'reduce_short'
       const isSell = ty.startsWith('open_short') || ty === 'sell' || ty === 'add_short' ||
-        ty.startsWith('close_long') || ty === 'liquidation'
+        ty.startsWith('close_long') || ty === 'reduce_long' || ty === 'liquidation'
       const colorByAction = {
         openLong: '#00C853',
         addLong: '#00E676',
+        reduceLong: '#AB47BC',
         closeLong: '#EF5350',
         closeLongStop: '#FF6D00',
         closeLongProfit: '#29B6F6',
         closeLongTrailing: '#7E57C2',
         openShort: '#FF5252',
         addShort: '#FF8A80',
+        reduceShort: '#AB47BC',
         closeShort: '#00C853',
         closeShortStop: '#FF6D00',
         closeShortProfit: '#29B6F6',
@@ -6257,12 +6239,14 @@ export default {
       const shortLabelByAction = {
         openLong: 'OL',
         addLong: '+OL',
+        reduceLong: '-OL',
         closeLong: 'XL',
         closeLongStop: 'SL',
         closeLongProfit: 'TP',
         closeLongTrailing: 'TR',
         openShort: 'OS',
         addShort: '+OS',
+        reduceShort: '-OS',
         closeShort: 'XS',
         closeShortStop: 'SL',
         closeShortProfit: 'TP',
@@ -6364,9 +6348,25 @@ export default {
       this.invalidateBacktestMarkersOnContextChange()
       this.schedulePersistIdeUiState()
     },
+    cryptoExchangeId () {
+      this.invalidateBacktestMarkersOnContextChange()
+      this.ensureChartReady()
+      this.schedulePersistIdeUiState()
+    },
+    cryptoMarketType () {
+      this.invalidateBacktestMarkersOnContextChange()
+      this.ensureChartReady()
+      this.schedulePersistIdeUiState()
+    },
     selectedIndicatorId () {
       this.invalidateBacktestMarkersOnContextChange()
       this.schedulePersistIdeUiState()
+    },
+    '$route.query.indicator_id' () {
+      this.applyIndicatorRouteSelection()
+    },
+    '$route.query.indicatorId' () {
+      this.applyIndicatorRouteSelection()
     },
     chartVisibleIndicatorIds: {
       deep: true,
@@ -6387,10 +6387,12 @@ export default {
       this.schedulePersistIdeUiState()
     },
     userId () {
-      this.loadPurchasedMarketHintDismissed()
       this.loadStrategyDirectivesAlertDismissed()
     },
     selectedIndicatorIsPurchased () {
+      this.$nextTick(() => this.applyCodeMirrorReadOnly())
+    },
+    selectedIndicatorCodeHidden () {
       this.$nextTick(() => this.applyCodeMirrorReadOnly())
     },
     isDarkTheme () {
@@ -6441,13 +6443,6 @@ export default {
       this.ensureChartReady()
       this.schedulePersistIdeUiState()
     },
-    ideWorkspaceTab (val) {
-      if (val === 'chart' && this.shouldShowBacktestMarkersOnChart()) {
-        this.$nextTick(() => {
-          setTimeout(() => this.renderBacktestSignals(), 200)
-        })
-      }
-    },
     aiGenerating (val) {
       if (val) {
         this.ideAiTipIndex = 0
@@ -6485,15 +6480,41 @@ export default {
   gap: 6px;
   flex-shrink: 0;
 }
-.chart-panel-icon-btn {
-  border-radius: 8px !important;
-  width: 28px;
+.chart-panel-action-btn {
   height: 28px !important;
-  padding: 0 !important;
+  padding: 0 12px !important;
+  border-radius: 8px !important;
   display: inline-flex !important;
   align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.chart-panel-convert-strategy-btn {
+  min-width: 92px;
+}
+.chart-panel-signal-alert-btn {
+  min-width: 78px;
+  border-color: color-mix(in srgb, var(--primary-color, #1890ff) 36%, #d9d9d9) !important;
+  color: var(--primary-color, @primary-color) !important;
+  background: color-mix(in srgb, var(--primary-color, #1890ff) 9%, transparent) !important;
+  em {
+    min-width: 16px;
+    height: 16px;
+    line-height: 16px;
+    border-radius: 999px;
+    font-style: normal;
+    font-size: 10px;
+    text-align: center;
+    color: #fff;
+    background: var(--primary-color, @primary-color);
+  }
+  &:hover,
+  &:focus {
+    border-color: var(--primary-color, @primary-color) !important;
+    color: var(--primary-color, @primary-color) !important;
+  }
 }
 .chart-panel-qt-btn {
   border-radius: 8px !important;
@@ -6512,6 +6533,33 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+@media (max-width: 1180px) {
+  .chart-panel-action-btn {
+    width: 28px;
+    min-width: 28px !important;
+    padding: 0 !important;
+    justify-content: center;
+
+    span {
+      display: none;
+    }
+  }
+  .chart-panel-convert-strategy-btn {
+    min-width: 28px;
+  }
+  .chart-panel-signal-alert-btn {
+    min-width: 28px;
+    em {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      min-width: 14px;
+      height: 14px;
+      line-height: 14px;
+      font-size: 9px;
+    }
+  }
 }
 .ide-toolbar-group {
   display: flex;
@@ -6552,6 +6600,16 @@ export default {
   width: 220px;
   max-width: 36vw;
 }
+.ide-market-context-controls {
+  display: flex;
+  gap: 6px;
+}
+.ide-toolbar-select--exchange {
+  width: 112px;
+}
+.ide-toolbar-select--market-type {
+  width: 104px;
+}
 .ide-toolbar-select--indicator {
   width: 220px;
   max-width: 42vw;
@@ -6578,6 +6636,329 @@ export default {
   flex-wrap: wrap;
   align-items: center;
   row-gap: 6px;
+}
+.ide-toolbar-group--params {
+  min-width: 96px;
+}
+.ide-param-trigger {
+  height: 30px !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  em {
+    min-width: 18px;
+    height: 18px;
+    line-height: 18px;
+    border-radius: 999px;
+    font-style: normal;
+    font-size: 11px;
+    text-align: center;
+    color: inherit;
+    background: rgba(255, 255, 255, 0.22);
+  }
+  &.ant-btn-default em {
+    color: var(--primary-color, @primary-color);
+    background: color-mix(in srgb, var(--primary-color, #1890ff) 12%, transparent);
+  }
+}
+.ide-signal-alert-modal {
+  .ant-tabs-bar {
+    margin-bottom: 14px;
+    border-bottom-color: #edf0f5;
+  }
+  .ant-tabs-tab {
+    font-weight: 700;
+  }
+  .ant-tabs-tab-active {
+    color: var(--primary-color, @primary-color);
+  }
+  .ant-tabs-ink-bar {
+    background: var(--primary-color, @primary-color);
+  }
+}
+.signal-alert-current-card,
+.signal-alert-block,
+.signal-alert-field,
+.signal-alert-task-card {
+  border: 1px solid #e8edf3;
+  border-radius: 10px;
+  background: #fff;
+}
+.signal-alert-current-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--primary-color, #1890ff) 18%, transparent), transparent 38%),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-color, #1890ff) 8%, #fff), #fff);
+  span {
+    display: block;
+    margin-bottom: 4px;
+    color: #7a8596;
+    font-size: 12px;
+  }
+  strong {
+    display: block;
+    max-width: 560px;
+    overflow: hidden;
+    color: #111827;
+    font-size: 15px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ant-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    margin: 0;
+    border-radius: 7px;
+    font-weight: 700;
+  }
+}
+.signal-alert-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.signal-alert-field {
+  min-width: 0;
+  padding: 10px 12px;
+  label {
+    display: block;
+    margin-bottom: 7px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .ant-select {
+    width: 100%;
+  }
+}
+.signal-alert-block {
+  margin-bottom: 12px;
+  padding: 13px 14px;
+}
+.signal-alert-block__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+  strong {
+    color: #111827;
+    font-size: 14px;
+  }
+  span {
+    color: #7a8596;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: right;
+  }
+}
+.signal-alert-check-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
+  width: 100%;
+  .ant-checkbox-wrapper {
+    margin: 0;
+    overflow: hidden;
+    color: #334155;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+.signal-alert-channel-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  .ant-checkbox-wrapper {
+    margin: 0;
+    color: #334155;
+    font-weight: 700;
+  }
+}
+.signal-alert-target-row {
+  margin-top: 10px;
+}
+.signal-alert-target-row--split {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+}
+.signal-alert-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+.signal-alert-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 440px;
+  overflow: auto;
+  padding-right: 4px;
+}
+.signal-alert-task-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 14px;
+  transition: border-color 0.18s ease, background 0.18s ease;
+  &.paused {
+    opacity: 0.78;
+  }
+}
+.signal-alert-task-card__main {
+  min-width: 0;
+}
+.signal-alert-task-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  strong {
+    max-width: 420px;
+    overflow: hidden;
+    color: #111827;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+.signal-alert-task-card__meta,
+.signal-alert-task-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  color: #7a8596;
+  font-size: 12px;
+}
+.signal-alert-task-card__meta {
+  margin-bottom: 6px;
+  .danger {
+    color: #ef4444;
+  }
+}
+.signal-alert-task-card__actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+@media (max-width: 860px) {
+  .signal-alert-form-grid,
+  .signal-alert-target-row--split {
+    grid-template-columns: 1fr;
+  }
+  .signal-alert-check-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .signal-alert-task-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+.ide-signal-alert-modal-wrap.ide-modal-wrap--dark,
+body.dark .ide-signal-alert-modal-wrap {
+  .ant-modal-content {
+    background: #141414;
+    box-shadow: 0 18px 56px rgba(0, 0, 0, 0.62);
+  }
+  .ant-modal-header {
+    background: #1f1f1f;
+    border-bottom-color: #303030;
+  }
+  .ant-modal-title,
+  .ant-modal-close {
+    color: rgba(255, 255, 255, 0.88);
+  }
+  .ant-modal-body {
+    background: #141414;
+    color: rgba(255, 255, 255, 0.82);
+  }
+  .ide-signal-alert-modal {
+    .ant-tabs-bar {
+      border-bottom-color: #303030;
+    }
+    .ant-tabs-tab {
+      color: rgba(255, 255, 255, 0.58);
+    }
+    .ant-tabs-tab-active {
+      color: var(--primary-color, #ff4d4f);
+    }
+  }
+  .signal-alert-current-card {
+    background:
+      radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--primary-color, #ff4d4f) 24%, transparent), transparent 40%),
+      linear-gradient(135deg, color-mix(in srgb, var(--primary-color, #ff4d4f) 12%, #202020), #171717);
+    border-color: color-mix(in srgb, var(--primary-color, #ff4d4f) 30%, #303030);
+    span {
+      color: rgba(255, 255, 255, 0.5);
+    }
+    strong {
+      color: rgba(255, 255, 255, 0.92);
+    }
+  }
+  .signal-alert-block,
+  .signal-alert-field,
+  .signal-alert-task-card {
+    background: #1f1f1f;
+    border-color: #303030;
+  }
+  .signal-alert-field label,
+  .signal-alert-block__head strong,
+  .signal-alert-task-card__title strong {
+    color: rgba(255, 255, 255, 0.88);
+  }
+  .signal-alert-block__head span,
+  .signal-alert-task-card__meta,
+  .signal-alert-task-card__chips {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .signal-alert-check-grid .ant-checkbox-wrapper,
+  .signal-alert-channel-row .ant-checkbox-wrapper {
+    color: rgba(255, 255, 255, 0.76);
+  }
+  .ant-input,
+  .ant-select-selection {
+    background: #151515;
+    border-color: #383838;
+    color: rgba(255, 255, 255, 0.86);
+  }
+  .ant-select-arrow,
+  .ant-select-selection__placeholder,
+  .ant-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+  .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous) {
+    background: #1f1f1f;
+    border-color: #3a3a3a;
+    color: rgba(255, 255, 255, 0.72);
+    &:hover,
+    &:focus {
+      border-color: var(--primary-color, #ff4d4f);
+      color: var(--primary-color, #ff4d4f);
+    }
+  }
+  .ant-empty-description {
+    color: rgba(255, 255, 255, 0.45);
+  }
 }
 .ide-purchased-hint {
   margin: 0 0 10px 0;
@@ -6619,15 +7000,15 @@ export default {
 .ide-main { display: flex; flex: 1 1 auto; overflow: visible; min-height: 0; align-items: stretch; }
 
 .ide-code-rail {
-  flex: 0 0 32px;
-  width: 32px;
-  min-width: 32px;
+  flex: 0 0 34px;
+  width: 34px;
+  min-width: 34px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 14px 0;
-  gap: 10px;
+  padding: 12px 0;
+  gap: 8px;
   cursor: pointer;
   user-select: none;
   border-right: 1px solid #e2e8f0;
@@ -6636,18 +7017,40 @@ export default {
   transition: background 0.2s, color 0.2s, box-shadow 0.2s;
   box-shadow: 2px 0 8px rgba(15, 23, 42, 0.04);
   &:hover {
-    background: linear-gradient(180deg, #e8f4ff 0%, #dbeafe 100%);
-    color: @primary-color;
-    box-shadow: 2px 0 12px rgba(24, 144, 255, 0.12);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--primary-color, #1890ff) 10%, #fff) 0%, color-mix(in srgb, var(--primary-color, #1890ff) 16%, #fff) 100%);
+    color: var(--primary-color, @primary-color);
+    box-shadow: 2px 0 12px color-mix(in srgb, var(--primary-color, #1890ff) 14%, transparent);
   }
   &:focus {
     outline: none;
-    box-shadow: inset 0 0 0 2px rgba(24, 144, 255, 0.35);
+    box-shadow: inset 0 0 0 2px var(--primary-color-ring, color-mix(in srgb, var(--primary-color, #1890ff) 35%, transparent));
+  }
+  &.is-open {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--primary-color, #1890ff) 12%, #fff) 0%, color-mix(in srgb, var(--primary-color, #1890ff) 20%, #fff) 100%);
+    color: var(--primary-color, @primary-color);
+    box-shadow: inset -2px 0 0 var(--primary-color, @primary-color);
   }
 }
 .ide-code-rail__icon {
   font-size: 16px;
-  color: @primary-color;
+  color: var(--primary-color, @primary-color);
+}
+.ide-code-rail__arrow {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #64748b;
+  background: rgba(15, 23, 42, 0.05);
+  transition: color 0.2s, background 0.2s, transform 0.2s;
+}
+.ide-code-rail:hover .ide-code-rail__arrow,
+.ide-code-rail.is-open .ide-code-rail__arrow {
+  color: var(--primary-color, @primary-color);
+  background: color-mix(in srgb, var(--primary-color, #1890ff) 14%, transparent);
 }
 .ide-code-rail__label {
   writing-mode: vertical-rl;
@@ -6689,26 +7092,6 @@ export default {
   }
 }
 
-.ide-code-drawer-handle {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 7px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #64748b;
-  background: linear-gradient(180deg, #f1f5f9 0%, #e8eef5 100%);
-  border-top: 1px solid #e2e8f0;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s, color 0.15s;
-  &:hover {
-    background: linear-gradient(180deg, #e6f0fa 0%, #dce8f4 100%);
-    color: @primary-color;
-  }
-}
 // ===== Code Panel =====
 .code-panel {
   flex: 1;
@@ -6720,6 +7103,47 @@ export default {
 }
 .code-panel-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .code-editor-wrapper { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.code-hidden-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px;
+  text-align: center;
+  color: rgba(15, 23, 42, 0.76);
+  background:
+    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--primary-color, #52c41a) 14%, transparent), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92)),
+    repeating-linear-gradient(45deg, rgba(15, 23, 42, 0.035) 0 8px, rgba(15, 23, 42, 0.01) 8px 16px);
+  backdrop-filter: blur(4px);
+  .anticon {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--primary-color, #52c41a);
+    background: color-mix(in srgb, var(--primary-color, #52c41a) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary-color, #52c41a) 36%, transparent);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--primary-color, #52c41a) 6%, transparent);
+    font-size: 20px;
+  }
+  strong {
+    font-size: 15px;
+    color: rgba(15, 23, 42, 0.88);
+  }
+  span {
+    max-width: 280px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: rgba(71, 85, 105, 0.78);
+  }
+}
 
 // ===== AI Loading Overlay on code editor =====
 .code-ai-overlay {
@@ -6772,6 +7196,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
   padding: 7px 10px;
   font-size: 12px;
   font-weight: 600;
@@ -6796,11 +7221,7 @@ export default {
   gap: 6px;
   flex: 1;
   min-width: 0;
-}
-.panel-title-chevron {
-  font-size: 11px;
-  color: #94a3b8;
-  flex-shrink: 0;
+  justify-content: flex-end;
 }
 .panel-title-actions {
   display: flex;
@@ -6809,13 +7230,14 @@ export default {
   gap: 6px;
   flex: 1;
   min-width: 0;
+  flex-wrap: wrap;
 }
 .panel-title-icon-actions {
   display: flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   ::v-deep .ant-btn-sm {
     width: 26px;
     min-width: 26px;
@@ -6919,6 +7341,115 @@ export default {
   line-height: 1.55;
   font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
   white-space: pre;
+}
+.ide-param-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100%;
+}
+.ide-param-drawer__hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 14% 10%, color-mix(in srgb, var(--primary-color, #1890ff) 16%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-color, #1890ff) 8%, #fff), #fff);
+  border: 1px solid color-mix(in srgb, var(--primary-color, #1890ff) 18%, #e5e7eb);
+  span {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: #64748b;
+  }
+  strong {
+    display: block;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #111827;
+  }
+}
+.ide-param-boundary {
+  border-radius: 8px;
+}
+.ide-param-empty {
+  margin: 32px 0;
+}
+.ide-param-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 68px;
+}
+.ide-param-item {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.ide-param-item__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  strong {
+    display: block;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #111827;
+    font-size: 13px;
+  }
+  code {
+    display: inline-block;
+    margin-top: 3px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--primary-color, @primary-color);
+    background: color-mix(in srgb, var(--primary-color, #1890ff) 10%, transparent);
+  }
+}
+.ide-param-item__desc {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ide-param-item__control {
+  width: 100%;
+}
+.ide-param-item__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  b {
+    color: #475569;
+    font-weight: 700;
+  }
+}
+.ide-param-drawer__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: auto -24px -24px;
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.94);
+  border-top: 1px solid #e5e7eb;
+  backdrop-filter: blur(10px);
 }
 .ide-guide-bar {
   display: flex;
@@ -7417,6 +7948,8 @@ export default {
   overflow: hidden;
 }
 .ide-right--workspace {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
   align-self: stretch;
@@ -7424,211 +7957,12 @@ export default {
   height: calc(var(--ide-shell-height, calc(100vh - 64px)) - 8px);
   max-height: calc(var(--ide-shell-height, calc(100vh - 64px)) - 8px);
 }
-.ide-workspace-tabs {
-  flex: 1 1 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-  & > {
-    ::v-deep .ant-tabs-bar {
-      flex-shrink: 0;
-      margin-bottom: 0;
-    }
-  }
-  ::v-deep .ant-tabs-card-content {
-    flex: 1 1 0;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    > .ant-tabs-tabpane-active {
-      flex: 1 1 0;
-      min-height: 0;
-      overflow: hidden;
-      display: flex !important;
-      flex-direction: column;
-      .ide-workspace-pane--chart {
-        flex: 1 1 0;
-        min-height: 0;
-        overflow: hidden;
-      }
-    }
-  }
-}
-.ide-backtest-scroll-mount {
-  flex: 1 1 0;
-  min-height: 120px;
-  min-width: 0;
-  align-self: stretch;
-  width: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-.ide-workspace-tabs ::v-deep .ant-tabs-card-content > .ant-tabs-tabpane-active:has(.ide-backtest-scroll-mount) {
-  flex: 1 1 0 !important;
-  min-height: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
 .ide-workspace-pane--chart {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-.ide-workspace-pane--backtest {
-  flex: 0 0 auto;
-  min-height: 0;
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Mirrored toolbar shown above the result-panel on the backtest tab so
- * symbol / TF / indicator can be switched without leaving the tab. The
- * inner ``chart-panel-toolbar-controls`` keeps the chart-tab styling so
- * both toolbars are visually identical and users immediately recognise it. */
-.backtest-panel-toolbar {
-  background: #fff;
-  border: 1px solid #e8eaee;
-  border-radius: 10px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-
-  /* Mirror the horizontal flex layout used by chart-panel so the three
-   * controls (watchlist / timeframe / indicator) sit side-by-side instead of
-   * stacking into 3 rows. The chart-tab rules are scoped under .chart-panel
-   * which doesn't apply here. */
-  .chart-panel-toolbar-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 10px;
-    min-width: 0;
-    .ide-toolbar-group {
-      flex: 0 1 auto;
-      min-width: 0;
-    }
-    // K-line timeframe segmented control: size to its 8 buttons only and stop
-    // there. Previously this had `flex: 1 1 280px` which let it grow without
-    // bound, squashing the indicator picker on its right (reported by users
-    .ide-toolbar-group--tf {
-      flex: 0 0 auto;
-      min-width: 0;
-      max-width: 100%;
-    }
-    .ide-toolbar-group--indicator {
-      flex: 1 1 280px;
-      min-width: 220px;
-      align-items: flex-start;
-      .ide-toolbar-label {
-        width: 100%;
-        text-align: left;
-        align-self: flex-start;
-      }
-      .ide-indicator-multiselect-trigger {
-        width: 100%;
-        max-width: none;
-      }
-    }
-  }
-  .chart-panel-watchlist-select {
-    width: 100%;
-    min-width: 220px;
-    max-width: 320px;
-  }
-  .ide-tf-seg--backtest {
-    display: inline-flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    // its content (~360px for 8 buttons) so it stops claiming flex space
-    // that the indicator picker needs.
-    width: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
-    ::v-deep .ant-radio-button-wrapper {
-      flex-shrink: 0;
-    }
-  }
-}
-body.dark .backtest-panel-toolbar,
-body.realdark .backtest-panel-toolbar {
-  background: #1c1c1c;
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-.ide-backtest-scroll-mount .result-panel {
-  flex: 0 0 auto;
-  min-height: 0;
-  overflow: visible;
-  padding-bottom: 16px;
-}
-
-.ide-workspace-tabs.ide-workspace-tabs--pill {
-  padding: 0 10px 0;
-  & > {
-    ::v-deep .ant-tabs-bar {
-      border-bottom: 1px solid #e8e8e8;
-      margin: 0 0 0;
-      padding: 8px 0 0;
-      background: linear-gradient(180deg, #fafbfc 0%, #f4f6f9 100%);
-      ::v-deep .ant-tabs-nav-container {
-        height: auto !important;
-      }
-      ::v-deep .ant-tabs-nav-wrap {
-        margin-bottom: 0;
-      }
-      ::v-deep .ant-tabs-tab {
-        margin: 0 4px 0 0 !important;
-        padding: 7px 18px !important;
-        height: auto !important;
-        line-height: 1.35 !important;
-        font-size: 12px;
-        font-weight: 600;
-        border-radius: 10px 10px 0 0 !important;
-        border: 1px solid #e2e8f0 !important;
-        border-bottom: none !important;
-        background: #fff !important;
-        color: #64748b !important;
-        transition: color 0.15s, background 0.15s, box-shadow 0.15s;
-        &:hover {
-          color: var(--primary-color, #1890ff) !important;
-          background: #f8fafc !important;
-        }
-      }
-      ::v-deep .ant-tabs-tab-active {
-        color: var(--primary-color, #1890ff) !important;
-        background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--primary-color, #1890ff) 7%, #ffffff) 100%) !important;
-        border-color: color-mix(in srgb, var(--primary-color, #1890ff) 35%, #e2e8f0) !important;
-        box-shadow: 0 -2px 10px var(--primary-color-ring, rgba(24, 144, 255, 0.12));
-        position: relative;
-        z-index: 1;
-      }
-      ::v-deep .ant-tabs-nav .ant-tabs-tab {
-        &:last-child {
-          margin-right: 0 !important;
-        }
-      }
-      ::v-deep .ant-tabs-ink-bar {
-        display: none !important;
-      }
-    }
-  }
-  ::v-deep .ant-tabs-card-content {
-    border-radius: 0 0 10px 10px;
-    background: #fff;
-    border: 1px solid #e8e8e8;
-    border-top: none;
-    margin-top: -1px;
-  }
 }
 
 .ide-quick-right {
@@ -9713,60 +10047,43 @@ body.realdark .backtest-panel-toolbar {
 // ===== Dark Theme =====
 &.theme-dark {
   background: #141414;
-  .ide-code-drawer-handle {
-    color: rgba(255, 255, 255, 0.55);
-    background: linear-gradient(180deg, #252525 0%, #1c1c1c 100%);
-    border-top-color: #363636;
-    &:hover {
-      color: var(--primary-color, #1890ff);
-      background: linear-gradient(180deg, #2a2a2a 0%, #222 100%);
-    }
-  }
   .ide-code-rail {
     border-right-color: #303030;
     background: linear-gradient(180deg, #1f1f1f 0%, #181818 100%);
     color: rgba(255, 255, 255, 0.5);
     box-shadow: 2px 0 14px rgba(0, 0, 0, 0.5);
     &:hover {
-      background: linear-gradient(180deg, var(--primary-color-soft-strong, rgba(23, 125, 220, 0.14)) 0%, var(--primary-color-soft, rgba(23, 125, 220, 0.06)) 100%);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--primary-color, #1890ff) 18%, #1f1f1f) 0%, color-mix(in srgb, var(--primary-color, #1890ff) 8%, #181818) 100%);
       color: var(--primary-color, #1890ff);
     }
     &:focus {
-      box-shadow: inset 0 0 0 2px var(--primary-color-ring, rgba(88, 166, 255, 0.45));
+      box-shadow: inset 0 0 0 2px var(--primary-color-ring, color-mix(in srgb, var(--primary-color, #1890ff) 38%, transparent));
     }
   }
   .ide-code-rail__icon {
     color: var(--primary-color, #1890ff);
   }
-  .ide-workspace-tabs.ide-workspace-tabs--pill {
-    ::v-deep .ant-tabs-bar {
-      border-bottom-color: #303030;
-      background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
-    }
-    ::v-deep .ant-tabs-tab {
-      border-color: #363636 !important;
-      border-bottom: none !important;
-      background: #1f1f1f !important;
-      color: rgba(255, 255, 255, 0.45) !important;
-      &:hover {
-        color: var(--primary-color, #1890ff) !important;
-        background: #262626 !important;
-      }
-    }
-    ::v-deep .ant-tabs-tab-active {
-      color: var(--primary-color, #1890ff) !important;
-      background: linear-gradient(180deg, #252525 0%, var(--primary-color-soft, rgba(23, 125, 220, 0.12)) 100%) !important;
-      border-color: var(--primary-color, #1890ff) !important;
-      box-shadow: 0 -2px 14px var(--primary-color-ring, rgba(23, 125, 220, 0.22));
-    }
-    ::v-deep .ant-tabs-card-content {
-      background: #141414;
-      border-color: #303030;
-      border-top: none;
-    }
+  .ide-code-rail__arrow {
+    color: rgba(255, 255, 255, 0.56);
+    background: rgba(255, 255, 255, 0.06);
   }
-  .panel-title-chevron {
-    color: rgba(255, 255, 255, 0.38);
+  .ide-code-rail:hover .ide-code-rail__arrow,
+  .ide-code-rail.is-open .ide-code-rail__arrow {
+    color: var(--primary-color, #1890ff);
+    background: color-mix(in srgb, var(--primary-color, #1890ff) 16%, transparent);
+  }
+  .code-hidden-mask {
+    color: rgba(255, 255, 255, 0.78);
+    background:
+      radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--primary-color, #52c41a) 18%, transparent), transparent 34%),
+      linear-gradient(135deg, rgba(5, 5, 5, 0.96), rgba(18, 18, 18, 0.94)),
+      repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.035) 0 8px, rgba(255, 255, 255, 0.01) 8px 16px);
+    strong {
+      color: #ffffff;
+    }
+    span {
+      color: rgba(255, 255, 255, 0.62);
+    }
   }
   .code-version-toolbar {
     color: rgba(255, 255, 255, 0.58);
@@ -9787,10 +10104,37 @@ body.realdark .backtest-panel-toolbar {
     border-color: #303030;
     strong { color: rgba(255, 255, 255, 0.88); }
   }
-  .chart-panel-icon-btn {
+  .ide-param-drawer__hero {
+    background:
+      radial-gradient(circle at 14% 10%, color-mix(in srgb, var(--primary-color, #1890ff) 22%, transparent), transparent 34%),
+      linear-gradient(135deg, #1f1f1f, #171717);
+    border-color: color-mix(in srgb, var(--primary-color, #1890ff) 24%, #303030);
+    span { color: rgba(255, 255, 255, 0.48); }
+    strong { color: rgba(255, 255, 255, 0.9); }
+  }
+  .ide-param-item {
+    background: #1f1f1f;
+    border-color: #303030;
+    box-shadow: none;
+  }
+  .ide-param-item__head strong {
+    color: rgba(255, 255, 255, 0.88);
+  }
+  .ide-param-item__desc {
+    color: rgba(255, 255, 255, 0.56);
+  }
+  .ide-param-item__meta {
+    color: rgba(255, 255, 255, 0.42);
+    b { color: rgba(255, 255, 255, 0.78); }
+  }
+  .ide-param-drawer__footer {
+    background: rgba(20, 20, 20, 0.94);
+    border-color: #303030;
+  }
+  .ide-param-trigger.ant-btn-default {
     background: #262626;
     border-color: #434343;
-    box-shadow: none;
+    color: rgba(255, 255, 255, 0.82);
   }
   .ide-toolbar-group {
     background: rgba(255, 255, 255, 0.04);
@@ -10574,6 +10918,574 @@ body.dark .ide-drawer-wrap .ant-drawer-close,
 body.dark .ide-drawer-wrap--dark .ant-drawer-close {
   color: rgba(255, 255, 255, 0.88);
 }
+body.dark .ide-drawer-wrap .ant-drawer-body,
+body.dark .ide-drawer-wrap--dark .ant-drawer-body {
+  color: rgba(255, 255, 255, 0.82);
+}
+body.dark .ide-drawer-wrap .code-version-toolbar,
+body.dark .ide-drawer-wrap--dark .code-version-toolbar {
+  color: rgba(255, 255, 255, 0.58);
+}
+body.dark .ide-drawer-wrap .code-version-item,
+body.dark .ide-drawer-wrap--dark .code-version-item {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+body.dark .ide-drawer-wrap .code-version-item__main strong,
+body.dark .ide-drawer-wrap--dark .code-version-item__main strong {
+  color: rgba(255, 255, 255, 0.88);
+}
+body.dark .ide-drawer-wrap .code-version-item__main span,
+body.dark .ide-drawer-wrap--dark .code-version-item__main span,
+body.dark .ide-drawer-wrap .code-version-item__main small,
+body.dark .ide-drawer-wrap--dark .code-version-item__main small {
+  color: rgba(255, 255, 255, 0.52);
+}
+body.dark .ide-drawer-wrap .code-version-preview,
+body.dark .ide-drawer-wrap--dark .code-version-preview {
+  border-color: #303030;
+}
+body.dark .ide-drawer-wrap .code-version-preview__head,
+body.dark .ide-drawer-wrap--dark .code-version-preview__head {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+body.dark .ide-drawer-wrap .code-version-preview__head strong,
+body.dark .ide-drawer-wrap--dark .code-version-preview__head strong {
+  color: rgba(255, 255, 255, 0.88);
+}
+body.dark .ide-drawer-wrap .code-version-item .ant-btn:not(.ant-btn-primary),
+body.dark .ide-drawer-wrap--dark .code-version-item .ant-btn:not(.ant-btn-primary),
+body.dark .ide-drawer-wrap .code-version-preview__head .ant-btn:not(.ant-btn-primary),
+body.dark .ide-drawer-wrap--dark .code-version-preview__head .ant-btn:not(.ant-btn-primary),
+body.dark .ide-drawer-wrap .code-version-toolbar .ant-btn:not(.ant-btn-primary),
+body.dark .ide-drawer-wrap--dark .code-version-toolbar .ant-btn:not(.ant-btn-primary) {
+  background: #1f1f1f;
+  border-color: #434343;
+  color: rgba(255, 255, 255, 0.68);
+}
+body.dark .ide-drawer-wrap .code-version-item .ant-btn:not(.ant-btn-primary):hover,
+body.dark .ide-drawer-wrap--dark .code-version-item .ant-btn:not(.ant-btn-primary):hover,
+body.dark .ide-drawer-wrap .code-version-preview__head .ant-btn:not(.ant-btn-primary):hover,
+body.dark .ide-drawer-wrap--dark .code-version-preview__head .ant-btn:not(.ant-btn-primary):hover,
+body.dark .ide-drawer-wrap .code-version-toolbar .ant-btn:not(.ant-btn-primary):hover,
+body.dark .ide-drawer-wrap--dark .code-version-toolbar .ant-btn:not(.ant-btn-primary):hover {
+  border-color: var(--primary-color-active, #177ddc);
+  color: var(--primary-color-active, #177ddc);
+}
+
+.ide-publish-modal-wrap {
+  .ant-modal-content {
+    overflow: hidden;
+    border-radius: 10px;
+    background: #fff;
+  }
+  .ant-modal-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid #edf0f5;
+    background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+  }
+  .ant-modal-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #1f2937;
+  }
+  .ant-modal-close-x {
+    width: 58px;
+    height: 58px;
+    line-height: 58px;
+  }
+  .ant-modal-body {
+    padding: 18px 24px 20px;
+    background: #f6f7f9;
+  }
+  .ant-modal-footer {
+    padding: 14px 24px;
+    border-top: 1px solid #edf0f5;
+    background: #fff;
+    .ant-btn {
+      min-width: 88px;
+      height: 34px;
+      border-radius: 6px;
+      font-weight: 700;
+    }
+    .ant-btn-primary {
+      background: var(--primary-color, #1890ff);
+      border-color: var(--primary-color, #1890ff);
+    }
+  }
+  .publish-market-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .publish-summary-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 74px;
+    padding: 14px;
+    border: 1px solid var(--primary-color-ring, rgba(24, 144, 255, 0.18));
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--primary-color-soft, rgba(24, 144, 255, 0.08)) 0%, #fff 72%);
+  }
+  .publish-summary-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #fff;
+    background: var(--primary-color, #1890ff);
+    box-shadow: 0 10px 24px var(--primary-color-ring, rgba(24, 144, 255, 0.25));
+    font-size: 18px;
+  }
+  .publish-summary-main {
+    flex: 1;
+    min-width: 0;
+  }
+  .publish-summary-label {
+    margin-bottom: 3px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b7280;
+  }
+  .publish-summary-name {
+    overflow: hidden;
+    color: #111827;
+    font-size: 16px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .publish-summary-tag {
+    margin: 0;
+    height: 24px;
+    line-height: 22px;
+    border-radius: 999px;
+    font-weight: 700;
+  }
+  .publish-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    color: #4b5563;
+    font-size: 13px;
+    line-height: 1.55;
+    .anticon {
+      margin-top: 3px;
+      color: var(--primary-color, #1890ff);
+    }
+  }
+  .publish-section {
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+  }
+  .publish-section-title {
+    margin-bottom: 10px;
+    color: #1f2937;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .publish-pricing-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    .ant-radio-button-wrapper {
+      height: 40px;
+      line-height: 38px;
+      padding: 0 14px;
+      border: 1px solid #dfe3ea;
+      border-radius: 8px !important;
+      color: #4b5563;
+      text-align: center;
+      font-weight: 700;
+      background: #fafafa;
+      box-shadow: none;
+      &::before {
+        display: none;
+      }
+      .anticon {
+        margin-right: 6px;
+      }
+      &:hover {
+        color: var(--primary-color, #1890ff);
+        border-color: var(--primary-color, #1890ff);
+      }
+      &.ant-radio-button-wrapper-checked {
+        color: #fff;
+        border-color: var(--primary-color, #1890ff);
+        background: var(--primary-color, #1890ff);
+        box-shadow: 0 8px 18px var(--primary-color-ring, rgba(24, 144, 255, 0.25));
+      }
+    }
+  }
+  .publish-price-box {
+    margin-top: 12px;
+  }
+  .publish-price-input {
+    width: 100%;
+  }
+  .publish-option-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .publish-option-card {
+    min-height: 112px;
+    padding: 13px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    &.active {
+      border-color: var(--primary-color, #1890ff);
+      background: linear-gradient(135deg, var(--primary-color-soft, rgba(24, 144, 255, 0.08)) 0%, #fff 76%);
+      box-shadow: inset 0 0 0 1px var(--primary-color-ring, rgba(24, 144, 255, 0.12));
+    }
+  }
+  .publish-option-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+    color: #1f2937;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .publish-hint {
+    margin-top: 0;
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .publish-description-input {
+    min-height: 104px;
+    resize: vertical;
+  }
+  .publish-unpublish-row {
+    display: flex;
+    justify-content: flex-start;
+  }
+}
+
+body.dark .ide-publish-modal-wrap,
+.ide-publish-modal-wrap.ide-modal-wrap--dark {
+  .ant-modal-content {
+    background: #181818;
+    box-shadow: 0 18px 54px rgba(0, 0, 0, 0.55);
+  }
+  .ant-modal-header {
+    border-bottom-color: #2a2a2a;
+    background: linear-gradient(180deg, #202020 0%, #181818 100%);
+  }
+  .ant-modal-title {
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .ant-modal-body {
+    background: #141414;
+  }
+  .ant-modal-footer {
+    border-top-color: #2a2a2a;
+    background: #181818;
+  }
+  .publish-summary-card {
+    border-color: var(--primary-color-ring, rgba(255, 77, 79, 0.32));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary-color, #ff4d4f) 18%, #221719) 0%, #1c1c1c 72%);
+  }
+  .publish-summary-label {
+    color: rgba(255, 255, 255, 0.52);
+  }
+  .publish-summary-name,
+  .publish-section-title,
+  .publish-option-head {
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .publish-note,
+  .publish-section,
+  .publish-option-card {
+    border-color: #303030;
+    background: #1f1f1f;
+  }
+  .publish-note {
+    color: rgba(255, 255, 255, 0.66);
+  }
+  .publish-option-card.active {
+    border-color: var(--primary-color, #ff4d4f);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary-color, #ff4d4f) 16%, #201a1a) 0%, #1f1f1f 78%);
+    box-shadow: inset 0 0 0 1px var(--primary-color-ring, rgba(255, 77, 79, 0.22));
+  }
+  .publish-hint {
+    color: rgba(255, 255, 255, 0.48);
+  }
+  .publish-pricing-group {
+    .ant-radio-button-wrapper {
+      border-color: #383838;
+      color: rgba(255, 255, 255, 0.68);
+      background: #181818;
+      &:hover {
+        color: var(--primary-color, #ff4d4f);
+        border-color: var(--primary-color, #ff4d4f);
+      }
+      &.ant-radio-button-wrapper-checked {
+        color: #fff;
+        border-color: var(--primary-color, #ff4d4f);
+        background: var(--primary-color, #ff4d4f);
+      }
+    }
+  }
+  .ant-input,
+  .ant-input-number {
+    background: #181818;
+    border-color: #383838;
+    color: rgba(255, 255, 255, 0.86);
+  }
+  .ant-input-number-input {
+    color: rgba(255, 255, 255, 0.86);
+  }
+}
+
+.ide-param-modal-wrap {
+  .ant-modal-content {
+    overflow: hidden;
+    border-radius: 12px;
+  }
+  .ant-modal-body {
+    padding: 18px;
+  }
+  .ide-param-drawer {
+    gap: 14px;
+  }
+  .ide-param-drawer__hero {
+    border-radius: 10px;
+    align-items: center;
+    .ant-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      height: 28px;
+      line-height: 26px;
+      margin: 0;
+      padding: 0 10px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+  }
+  .ide-param-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    max-height: ~"min(54vh, 520px)";
+    overflow: auto;
+    padding: 0 2px 2px;
+  }
+  .ide-param-item {
+    min-width: 0;
+  }
+  .ide-param-item__head strong {
+    max-width: 220px;
+  }
+  .ide-param-item__head .ant-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-start;
+    flex-shrink: 0;
+    min-width: 34px;
+    height: 24px;
+    line-height: 22px;
+    margin: 0;
+    padding: 0 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .ide-param-drawer__footer {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 2px 0 0;
+    padding: 0;
+    background: transparent;
+    border-top: 0;
+    backdrop-filter: none;
+    .ant-btn {
+      width: 100%;
+      height: 32px;
+      padding: 0 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}
+
+@media (max-width: 860px) {
+  .ide-param-modal-wrap {
+    .ant-modal {
+      max-width: calc(100vw - 24px);
+    }
+    .ide-param-list {
+      grid-template-columns: 1fr;
+      max-height: 56vh;
+    }
+    .ide-param-drawer__footer {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}
+
+.ide-param-drawer-wrap.ide-drawer-wrap--dark,
+.ide-param-modal-wrap.ide-modal-wrap--dark,
+body.dark .ide-param-drawer-wrap,
+body.dark .ide-param-modal-wrap {
+  .ant-drawer-content {
+    background: #141414;
+  }
+  .ant-modal-content {
+    background: #141414;
+    box-shadow: 0 18px 56px rgba(0, 0, 0, 0.62);
+  }
+  .ant-drawer-wrapper-body,
+  .ant-drawer-body,
+  .ant-modal-body {
+    background: #141414;
+    color: rgba(255, 255, 255, 0.82);
+  }
+  .ant-drawer-header,
+  .ant-modal-header {
+    background: #1f1f1f;
+    border-bottom-color: #303030;
+  }
+  .ant-drawer-title,
+  .ant-modal-title,
+  .ant-drawer-close,
+  .ant-modal-close {
+    color: rgba(255, 255, 255, 0.88);
+  }
+  .ant-modal-close:hover {
+    color: rgba(255, 255, 255, 0.92);
+  }
+  .ide-param-drawer__hero {
+    background:
+      radial-gradient(circle at 14% 8%, color-mix(in srgb, var(--primary-color, #1890ff) 22%, transparent), transparent 36%),
+      linear-gradient(135deg, color-mix(in srgb, var(--primary-color, #1890ff) 8%, #202020), #151515);
+    border-color: color-mix(in srgb, var(--primary-color, #1890ff) 26%, #303030);
+    span { color: rgba(255, 255, 255, 0.48); }
+    strong { color: rgba(255, 255, 255, 0.92); }
+  }
+  .ide-param-boundary.ant-alert-info {
+    background: color-mix(in srgb, var(--primary-color, #1890ff) 11%, #181818);
+    border-color: color-mix(in srgb, var(--primary-color, #1890ff) 28%, #303030);
+    .ant-alert-message {
+      color: rgba(255, 255, 255, 0.78);
+    }
+    .ant-alert-icon {
+      color: var(--primary-color, #1890ff);
+    }
+  }
+  .ide-param-empty .ant-empty-description {
+    color: rgba(255, 255, 255, 0.45);
+  }
+  .ide-param-item {
+    background: #1f1f1f;
+    border-color: #303030;
+    box-shadow: none;
+  }
+  .ide-param-item__head {
+    strong { color: rgba(255, 255, 255, 0.9); }
+    code {
+      color: var(--primary-color, #1890ff);
+      background: color-mix(in srgb, var(--primary-color, #1890ff) 16%, transparent);
+    }
+  }
+  .ide-param-item__desc {
+    color: rgba(255, 255, 255, 0.58);
+  }
+  .ide-param-item__meta {
+    color: rgba(255, 255, 255, 0.42);
+    b { color: rgba(255, 255, 255, 0.78); }
+  }
+  .ant-tag {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.72);
+  }
+  .ant-input,
+  .ant-input-number,
+  .ant-select-selection {
+    background: #141414;
+    border-color: #3a3a3a;
+    color: rgba(255, 255, 255, 0.86);
+    &:hover,
+    &:focus {
+      border-color: var(--primary-color, #1890ff);
+    }
+  }
+  .ant-input-number-input {
+    color: rgba(255, 255, 255, 0.86);
+  }
+  .ant-input-number-handler-wrap {
+    background: #1f1f1f;
+    border-left-color: #3a3a3a;
+  }
+  .ant-input-number-handler {
+    border-color: #3a3a3a;
+    color: rgba(255, 255, 255, 0.45);
+    &:hover {
+      color: var(--primary-color, #1890ff);
+    }
+  }
+  .ant-select-arrow,
+  .ant-select-selection__placeholder {
+    color: rgba(255, 255, 255, 0.45);
+  }
+  .ant-switch {
+    background-color: rgba(255, 255, 255, 0.22);
+  }
+  .ant-switch-checked {
+    background-color: var(--primary-color, #1890ff);
+  }
+  .ide-param-drawer__footer {
+    background: transparent;
+    border-top-color: transparent;
+  }
+  .ant-btn:not(.ant-btn-primary) {
+    background: #1f1f1f;
+    border-color: #3a3a3a;
+    color: rgba(255, 255, 255, 0.72);
+    &:hover,
+    &:focus {
+      border-color: var(--primary-color, #1890ff);
+      color: var(--primary-color, #1890ff);
+    }
+  }
+  .ant-btn-primary {
+    background: var(--primary-color, #1890ff);
+    border-color: var(--primary-color, #1890ff);
+    color: #fff;
+  }
+  .ant-btn[disabled],
+  .ant-btn[disabled]:hover,
+  .ant-btn[disabled]:focus {
+    background: #181818;
+    border-color: #303030;
+    color: rgba(255, 255, 255, 0.28);
+  }
+}
 
 /* ===== Watchlist dropdown ===== */
 .ide-watchlist-dropdown {
@@ -10760,6 +11672,12 @@ body.dark .ide-drawer-wrap--dark .ant-drawer-close {
 </style>
 
 <style lang="less">
+.ide-add-source-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .ant-select-dropdown.ide-qt-select-dropdown {
   z-index: 10060 !important;
 }

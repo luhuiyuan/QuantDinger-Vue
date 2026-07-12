@@ -128,6 +128,29 @@
               <a-icon type="reload" />
               {{ $t('common.refresh') || 'Refresh' }}
             </a-button>
+            <a-divider type="vertical" class="toolbar-divider" />
+            <span v-if="selectedUserRowKeys.length" class="batch-selected-count">
+              {{ selectedCountText }}
+            </span>
+            <a-popconfirm
+              :title="batchBanConfirmText"
+              :ok-text="$t('userManage.batchBan') || 'Batch ban'"
+              :cancel-text="$t('common.cancel') || 'Cancel'"
+              placement="bottomLeft"
+              @confirm="handleBatchBanUsers"
+            >
+              <a-button
+                type="danger"
+                :disabled="!batchBannableUsers.length"
+                :loading="batchBanLoading"
+              >
+                <a-icon type="stop" />
+                {{ $t('userManage.batchBan') || 'Batch ban' }}
+              </a-button>
+            </a-popconfirm>
+            <a-button v-if="selectedUserRowKeys.length" @click="clearSelectedUsers">
+              {{ $t('userManage.clearSelection') || 'Clear selection' }}
+            </a-button>
           </div>
           <div class="toolbar-right toolbar-filters">
             <a-input
@@ -167,6 +190,7 @@
             :loading="loading"
             :pagination="pagination"
             :rowKey="record => record.id"
+            :rowSelection="userRowSelection"
             :scroll="{ x: 1420 }"
             @change="handleTableChange"
           >
@@ -463,10 +487,6 @@
             <template slot="symbolInfo" slot-scope="text, record">
               <div>
                 <span class="symbol-text">{{ record.symbol || '-' }}</span>
-                <a-tag v-if="record.cs_strategy_type === 'cross_sectional'" color="purple" size="small" style="margin-left: 4px">CS</a-tag>
-              </div>
-              <div v-if="record.cs_strategy_type === 'cross_sectional' && record.symbol_list && record.symbol_list.length" class="symbol-count text-muted">
-                {{ record.symbol_list.length }} {{ $t('systemOverview.symbols') || 'symbols' }}
               </div>
             </template>
 
@@ -1177,7 +1197,10 @@ export default {
       activeTab: 'users',
       loading: false,
       exportingUsers: false,
+      batchBanLoading: false,
       users: [],
+      selectedUserRowKeys: [],
+      selectedUserRows: [],
       roles: [],
       searchKeyword: '',
       userIdSearch: '',
@@ -1324,6 +1347,33 @@ export default {
     },
     hasUserFilters () {
       return !!(this.normalizePositiveInt(this.userIdSearch) || String(this.searchKeyword || '').trim())
+    },
+    selectedCountText () {
+      const template = this.$t('userManage.selectedCount') || '{count} selected'
+      return String(template).replace('{count}', this.selectedUserRowKeys.length)
+    },
+    batchBanConfirmText () {
+      const template = this.$t('userManage.batchBanConfirm') || 'Ban {count} selected users? They will not be able to log in.'
+      return String(template).replace('{count}', this.batchBannableUsers.length)
+    },
+    batchBannableUsers () {
+      return this.selectedUserRows.filter(user => {
+        return user &&
+          user.id !== this.currentUserId &&
+          String(user.status || '').toLowerCase() !== 'disabled'
+      })
+    },
+    userRowSelection () {
+      return {
+        selectedRowKeys: this.selectedUserRowKeys,
+        onChange: this.handleUserSelectionChange,
+        getCheckboxProps: record => ({
+          props: {
+            disabled: record.id === this.currentUserId || String(record.status || '').toLowerCase() === 'disabled',
+            name: String(record.id)
+          }
+        })
+      }
     },
     hasStrategyFilters () {
       return !!(
@@ -2364,6 +2414,7 @@ export default {
           }
           this.users = items
           this.pagination.total = total
+          this.pruneSelectedUsers(items)
         } else {
           this.$message.error(res.msg || 'Failed to load users')
         }
@@ -2397,6 +2448,7 @@ export default {
 
     handleSearch () {
       this.pagination.current = 1
+      this.clearSelectedUsers()
       this.loadUsers()
     },
 
@@ -2414,7 +2466,25 @@ export default {
     handleTableChange (pagination) {
       this.pagination.current = pagination.current
       this.pagination.pageSize = pagination.pageSize
+      this.clearSelectedUsers()
       this.loadUsers()
+    },
+
+    handleUserSelectionChange (selectedRowKeys, selectedRows) {
+      this.selectedUserRowKeys = selectedRowKeys
+      this.selectedUserRows = selectedRows
+    },
+
+    clearSelectedUsers () {
+      this.selectedUserRowKeys = []
+      this.selectedUserRows = []
+    },
+
+    pruneSelectedUsers (visibleRows) {
+      if (!this.selectedUserRowKeys.length) return
+      const rowMap = new Map((visibleRows || []).map(row => [row.id, row]))
+      this.selectedUserRowKeys = this.selectedUserRowKeys.filter(id => rowMap.has(id))
+      this.selectedUserRows = this.selectedUserRowKeys.map(id => rowMap.get(id)).filter(Boolean)
     },
 
     showCreateModal () {
@@ -2491,6 +2561,43 @@ export default {
         }
       } catch (error) {
         this.$message.error('Delete failed')
+      }
+    },
+
+    async handleBatchBanUsers () {
+      const targets = this.batchBannableUsers
+      if (!targets.length) {
+        this.$message.warning(this.$t('userManage.batchBanNoValid') || 'Please select users that can be banned')
+        return
+      }
+
+      this.batchBanLoading = true
+      try {
+        const results = await Promise.allSettled(
+          targets.map(user => updateUser(user.id, { status: 'disabled' }))
+        )
+        const successCount = results.filter(result => {
+          return result.status === 'fulfilled' && result.value && result.value.code === 1
+        }).length
+        const failedCount = targets.length - successCount
+
+        if (successCount && !failedCount) {
+          const template = this.$t('userManage.batchBanSuccess') || 'Banned {count} users'
+          this.$message.success(String(template).replace('{count}', successCount))
+        } else if (successCount) {
+          const template = this.$t('userManage.batchBanPartial') || 'Banned {success} users, {failed} failed'
+          this.$message.warning(String(template).replace('{success}', successCount).replace('{failed}', failedCount))
+        } else {
+          this.$message.error(this.$t('userManage.batchBanFailed') || 'Batch ban failed')
+        }
+
+        this.clearSelectedUsers()
+        this.loadUsers()
+        this.loadUserStats(true)
+      } catch (error) {
+        this.$message.error(this.$t('userManage.batchBanFailed') || 'Batch ban failed')
+      } finally {
+        this.batchBanLoading = false
       }
     },
 
@@ -2961,6 +3068,25 @@ export default {
       flex-wrap: wrap;
       gap: 8px;
       align-items: center;
+
+      .toolbar-divider {
+        height: 24px;
+        margin: 0 4px;
+      }
+
+      .batch-selected-count {
+        display: inline-flex;
+        align-items: center;
+        height: 32px;
+        padding: 0 10px;
+        border: 1px solid color-mix(in srgb, var(--primary-color, #1890ff) 24%, transparent);
+        border-radius: 4px;
+        color: var(--primary-color, #1890ff);
+        background: color-mix(in srgb, var(--primary-color, #1890ff) 8%, transparent);
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
     }
 
     .toolbar-right {

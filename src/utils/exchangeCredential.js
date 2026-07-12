@@ -4,11 +4,7 @@ export const CRYPTO_EXCHANGE_DISPLAY_NAMES = {
   okx: 'OKX',
   bitget: 'Bitget',
   bybit: 'Bybit',
-  coinbaseexchange: 'Coinbase',
-  kraken: 'Kraken',
-  kucoin: 'KuCoin',
   gate: 'Gate.io',
-  bitfinex: 'Bitfinex',
   htx: 'HTX',
   alpaca: 'Alpaca',
   ibkr: 'IBKR'
@@ -19,12 +15,7 @@ export const CRYPTO_EXCHANGE_IDS = new Set([
   'okx',
   'bitget',
   'bybit',
-  'coinbaseexchange',
-  'coinbase_exchange',
-  'kraken',
-  'kucoin',
   'gate',
-  'bitfinex',
   'htx'
 ])
 
@@ -33,9 +24,6 @@ export const QUICK_TRADE_EXCHANGE_IDS = new Set([
   'okx',
   'bitget',
   'bybit',
-  'coinbaseexchange',
-  'coinbase_exchange',
-  'kraken',
   'gate',
   'htx'
 ])

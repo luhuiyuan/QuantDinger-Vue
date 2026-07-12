@@ -182,29 +182,30 @@ export default {
 .broker-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 4px 0;
+  gap: 16px;
+  padding: 2px 0;
 }
 .bp-status-card {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  padding: 16px 18px;
-  border-radius: 12px;
-  border: 1px solid #eef0f3;
-  background: linear-gradient(135deg, #ffffff 0%, #f7fafe 100%);
+  padding: 4px 0 20px;
+  border: 0;
+  border-bottom: 1px solid #e8edf3;
+  border-radius: 0;
+  background: transparent;
   &.is-connected {
-    border-color: rgba(82, 196, 26, 0.35);
-    background: linear-gradient(135deg, rgba(82, 196, 26, 0.06) 0%, #fff 60%);
+    border-bottom-color: #e8edf3;
+    background: transparent;
   }
 }
 .theme-dark .bp-status-card {
-  background: linear-gradient(135deg, #1f1f1f 0%, #181818 100%);
-  border-color: #303030;
+  background: transparent;
+  border-color: #30343a;
   &.is-connected {
-    border-color: rgba(115, 209, 61, 0.4);
-    background: linear-gradient(135deg, rgba(115, 209, 61, 0.08) 0%, #1f1f1f 60%);
+    border-color: #30343a;
+    background: transparent;
   }
 }
 .bp-status-left {
@@ -214,23 +215,23 @@ export default {
   min-width: 0;
 }
 .bp-status-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
   background: rgba(24, 144, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  i { font-size: 22px; }
+  i { font-size: 26px; }
 }
 .bp-status-meta {
   flex: 1;
   min-width: 0;
 }
 .bp-status-name {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 21px;
+  font-weight: 750;
   color: #1f1f1f;
   display: flex;
   align-items: center;
@@ -257,7 +258,7 @@ export default {
 .bp-badge { font-size: 11px; }
 .bp-status-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
   flex-shrink: 0;
 }
@@ -323,6 +324,31 @@ export default {
   border-color: color-mix(in srgb, var(--primary-color, #1890ff) 30%, transparent);
   color: rgba(255, 255, 255, 0.55);
   a { color: var(--primary-color, #1890ff); }
+}
+.theme-dark .bp-form-wrapper {
+  ::v-deep .broker-form .ant-form-item-label > label {
+    color: rgba(255, 255, 255, 0.62);
+  }
+
+  ::v-deep .broker-form .ant-input,
+  ::v-deep .broker-form .ant-input-password {
+    background: #141414 !important;
+    border-color: #303030 !important;
+    color: rgba(255, 255, 255, 0.86) !important;
+  }
+
+  ::v-deep .broker-form .ant-input-password .ant-input {
+    background: transparent !important;
+    border-color: transparent !important;
+  }
+
+  ::v-deep .broker-form .ant-input::placeholder {
+    color: rgba(255, 255, 255, 0.28);
+  }
+
+  ::v-deep .broker-form .ant-input-password-icon {
+    color: rgba(255, 255, 255, 0.45);
+  }
 }
 .bp-cloud-alert { margin-bottom: 0; }
 </style>

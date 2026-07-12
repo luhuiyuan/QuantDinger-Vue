@@ -129,6 +129,9 @@
             <a-button type="link" size="small" @click="$emit('view-in-market', record)">
               {{ $t('authorDashboard.viewInMarket') }}
             </a-button>
+            <a-button type="link" size="small" class="ad-danger-link" @click="confirmUnpublish(record)">
+              {{ $t('authorDashboard.unpublish') }}
+            </a-button>
           </template>
         </a-table>
       </a-tab-pane>
@@ -196,7 +199,7 @@ export default {
         { title: this.$t('authorDashboard.col.sales'), dataIndex: 'purchase_count', key: 'purchase_count', width: 80, align: 'right', sorter: (a, b) => a.purchase_count - b.purchase_count },
         { title: this.$t('authorDashboard.col.revenue'), dataIndex: 'revenue', key: 'revenue', width: 110, align: 'right', scopedSlots: { customRender: 'revenue' }, sorter: (a, b) => a.revenue - b.revenue },
         { title: this.$t('authorDashboard.col.rating'), dataIndex: 'avg_rating', key: 'avg_rating', width: 130, scopedSlots: { customRender: 'rating' } },
-        { title: this.$t('authorDashboard.col.actions'), key: 'actions', width: 180, scopedSlots: { customRender: 'actions' } }
+        { title: this.$t('authorDashboard.col.actions'), key: 'actions', width: 230, scopedSlots: { customRender: 'actions' } }
       ]
     },
     salesColumns () {
@@ -325,6 +328,35 @@ export default {
       this.salesIndicatorFilter = null
       this.loadSales(1)
     },
+    confirmUnpublish (record) {
+      if (!record || !record.id) return
+      this.$confirm({
+        title: this.$t('authorDashboard.unpublishConfirmTitle'),
+        content: this.$t('authorDashboard.unpublishConfirmContent'),
+        okText: this.$t('authorDashboard.unpublish'),
+        cancelText: this.$t('community.cancelEdit'),
+        okType: 'danger',
+        onOk: () => this.unpublishAsset(record)
+      })
+    },
+    async unpublishAsset (record) {
+      try {
+        const res = await request({
+          url: `/api/community/author/indicators/${record.id}/unpublish`,
+          method: 'post',
+          data: { note: '' }
+        })
+        if (res && res.code === 1) {
+          this.$message.success(this.$t('authorDashboard.unpublishSuccess'))
+          this.refreshAll()
+          return
+        }
+        this.$message.error((res && res.msg) || this.$t('authorDashboard.unpublishFailed'))
+      } catch (e) {
+        const msg = e && e.response && e.response.data && e.response.data.msg
+        this.$message.error(msg || this.$t('authorDashboard.unpublishFailed'))
+      }
+    },
     formatTime (iso) {
       if (!iso) return '—'
       try {
@@ -337,8 +369,7 @@ export default {
     },
     getAssetTypeText (assetType) {
       const type = assetType || 'indicator'
-      if (type === 'script_template') return this.$t('community.tabScriptTemplates')
-      if (type === 'bot_preset') return this.$t('community.tabBotPresets')
+      if (type === 'script_template' || type === 'bot_preset') return this.$t('community.tabScriptTemplates')
       return this.$t('community.tabIndicators')
     }
   }
@@ -477,6 +508,10 @@ export default {
 .ad-revenue {
   color: #fa8c16;
   font-weight: 600;
+}
+
+.ad-danger-link {
+  color: #ff4d4f;
 }
 
 .ad-buyer {

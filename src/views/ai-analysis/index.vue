@@ -432,6 +432,18 @@ class="analyze-button">
           </a-tab-pane>
         </a-tabs>
 
+        <div v-if="selectedMarketTab === 'Crypto'" class="crypto-source-row">
+          <a-select v-model="cryptoExchangeId" @change="handleCryptoSourceChange">
+            <a-select-option v-for="exchangeId in cryptoExchangeIds" :key="exchangeId" :value="exchangeId">
+              {{ exchangeId.toUpperCase() }}
+            </a-select-option>
+          </a-select>
+          <a-select v-model="cryptoMarketType" @change="handleCryptoSourceChange">
+            <a-select-option value="spot">{{ $t('marketContext.spot') }}</a-select-option>
+            <a-select-option value="swap">{{ $t('marketContext.swap') }}</a-select-option>
+          </a-select>
+        </div>
+
         <!-- Search/input -->
         <div class="symbol-search-section">
           <a-input-search
@@ -483,8 +495,8 @@ class="analyze-button">
                   <div class="symbol-item-content">
                     <span class="symbol-code">{{ item.symbol }}</span>
                     <span class="symbol-name">{{ item.name }}</span>
-                    <a-tag v-if="item.exchange" size="small" color="blue" style="margin-left: 8px;">
-                      {{ item.exchange }}
+                    <a-tag v-if="item.exchange_id || item.exchange" size="small" color="gold" style="margin-left: 8px;">
+                      {{ String(item.exchange_id || item.exchange).toUpperCase() }} · {{ $t(`marketContext.${item.market_type || 'spot'}`) }}
                     </a-tag>
                   </div>
                 </template>
@@ -526,6 +538,7 @@ class="analyze-button">
         <!-- Selected symbol -->
         <div v-if="selectedSymbolForAdd" class="selected-symbol-section">
           <a-alert
+            class="selected-symbol-alert"
             :message="$t('dashboard.analysis.modal.addStock.selectedSymbol')"
             type="info"
             show-icon
@@ -539,6 +552,9 @@ class="analyze-button">
                 </a-tag>
                 <strong>{{ selectedSymbolForAdd.symbol }}</strong>
                 <span v-if="selectedSymbolForAdd.name" style="color: #999; margin-left: 8px;">{{ selectedSymbolForAdd.name }}</span>
+                <a-tag v-if="selectedSymbolForAdd.market === 'Crypto'" color="gold" style="margin-left: 8px;">
+                  {{ String(selectedSymbolForAdd.exchange_id || cryptoExchangeId).toUpperCase() }} · {{ $t(`marketContext.${selectedSymbolForAdd.market_type || cryptoMarketType}`) }}
+                </a-tag>
               </div>
             </template>
           </a-alert>
@@ -743,7 +759,7 @@ class="analyze-button">
                       :color="item.decision === 'BUY' ? 'green' : (item.decision === 'SELL' ? 'red' : 'blue')"
                       style="margin-left: 12px;"
                     >
-                      {{ item.decision }}
+                      {{ formatDecisionLabel(item.decision) }}
                     </a-tag>
                     <a-tag :color="getStatusColor(item.status || 'completed')" style="margin-left: 8px;">
                       {{ getStatusText(item.status || 'completed') }}
@@ -783,7 +799,7 @@ class="analyze-button">
               <template slot="description">
                 <div style="color: #666; font-size: 12px;">
                   <span v-if="item.price">${{ formatNumber(item.price) }}</span>
-                  <span v-if="item.summary" style="margin-left: 8px;">{{ item.summary.substring(0, 80) }}{{ item.summary.length > 80 ? '...' : '' }}</span>
+                  <span v-if="item.summary" style="margin-left: 8px;">{{ formatHistorySummary(item.summary) }}</span>
                 </div>
                 <div v-if="item.created_at" style="color: #999; font-size: 12px; margin-top: 4px;">
                   {{ formatIsoTime(item.created_at) }}
@@ -809,6 +825,7 @@ import FastAnalysisReport from './components/FastAnalysisReport.vue'
 import CopilotWorkbench from './components/CopilotWorkbench.vue'
 import sessionCache from '@/utils/sessionCache'
 import { loadEnabledMarketOptions, firstMarketValue } from '@/utils/marketModules'
+import { CRYPTO_EXCHANGE_IDS } from '@/utils/marketContext'
 
 // Cache only the context panels that remain on the default AI analysis screen.
 // Market heatmaps and global index tickers are not loaded by default because
@@ -889,6 +906,9 @@ export default {
       taskPollingStartedAt: 0,
       marketTypes: [],
       selectedMarketTab: '',
+      cryptoExchangeId: 'binance',
+      cryptoMarketType: 'spot',
+      cryptoExchangeIds: CRYPTO_EXCHANGE_IDS,
       symbolSearchKeyword: '',
       symbolSearchResults: [],
       searchingSymbols: false,
@@ -896,6 +916,7 @@ export default {
       loadingHotSymbols: false,
       selectedSymbolForAdd: null,
       searchTimer: null,
+      symbolSearchRequestId: 0,
       hasSearched: false,
       positions: [],
       monitors: [],
@@ -1819,6 +1840,32 @@ export default {
       if (Number.isNaN(x)) return String(n)
       return Number.isInteger(x) ? String(x) : x.toFixed(2)
     },
+    formatDecisionLabel (decision) {
+      const d = String(decision || 'HOLD').toUpperCase()
+      if (d === 'BUY') return this.$t('fastAnalysis.outlookBull')
+      if (d === 'SELL') return this.$t('fastAnalysis.outlookBear')
+      return this.$t('fastAnalysis.outlookNeutral')
+    },
+    neutralizeDecisionText (text) {
+      if (text === undefined || text === null) return ''
+      const buy = this.formatDecisionLabel('BUY')
+      const sell = this.formatDecisionLabel('SELL')
+      const hold = this.formatDecisionLabel('HOLD')
+      return String(text)
+        .replace(/建议\s*BUY/gi, `倾向${buy}`)
+        .replace(/建议\s*SELL/gi, `倾向${sell}`)
+        .replace(/建议\s*HOLD/gi, `倾向${hold}`)
+        .replace(/suggested\s+decision\s+BUY/gi, `outlook ${buy}`)
+        .replace(/suggested\s+decision\s+SELL/gi, `outlook ${sell}`)
+        .replace(/suggested\s+decision\s+HOLD/gi, `outlook ${hold}`)
+        .replace(/\bBUY\b/gi, buy)
+        .replace(/\bSELL\b/gi, sell)
+        .replace(/\bHOLD\b/gi, hold)
+    },
+    formatHistorySummary (summary) {
+      const text = this.neutralizeDecisionText(summary)
+      return `${text.substring(0, 80)}${text.length > 80 ? '...' : ''}`
+    },
     async refreshUserInfoFromServer () {
       try {
         const res = await getUserInfo()
@@ -1846,7 +1893,7 @@ export default {
         take_profit: tp.take_profit || tp.takeProfit || ''
       }
       Object.keys(query).forEach(k => { if (!query[k] && query[k] !== 0) delete query[k] })
-      this.$router.push({ path: '/strategy-live', query })
+      this.$router.push({ path: '/strategy-center', query })
     },
     handleGoBacktest (result) {
       const market = result.market || (this.selectedSymbol ? this.selectedSymbol.split(':')[0] : '')
@@ -2217,7 +2264,15 @@ export default {
           userid: this.userId,
           market: market,
           symbol: symbol,
-          name: name
+          name: name,
+          exchange_id: market === 'Crypto'
+            ? (this.selectedSymbolForAdd?.exchange_id || this.cryptoExchangeId)
+            : '',
+          market_type: market === 'Crypto'
+            ? (this.selectedSymbolForAdd?.market_type || this.cryptoMarketType)
+            : 'spot',
+          instrument_id: this.selectedSymbolForAdd?.instrument_id || '',
+          settle_currency: this.selectedSymbolForAdd?.settle_currency || ''
         })
         if (res && res.code === 1) {
           this.$message.success(this.$t('dashboard.analysis.message.addStockSuccess'))
@@ -2234,6 +2289,8 @@ export default {
       }
     },
     handleCloseAddStockModal () {
+      this.symbolSearchRequestId += 1
+      this.searchingSymbols = false
       this.showAddStockModal = false
       this.selectedSymbolForAdd = null
       this.symbolSearchKeyword = ''
@@ -2248,6 +2305,14 @@ export default {
       this.selectedSymbolForAdd = null
       this.hasSearched = false
       this.loadHotSymbols(activeKey)
+    },
+    handleCryptoSourceChange () {
+      this.symbolSearchResults = []
+      this.selectedSymbolForAdd = null
+      this.hasSearched = false
+      if (this.symbolSearchKeyword && this.symbolSearchKeyword.trim()) {
+        this.searchSymbolsInModal(this.symbolSearchKeyword)
+      }
     },
     // Triggered by the inline mismatch-hint's "Switch to <market>" button.
     // Keeps the keyword the user already typed so they don't have to retype
@@ -2281,6 +2346,8 @@ export default {
       }
 
       if (!keyword || keyword.trim() === '') {
+        this.symbolSearchRequestId += 1
+        this.searchingSymbols = false
         this.symbolSearchResults = []
         this.hasSearched = false
         this.selectedSymbolForAdd = null
@@ -2289,10 +2356,17 @@ export default {
 
       this.searchTimer = setTimeout(() => {
         this.searchSymbolsInModal(keyword)
-      }, 500)
+      }, 250)
     },
     handleSearchOrInput (keyword) {
       if (!keyword || !keyword.trim()) return
+
+      if (this.searchTimer) {
+        clearTimeout(this.searchTimer)
+        this.searchTimer = null
+      }
+
+      if (this.searchingSymbols) return
 
       if (!this.selectedMarketTab) {
         this.$message.warning(this.$t('dashboard.analysis.modal.addStock.pleaseSelectMarket'))
@@ -2319,14 +2393,31 @@ export default {
         return
       }
 
+      const requestId = ++this.symbolSearchRequestId
       this.searchingSymbols = true
       this.hasSearched = true
       try {
-        const res = await searchSymbols({
+        const params = {
           market: this.selectedMarketTab,
           keyword: keyword.trim(),
-          limit: 20
-        })
+          limit: 20,
+          exchange_id: this.selectedMarketTab === 'Crypto' ? this.cryptoExchangeId : undefined,
+          market_type: this.selectedMarketTab === 'Crypto' ? this.cryptoMarketType : undefined
+        }
+        let res = await searchSymbols(params)
+        if (requestId !== this.symbolSearchRequestId) return
+        if (
+          this.selectedMarketTab === 'Crypto' &&
+          this.cryptoMarketType === 'spot' &&
+          !(res && res.code === 1 && Array.isArray(res.data) && res.data.length)
+        ) {
+          const swapRes = await searchSymbols({ ...params, market_type: 'swap' })
+          if (requestId !== this.symbolSearchRequestId) return
+          if (swapRes && swapRes.code === 1 && Array.isArray(swapRes.data) && swapRes.data.length) {
+            this.cryptoMarketType = 'swap'
+            res = swapRes
+          }
+        }
         if (res && res.code === 1 && res.data && res.data.length > 0) {
           const usable = res.data.filter(this.isUsableSymbolSearchResult)
           this.symbolSearchResults = usable
@@ -2350,7 +2441,9 @@ export default {
             this.selectedSymbolForAdd = {
               market: this.selectedMarketTab,
               symbol: candidate,
-              name: ''
+              name: '',
+              exchange_id: this.selectedMarketTab === 'Crypto' ? this.cryptoExchangeId : '',
+              market_type: this.selectedMarketTab === 'Crypto' ? this.cryptoMarketType : 'spot'
             }
           }
         }
@@ -2367,11 +2460,15 @@ export default {
           this.selectedSymbolForAdd = {
             market: this.selectedMarketTab,
             symbol: candidate,
-            name: ''
+            name: '',
+            exchange_id: this.selectedMarketTab === 'Crypto' ? this.cryptoExchangeId : '',
+            market_type: this.selectedMarketTab === 'Crypto' ? this.cryptoMarketType : 'spot'
           }
         }
       } finally {
-        this.searchingSymbols = false
+        if (requestId === this.symbolSearchRequestId) {
+          this.searchingSymbols = false
+        }
       }
     },
     handleDirectAdd () {
@@ -2396,14 +2493,20 @@ export default {
       this.selectedSymbolForAdd = {
         market: this.selectedMarketTab,
         symbol: candidate,
-        name: ''
+        name: '',
+        exchange_id: this.selectedMarketTab === 'Crypto' ? this.cryptoExchangeId : '',
+        market_type: this.selectedMarketTab === 'Crypto' ? this.cryptoMarketType : 'spot'
       }
     },
     selectSymbol (symbol) {
       this.selectedSymbolForAdd = {
         market: symbol.market,
         symbol: symbol.symbol,
-        name: symbol.name || symbol.symbol
+        name: symbol.name || symbol.symbol,
+        exchange_id: symbol.exchange_id || '',
+        market_type: symbol.market_type || 'spot',
+        instrument_id: symbol.instrument_id || '',
+        settle_currency: symbol.settle_currency || ''
       }
     },
     isUsableSymbolSearchResult (item) {
@@ -2448,7 +2551,10 @@ export default {
         const res = await removeWatchlist({
           userid: this.userId,
           symbol: symbol,
-          market: market
+          market: market,
+          exchange_id: typeof stock === 'object' ? stock.exchange_id : '',
+          market_type: typeof stock === 'object' ? stock.market_type : '',
+          instrument_id: typeof stock === 'object' ? stock.instrument_id : ''
         })
         if (res && res.code === 1) {
           this.$message.success(this.$t('dashboard.analysis.message.removeStockSuccess'))
@@ -4137,6 +4243,12 @@ export default {
 /* Add Stock Modal */
 .add-stock-modal-content {
   .market-tabs { margin-bottom: 16px; }
+  .crypto-source-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
   .symbol-search-section { margin-bottom: 24px; }
   .market-mismatch-hint {
     margin-top: 8px;
@@ -4347,6 +4459,14 @@ export default {
   .ant-alert { background: rgba(24,144,255,0.06); border-color: #2a2a2a; }
   .ant-alert-message { color: #d4d4d4; }
   .ant-alert-info .ant-alert-icon { color: var(--primary-color, #1890ff); }
+  .selected-symbol-alert.ant-alert-info {
+    background: color-mix(in srgb, var(--primary-color, #faad14) 10%, #141414);
+    border-color: color-mix(in srgb, var(--primary-color, #faad14) 38%, #2a2a2a);
+  }
+  .selected-symbol-alert.ant-alert-info .ant-alert-icon,
+  .selected-symbol-alert.ant-alert-info .ant-alert-message {
+    color: var(--primary-color, #faad14);
+  }
   .ant-list-item { border-bottom-color: #2a2a2a; color: #d4d4d4; }
   .ant-list-item-meta-title { color: #d4d4d4; }
   .ant-list-item-meta-description { color: #888; }
@@ -4409,6 +4529,9 @@ body.colorWeak .ant-select-dropdown,
   .ant-select-dropdown-menu-item { color: #d4d4d4; }
   .ant-select-dropdown-menu-item:hover { background: #252525; }
   .ant-select-dropdown-menu-item-active { background: #252525; }
-  .ant-select-dropdown-menu-item-selected { background: rgba(24,144,255,0.1); color: var(--primary-color, #1890ff); }
+  .ant-select-dropdown-menu-item-selected {
+    background: color-mix(in srgb, var(--primary-color, #faad14) 12%, #1c1c1c);
+    color: var(--primary-color, #faad14);
+  }
 }
 </style>

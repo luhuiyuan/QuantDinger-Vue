@@ -102,21 +102,21 @@ export default {
 .qd-account-trigger {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
   height: 64px !important;
-  margin-right: 18px;
-  padding: 0 6px !important;
+  margin-right: 8px;
+  padding: 0 4px !important;
   line-height: normal !important;
   vertical-align: top;
 
   .account-identity {
     display: inline-flex;
     align-items: center;
-    gap: 9px;
+    gap: 7px;
     min-width: 0;
     height: 32px;
-    padding: 0 9px 0 4px;
+    padding: 0 7px 0 3px;
     border-radius: 9px;
     line-height: 32px;
     cursor: pointer;
@@ -135,7 +135,7 @@ export default {
   }
 
   .account-name {
-    max-width: 120px;
+    max-width: 104px;
     overflow: hidden;
     color: rgba(15, 23, 42, 0.86);
     font-size: 13px;
@@ -150,7 +150,7 @@ export default {
     justify-content: center;
     gap: 6px;
     height: 32px;
-    padding: 0 11px;
+    padding: 0 9px;
     border: 1px solid color-mix(in srgb, var(--primary-color, #1890ff) 18%, transparent);
     border-radius: 9px;
     background: color-mix(in srgb, var(--primary-color, #1890ff) 5%, #fff);
@@ -183,7 +183,7 @@ export default {
     align-items: center;
     justify-content: center;
     height: 32px;
-    padding: 0 15px;
+    padding: 0 12px;
     border-radius: 9px;
     font-size: 12px;
     font-weight: 600;

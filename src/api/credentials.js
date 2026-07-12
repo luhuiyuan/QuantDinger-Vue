@@ -2,7 +2,6 @@ import request from '@/utils/request'
 
 const api = {
   list: '/api/credentials/list',
-  get: '/api/credentials/get',
   create: '/api/credentials/create',
   delete: '/api/credentials/delete',
   updateName: '/api/credentials/update-name',
@@ -15,14 +14,6 @@ export function listExchangeCredentials (params = {}) {
     url: api.list,
     method: 'get',
     params
-  })
-}
-
-export function getExchangeCredential (id, params = {}) {
-  return request({
-    url: api.get,
-    method: 'get',
-    params: { id, ...params }
   })
 }
 

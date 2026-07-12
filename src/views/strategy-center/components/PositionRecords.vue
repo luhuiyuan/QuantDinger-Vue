@@ -8,8 +8,12 @@
         show-icon
         :message="reconciliationMessage"
       />
-      <div v-if="positions.length === 0 && !loading" class="empty-state strategy-tab-empty">
-        <a-empty :description="$t('trading-assistant.table.noPositions')" />
+      <div v-if="positions.length === 0 && !loading" class="empty-state strategy-tab-empty" :class="{ 'is-compact': compact }">
+        <template v-if="compact">
+          <a-icon type="inbox" />
+          <span>{{ $t('trading-assistant.table.noPositions') }}</span>
+        </template>
+        <a-empty v-else :image="false" :description="$t('trading-assistant.table.noPositions')" />
       </div>
       <a-table
         v-else
@@ -60,6 +64,22 @@
             {{ formatPercent(record.strategy_capital_pnl_percent || text) }}
           </span>
         </template>
+        <template slot="priceSummary" slot-scope="text, record">
+          <span class="position-price-summary">
+            <span>{{ formatPrice(record.entry_price) }}</span>
+            <a-icon type="arrow-right" />
+            <strong>{{ formatPrice(record.current_price) }}</strong>
+          </span>
+        </template>
+        <template slot="pnlSummary" slot-scope="text, record">
+          <span class="position-pnl-summary" :class="pnlClass(record.unrealized_pnl)">
+            <strong>{{ formatSignedMoney(record.unrealized_pnl) }}</strong>
+            <small>{{ formatPercent(record.position_margin_pnl_percent) }}</small>
+          </span>
+        </template>
+        <template slot="leverage">
+          <strong class="position-leverage">{{ effectiveLeverage }}x</strong>
+        </template>
       </a-table>
     </div>
   </div>
@@ -87,6 +107,10 @@ export default {
     leverage: {
       type: [Number, String],
       default: 1
+    },
+    compact: {
+      type: Boolean,
+      default: false
     },
     loading: {
       type: Boolean,
@@ -127,6 +151,56 @@ export default {
       return messageKeys[status] ? `${this.$t(messageKeys[status])}${detail}` : ''
     },
     columns () {
+      if (this.compact) {
+        return [
+          {
+            title: this.$t('trading-assistant.table.symbol'),
+            dataIndex: 'symbol',
+            key: 'symbol',
+            width: 120,
+            scopedSlots: { customRender: 'symbol' }
+          },
+          {
+            title: this.$t('trading-assistant.table.side'),
+            dataIndex: 'side',
+            key: 'side',
+            width: 84,
+            scopedSlots: { customRender: 'side' }
+          },
+          {
+            title: this.$t('trading-assistant.table.size'),
+            dataIndex: 'size',
+            key: 'size',
+            width: 118,
+            scopedSlots: { customRender: 'size' }
+          },
+          {
+            title: this.$t('trading-assistant.table.notional'),
+            dataIndex: 'notional',
+            key: 'notional',
+            width: 132,
+            scopedSlots: { customRender: 'notional' }
+          },
+          {
+            title: `${this.$t('trading-assistant.table.entryPrice')} / ${this.$t('trading-assistant.table.currentPrice')}`,
+            key: 'price_summary',
+            width: 190,
+            scopedSlots: { customRender: 'priceSummary' }
+          },
+          {
+            title: `${this.$t('trading-assistant.table.unrealizedPnl')} / ${this.$t('trading-assistant.table.positionRoi')}`,
+            key: 'pnl_summary',
+            width: 170,
+            scopedSlots: { customRender: 'pnlSummary' }
+          },
+          {
+            title: this.$t('trading-assistant.form.leverage'),
+            key: 'leverage',
+            width: 86,
+            scopedSlots: { customRender: 'leverage' }
+          }
+        ]
+      }
       return [
         {
           title: this.$t('trading-assistant.table.symbol'),
@@ -150,7 +224,7 @@ export default {
           scopedSlots: { customRender: 'size' }
         },
         {
-          title: this.$t('trading-assistant.table.notional') || 'Value (USDT)',
+          title: this.$t('trading-assistant.table.notional'),
           dataIndex: 'notional',
           key: 'notional',
           width: 130,
@@ -192,6 +266,11 @@ export default {
           scopedSlots: { customRender: 'capitalContribution' }
         }
       ]
+    },
+    effectiveLeverage () {
+      if (String(this.marketType || '').toLowerCase() === 'spot') return 1
+      const parsed = parseFloat(this.leverage)
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
     }
   },
   watch: {
@@ -280,6 +359,15 @@ export default {
       const parsed = this.safeNumber(value)
       return `${(Number.isFinite(parsed) ? parsed : 0).toFixed(2)}%`
     },
+    formatPrice (value) {
+      const parsed = this.safeNumber(value)
+      return Number.isFinite(parsed) && parsed > 0 ? parsed.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '--'
+    },
+    formatSignedMoney (value) {
+      const parsed = this.safeNumber(value)
+      const amount = Number.isFinite(parsed) ? parsed : 0
+      return `${amount > 0 ? '+' : amount < 0 ? '-' : ''}$${Math.abs(amount).toFixed(2)}`
+    },
     pnlClass (value) {
       const parsed = this.safeNumber(value)
       return {
@@ -337,6 +425,16 @@ export default {
     border-radius: 8px;
     background: #fafafa;
     border: 1px solid #f0f0f0;
+  }
+
+  .empty-state.is-compact {
+    flex-direction: column;
+    gap: 8px;
+    min-height: 112px;
+    padding: 24px 16px;
+    color: #8b95a3;
+
+    > .anticon { font-size: 22px; }
   }
 
   &.theme-dark .empty-state {
@@ -422,6 +520,41 @@ export default {
   .loss {
     color: @danger-color;
     font-weight: 700;
+  }
+
+  .position-price-summary,
+  .position-pnl-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .position-price-summary {
+    color: #64748b;
+
+    .anticon { color: #94a3b8; font-size: 10px; }
+    strong { color: #273244; font-weight: 650; }
+  }
+
+  .position-pnl-summary {
+    small { font-size: 11px; font-weight: 650; opacity: .82; }
+  }
+
+  .position-leverage {
+    color: #9a6b00;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.theme-dark {
+    .position-price-summary {
+      color: #8f98a5;
+
+      strong { color: #e0e4e9; }
+    }
+
+    .position-leverage { color: #d9a928; }
   }
 }
 </style>

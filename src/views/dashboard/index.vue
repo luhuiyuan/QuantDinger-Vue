@@ -30,7 +30,7 @@
             <span class="kpi-icon">
               <a-icon type="trophy" />
             </span>
-            <span class="kpi-label">{{ $t('dashboard.winRate') || '胜率' }}</span>
+            <span class="kpi-label">{{ $t('dashboard.winRate') }}</span>
           </div>
           <div class="kpi-value">
             <span class="amount">{{ formatNumber(performance.win_rate, 1) }}</span>
@@ -65,7 +65,7 @@
             <span class="kpi-icon">
               <a-icon type="rise" />
             </span>
-            <span class="kpi-label">{{ $t('dashboard.profitFactor') || '盈亏比' }}</span>
+            <span class="kpi-label">{{ $t('dashboard.profitFactor') }}</span>
           </div>
           <div class="kpi-value">
             <span class="amount">{{ formatNumber(performance.profit_factor, 2) }}</span>
@@ -84,7 +84,7 @@
             <span class="kpi-icon">
               <a-icon type="fall" />
             </span>
-            <span class="kpi-label">{{ $t('dashboard.maxDrawdown') || '最大回撤' }}</span>
+            <span class="kpi-label">{{ $t('dashboard.maxDrawdown') }}</span>
           </div>
           <div class="kpi-value">
             <span class="amount negative">{{ formatNumber(performance.max_drawdown_pct, 1) }}</span>
@@ -102,7 +102,7 @@
             <span class="kpi-icon">
               <a-icon type="swap" />
             </span>
-            <span class="kpi-label">{{ $t('dashboard.totalTrades') || '总交易' }}</span>
+            <span class="kpi-label">{{ $t('dashboard.totalTrades') }}</span>
           </div>
           <div class="kpi-value">
             <span class="amount">{{ performance.total_trades }}</span>
@@ -122,17 +122,13 @@
             <span class="kpi-icon">
               <a-icon type="thunderbolt" theme="filled" />
             </span>
-            <span class="kpi-label">{{ $t('dashboard.runningStrategies') || '运行中策略' }}</span>
+            <span class="kpi-label">{{ $t('dashboard.runningStrategies') }}</span>
           </div>
           <div class="kpi-value">
-            <span class="amount">{{ summary.running_strategy_count != null ? summary.running_strategy_count : summary.indicator_strategy_count }}</span>
+            <span class="amount">{{ summary.running_strategy_count || 0 }}</span>
             <span class="unit">{{ $t('dashboard.unit.strategies') }}</span>
           </div>
           <div class="kpi-sub kpi-sub--types">
-            <span class="type-pill type-pill--signal">
-              <em>{{ summary.running_indicator_count != null ? summary.running_indicator_count : 0 }}</em>
-              {{ $t('dashboard.label.indicator') }}
-            </span>
             <span class="type-pill type-pill--script">
               <em>{{ summary.running_script_count || 0 }}</em>
               {{ $t('dashboard.label.script') }}
@@ -172,7 +168,7 @@
         <div class="panel-header">
           <div class="panel-title">
             <a-icon type="calendar" />
-            <span>{{ $t('dashboard.profitCalendar') || '收益日曆' }}</span>
+            <span>{{ $t('dashboard.profitCalendar') }}</span>
           </div>
           <div class="calendar-nav">
             <a-button type="link" size="small" @click="prevMonth" :disabled="currentCalendarIndex >= calendarMonths.length - 1">
@@ -240,7 +236,7 @@
         <div class="panel-header">
           <div class="panel-title">
             <a-icon type="pie-chart" />
-            <span>{{ $t('dashboard.strategyAllocation') || '策略分布' }}</span>
+            <span>{{ $t('dashboard.strategyAllocation') }}</span>
           </div>
         </div>
         <div ref="pieChart" class="chart-body"></div>
@@ -252,7 +248,7 @@
         <div class="panel-header">
           <div class="panel-title">
             <a-icon type="area-chart" />
-            <span>{{ $t('dashboard.drawdownCurve') || '回撤曲线' }}</span>
+            <span>{{ $t('dashboard.drawdownCurve') }}</span>
           </div>
         </div>
         <div ref="drawdownChart" class="chart-body chart-sm"></div>
@@ -262,7 +258,7 @@
         <div class="panel-header">
           <div class="panel-title">
             <a-icon type="clock-circle" />
-            <span>{{ $t('dashboard.hourlyDistribution') || '交易时段' }}</span>
+            <span>{{ $t('dashboard.hourlyDistribution') }}</span>
           </div>
         </div>
         <div ref="hourlyChart" class="chart-body chart-sm"></div>
@@ -273,7 +269,7 @@
       <div class="panel-header">
         <div class="panel-title">
           <a-icon type="ordered-list" />
-          <span>{{ $t('dashboard.strategyRanking') || '策略排行榜' }}</span>
+          <span>{{ $t('dashboard.strategyRanking') }}</span>
         </div>
       </div>
       <div class="strategy-ranking">
@@ -291,7 +287,7 @@
             <div class="rank-badge" :class="`rank-${idx + 1}`">{{ idx + 1 }}</div>
             <div class="rank-info">
               <div class="rank-name">
-                <span class="rank-type-tag" :class="`rank-type-tag--${s.strategy_bucket || 'signal'}`">
+                <span class="rank-type-tag" :class="`rank-type-tag--${s.strategy_bucket || 'script'}`">
                   {{ strategyBucketLabel(s.strategy_bucket) }}
                 </span>
                 {{ s.strategy_name }}
@@ -532,7 +528,6 @@ export default {
     return {
       summary: {
         ai_strategy_count: 0,
-        indicator_strategy_count: 0,
         total_equity: 0,
         total_pnl: 0,
         total_realized_pnl: 0,
@@ -580,11 +575,7 @@ export default {
       return this.summary.strategy_stats || []
     },
     showSetupGuide () {
-      const runningStrategies = Number(
-        this.summary.running_strategy_count != null
-          ? this.summary.running_strategy_count
-          : this.summary.indicator_strategy_count || 0
-      )
+      const runningStrategies = Number(this.summary.running_strategy_count || 0)
       const hasPositions = Array.isArray(this.summary.current_positions) && this.summary.current_positions.length > 0
       const hasTrades = Array.isArray(this.summary.recent_trades) && this.summary.recent_trades.length > 0
       return runningStrategies === 0 || (!hasPositions && !hasTrades)
@@ -780,14 +771,13 @@ export default {
     },
     strategyBucketLabel (bucket) {
       const map = {
-        signal: this.$t('dashboard.label.indicator'),
         script: this.$t('dashboard.label.script'),
         bot: this.$t('dashboard.label.bot')
       }
-      return map[String(bucket || 'signal')] || map.signal
+      return map[String(bucket || 'script')] || map.script
     },
     goToStrategyCreate () {
-      this.$router.push({ path: '/strategy-live', query: { tab: 'strategy', mode: 'create' } }).catch(() => {})
+      this.$router.push({ path: '/strategy-center', query: { mode: 'create' } }).catch(() => {})
     },
     async fetchData () {
       try {
@@ -1248,7 +1238,7 @@ export default {
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                   <span style="display:flex;align-items:center;gap:8px;">
                     <span style="width:10px;height:10px;border-radius:2px;background:linear-gradient(180deg,#f87171,#dc2626);"></span>
-                    <span style="color:${textColor}">${this.$t('dashboard.drawdown') || 'Drawdown'}</span>
+                    <span style="color:${textColor}">${this.$t('dashboard.drawdown')}</span>
                   </span>
                   <span style="font-weight:700;color:#ef4444;font-family:monospace;">-$${vStr}</span>
                 </div>
@@ -1288,7 +1278,7 @@ export default {
         },
         series: [
           {
-            name: this.$t('dashboard.drawdown') || 'Drawdown',
+            name: this.$t('dashboard.drawdown'),
             type: 'line',
             data: dd,
             smooth: 0.3,
@@ -1327,10 +1317,10 @@ export default {
                 color: '#fff',
                 fontSize: 10,
                 fontWeight: 'bold',
-                formatter: () => this.$t('dashboard.label.maxDrawdownPoint') || 'MAX'
+                formatter: () => this.$t('dashboard.label.maxDrawdownPoint')
               },
               data: [{
-                name: this.$t('dashboard.maxDrawdown') || 'Max Drawdown',
+                name: this.$t('dashboard.maxDrawdown'),
                 coord: [maxDdIndex, maxDdValue]
               }]
             } : undefined,
@@ -1372,9 +1362,9 @@ export default {
             const hour = (arr[0] && arr[0].axisValue) ? arr[0].axisValue : ''
             let count = 0
             let profit = 0
-            const tradeCountLabel = this.$t('dashboard.tradeCount') || 'Trade Count'
-            const profitLabel = this.$t('dashboard.profit') || 'Profit'
-            const unitLabel = this.$t('dashboard.unit.trades') || ''
+            const tradeCountLabel = this.$t('dashboard.tradeCount')
+            const profitLabel = this.$t('dashboard.profit')
+            const unitLabel = this.$t('dashboard.unit.trades')
             for (const p of arr) {
               if (p.seriesName === tradeCountLabel) count = p.data || 0
               if (p.seriesName === profitLabel) profit = p.data || 0
@@ -1411,7 +1401,7 @@ export default {
         },
         series: [
           {
-            name: this.$t('dashboard.tradeCount') || 'Trade Count',
+            name: this.$t('dashboard.tradeCount'),
             type: 'bar',
             data: counts,
             barMaxWidth: 16,
@@ -1424,7 +1414,7 @@ export default {
             }
           },
           {
-            name: this.$t('dashboard.profit') || 'Profit',
+            name: this.$t('dashboard.profit'),
             type: 'line',
             data: profits,
             smooth: true,

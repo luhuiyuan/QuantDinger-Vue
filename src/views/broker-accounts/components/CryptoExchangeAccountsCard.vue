@@ -197,11 +197,7 @@ const DISPLAY_NAMES = {
   okx: 'OKX',
   bitget: 'Bitget',
   bybit: 'Bybit',
-  coinbaseexchange: 'Coinbase',
-  kraken: 'Kraken',
-  kucoin: 'KuCoin',
   gate: 'Gate.io',
-  bitfinex: 'Bitfinex',
   htx: 'HTX'
 }
 
@@ -210,11 +206,7 @@ const ICON_COLORS = {
   okx: '#000',
   bitget: '#00D1FF',
   bybit: '#F7A600',
-  coinbaseexchange: '#1652F0',
-  kraken: '#5741D9',
-  kucoin: '#24AE8F',
   gate: '#17E1A4',
-  bitfinex: '#16B157',
   htx: '#1B2C3B'
 }
 
@@ -301,6 +293,15 @@ export default {
     this.loadCredentials()
   },
   methods: {
+    emitSummary () {
+      this.$emit('summary-change', {
+        items: this.filteredItems.map(item => ({
+          id: item.id,
+          exchange_id: item.exchange_id,
+          name: item.name || ''
+        }))
+      })
+    },
     exchangeDisplayName (id) {
       return getExchangeDisplayName(id) || DISPLAY_NAMES[id] || (id ? id.toUpperCase() : '--')
     },
@@ -382,6 +383,7 @@ export default {
         this.items = []
       } finally {
         this.loading = false
+        this.emitSummary()
       }
     },
     openAddModal () {
@@ -466,6 +468,19 @@ export default {
 .crypto-card.theme-dark {
   background: #1f1f1f;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+
+  ::v-deep .ant-btn:not(.ant-btn-primary):not(.ant-btn-danger):not(.ant-btn-link) {
+    background: #262626;
+    border-color: #3a3a3a;
+    color: rgba(255, 255, 255, 0.76);
+  }
+
+  ::v-deep .ant-btn:not(.ant-btn-primary):not(.ant-btn-danger):not(.ant-btn-link):hover,
+  ::v-deep .ant-btn:not(.ant-btn-primary):not(.ant-btn-danger):not(.ant-btn-link):focus {
+    border-color: var(--primary-color, #1890ff);
+    color: var(--primary-color, #1890ff);
+    background: color-mix(in srgb, var(--primary-color, #1890ff) 10%, #262626);
+  }
 }
 .crypto-card-header {
   display: flex;
@@ -517,6 +532,10 @@ export default {
   padding: 32px 16px;
   color: #8c8c8c;
   i { font-size: 28px; color: #d9d9d9; display: block; margin-bottom: 10px; }
+}
+.crypto-card.theme-dark .crypto-empty {
+  color: rgba(255, 255, 255, 0.5);
+  i { color: rgba(255, 255, 255, 0.25); }
 }
 .crypto-empty-text { font-size: 13px; margin-bottom: 6px; }
 .crypto-grid {

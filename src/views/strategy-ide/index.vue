@@ -1,319 +1,389 @@
 <template>
   <div class="strategy-ide-shell" :class="{ 'theme-dark': isDarkTheme }">
-    <div class="strategy-ide-tabs">
-      <a-tabs v-model="activeMode" :animated="false" size="large">
-        <a-tab-pane key="indicator">
-          <span slot="tab"><a-icon type="line-chart" /> {{ text.indicator }}</span>
-          <indicator-ide />
-        </a-tab-pane>
-
-        <a-tab-pane key="script">
-          <span slot="tab"><a-icon type="code" /> {{ text.script }}</span>
-
-          <div class="script-workspace">
-            <section class="script-panel script-panel--editor">
-              <strategy-editor
-                ref="scriptEditor"
-                :key="scriptEditorKey"
-                v-model="scriptCode"
-                :is-dark="isDarkTheme"
-                :visible="activeMode === 'script'"
-                :user-id="userId"
-                :strategy-id="scriptDraftStrategyId"
-                :strategy-name="deriveScriptName()"
-                :initial-template-key="editorInitialTemplateKey"
-                @verified="scriptVerified = true"
-                @template-change="onScriptTemplateChange"
-                @name-change="scriptName = $event"
-              >
-                <template #toolbar>
-                  <div class="script-code-actions">
-                    <span class="script-select-label">{{ text.selectScriptLabel }}</span>
-                    <a-select
-                      v-model="selectedScriptId"
-                      class="script-select"
-                      show-search
-                      allow-clear
-                      option-filter-prop="children"
-                      :loading="loadingScripts"
-                      :placeholder="text.selectScriptPlaceholder"
-                      @change="handleScriptSelect"
-                    >
-                      <a-select-option
-                        v-for="item in scriptStrategyOptions"
-                        :key="String(item.id)"
-                        :value="String(item.id)"
-                      >
-                        {{ item.optionLabel }}
-                      </a-select-option>
-                    </a-select>
-                    <a-tooltip :title="text.newScript">
-                      <a-button class="ide-icon-btn" @click="newScriptDraft">
-                        <a-icon type="plus" />
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="text.refreshScripts">
-                      <a-button class="ide-icon-btn" :loading="loadingScripts" @click="loadScriptStrategies">
-                        <a-icon type="reload" />
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="text.versionHistory">
-                      <a-button
-                        class="ide-icon-btn"
-                        :disabled="!scriptDraftStrategyId"
-                        :loading="scriptVersionLoading"
-                        @click="openScriptVersionDrawer"
-                      >
-                        <a-icon type="history" />
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="scriptDraftStrategyId ? text.updateScript : text.saveScript">
-                      <a-button
-                        class="ide-icon-btn"
-                        type="primary"
-                        :loading="savingScript"
-                        @click="saveScriptStrategy(false)"
-                      >
-                        <a-icon type="save" />
-                      </a-button>
-                    </a-tooltip>
-                    <a-button
-                      class="script-live-button"
-                      type="primary"
-                      :loading="savingScript"
-                      @click="createLiveFromScript"
-                    >
-                      <a-icon type="thunderbolt" />
-                      {{ text.createLive }}
-                    </a-button>
-                    <a-tooltip v-if="scriptDraftStrategyId" :title="text.saveAsNew">
-                      <a-button
-                        class="ide-icon-btn"
-                        :loading="savingScript"
-                        @click="saveScriptStrategy(true)"
-                      >
-                        <a-icon type="copy" />
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip v-if="scriptDraftStrategyId" :title="text.publishScript">
-                      <a-button
-                        class="ide-icon-btn"
-                        :loading="savingScript || publishingScript"
-                        @click="openPublishScriptModal"
-                      >
-                        <a-icon type="shop" />
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip v-if="scriptDraftStrategyId" :title="text.deleteScript">
-                      <a-button
-                        class="ide-icon-btn ide-icon-btn--danger"
-                        :loading="savingScript"
-                        @click="deleteCurrentScriptSource"
-                      >
-                        <a-icon type="delete" />
-                      </a-button>
-                    </a-tooltip>
+    <div class="strategy-ide-layout">
+      <section class="script-panel script-panel--editor">
+        <strategy-editor
+          ref="scriptEditor"
+          :key="editorKey"
+          v-model="scriptCode"
+          :is-dark="isDarkTheme"
+          :visible="true"
+          :user-id="userId"
+          :strategy-id="currentSourceId"
+          :script-source-id="currentSourceId"
+          :asset-type="currentAssetType"
+          :initial-template-key="scriptTemplateKey || editorInitialTemplateKey"
+          :initial-param-schema="currentSourceParamSchema"
+          :initial-param-values="scriptTemplateParams"
+          :hidden-source="scriptCodeHidden"
+          :readonly="false"
+          :consume-copilot-draft="false"
+          side-mode="split"
+          @verified="scriptVerified = true"
+          @template-change="handleTemplateChange"
+        >
+          <template #toolbar>
+            <div class="ide-toolbar">
+              <div class="toolbar-left">
+                <div class="strategy-workspace-switcher">
+                  <div class="strategy-workspace-copy">
+                    <strong>{{ currentWorkspaceTitle }}</strong>
+                    <span>{{ currentWorkspaceDescription }}</span>
                   </div>
-                </template>
-              </strategy-editor>
-            </section>
-
-            <section class="script-panel script-panel--backtest">
-              <div class="panel-head">
-                <div>
-                  <div class="panel-title">
-                    <a-icon type="experiment" />
-                    <span>{{ text.backtestTitle }}</span>
-                  </div>
-                  <div class="panel-desc">{{ text.backtestDesc }}</div>
+                  <a-radio-group
+                    :value="currentAssetType"
+                    button-style="solid"
+                  >
+                    <a-radio-button value="script" @click="handleAssetTypeChange('script')">{{ text.ctaStrategy }}</a-radio-button>
+                    <a-radio-button value="portfolio_strategy" @click="handleAssetTypeChange('portfolio_strategy')">{{ text.portfolioStrategy }}</a-radio-button>
+                  </a-radio-group>
                 </div>
-                <a-tag v-if="scriptDraftStrategyId" color="green">{{ text.draftReady }}</a-tag>
+                <a-select
+                  class="script-select"
+                  show-search
+                  allow-clear
+                  option-filter-prop="children"
+                  :value="selectedScriptId"
+                  :loading="loadingScripts"
+                  :placeholder="text.selectScriptPlaceholder"
+                  @change="handleScriptSelect"
+                >
+                  <a-select-option
+                    v-for="item in scriptOptions"
+                    :key="item.id"
+                    :value="item.id"
+                  >
+                    {{ item.optionLabel }}
+                  </a-select-option>
+                </a-select>
+
+                <a-tooltip :title="currentNewScriptLabel">
+                  <a-button class="ide-icon-btn" @click="createNewDraft({ openTemplate: true })">
+                    <a-icon type="plus" />
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip :title="text.refreshScripts">
+                  <a-button class="ide-icon-btn" :loading="loadingScripts" @click="refreshSources">
+                    <a-icon type="reload" />
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip :title="text.versionHistory">
+                  <a-button
+                    class="ide-icon-btn"
+                    :disabled="!currentSourceId || scriptCodeHidden"
+                    :loading="scriptVersionLoading"
+                    @click="openVersionDrawer"
+                  >
+                    <a-icon type="history" />
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip v-if="currentSourceId" :title="text.saveAsNew">
+                  <a-button
+                    class="ide-icon-btn"
+                    :loading="savingScriptMode === 'copy'"
+                    :disabled="scriptCodeHidden || savingScript || deletingScript"
+                    @click="saveScript(true)"
+                  >
+                    <a-icon type="copy" />
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip v-if="currentSourceId" :title="text.publishScript">
+                  <a-button
+                    class="ide-icon-btn"
+                    :loading="savingScriptMode === 'publish' || publishingScript"
+                    :disabled="scriptCodeHidden || savingScript || deletingScript"
+                    @click="openPublishModal"
+                  >
+                    <a-icon type="shop" />
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip v-if="currentSourceId" :title="text.deleteScript">
+                  <a-button
+                    class="ide-icon-btn ide-icon-btn--danger"
+                    :loading="deletingScript"
+                    :disabled="savingScript"
+                    @click="deleteCurrentSource"
+                  >
+                    <a-icon type="delete" />
+                  </a-button>
+                </a-tooltip>
+                <a-button
+                  class="script-save-button"
+                  type="primary"
+                  :loading="savingScriptMode === 'save'"
+                  :disabled="scriptCodeHidden || savingScript || deletingScript || !hasUnsavedScriptChanges"
+                  @click="saveScript(false)"
+                >
+                  {{ text.saveScript }}
+                </a-button>
               </div>
 
-              <div class="run-config-grid">
-                <div class="run-section run-section--target">
-                  <div class="run-section__title">
-                    <a-icon type="star" />
-                    <span>{{ text.runTarget }}</span>
-                  </div>
-                  <div class="run-target-grid run-target-grid--simple">
-                    <div class="run-field">
-                      <label>{{ text.watchlistSymbol }}</label>
-                      <a-select
-                        v-model="selectedWatchKey"
-                        class="run-control run-control--symbol"
-                        show-search
-                        option-filter-prop="children"
-                        :loading="loadingWatchlist"
-                        :placeholder="text.watchlistPlaceholder"
-                        @change="onWatchSymbolChange"
-                      >
-                        <a-select-option
-                          v-for="item in watchlistOptions"
-                          :key="item.value"
-                          :value="item.value"
-                        >
-                          {{ item.label }}
-                        </a-select-option>
-                      </a-select>
-                    </div>
-                    <div class="run-field">
-                      <label>{{ text.runtimeCadence }}</label>
-                      <div class="run-fixed-cadence">
-                        <a-tag color="green">1m</a-tag>
-                        <a-tag color="blue">10s</a-tag>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="target-summary">
-                    <a-tag color="blue">{{ marketLabel(runForm.marketCategory) }}</a-tag>
-                    <strong>{{ runForm.symbol || text.noSymbol }}</strong>
-                    <span v-if="selectedWatchItem && selectedWatchItem.name">{{ selectedWatchItem.name }}</span>
-                    <span class="target-summary__divider"></span>
-                    <span>{{ text.timeframeBoundary }}</span>
-                  </div>
-                </div>
-
-                <div class="run-section">
-                  <div class="run-section__title">
-                    <a-icon type="wallet" />
-                    <span>{{ text.accountDirection }}</span>
-                  </div>
-                  <div class="run-form-grid">
-                    <div v-if="supportsSwap" class="run-field">
-                      <label>{{ text.marketType }}</label>
-                      <a-radio-group v-model="runForm.marketType" button-style="solid" class="run-segment">
-                        <a-radio-button value="spot">{{ text.spot }}</a-radio-button>
-                        <a-radio-button value="swap">{{ text.swap }}</a-radio-button>
-                      </a-radio-group>
-                    </div>
-                    <div class="run-field">
-                      <label>{{ text.direction }}</label>
-                      <a-radio-group v-model="runForm.tradeDirection" button-style="solid" class="run-segment" :disabled="!supportsSwap || runForm.marketType === 'spot'">
-                        <a-radio-button value="long">{{ text.long }}</a-radio-button>
-                        <a-radio-button value="short" :disabled="!supportsSwap || runForm.marketType === 'spot'">{{ text.short }}</a-radio-button>
-                        <a-radio-button value="both" :disabled="!supportsSwap || runForm.marketType === 'spot'">{{ text.both }}</a-radio-button>
-                      </a-radio-group>
-                      <div v-if="runForm.marketType === 'spot'" class="run-field__hint">
-                        {{ text.spotDirectionHint }}
-                      </div>
-                    </div>
-                    <div class="run-field">
-                      <label>{{ text.initialCapital }}</label>
-                      <a-input-number
-                        v-model="runForm.initialCapital"
-                        :min="investmentAmountMin"
-                        :max="investmentAmountMax"
-                        :step="1000"
-                        :precision="2"
-                        style="width: 100%"
-                      />
-                    </div>
-                    <div class="run-field">
-                      <label>{{ text.leverage }}</label>
-                      <a-input-number
-                        v-model="runForm.leverage"
-                        :min="1"
-                        :max="125"
-                        :step="1"
-                        :disabled="!supportsSwap || runForm.marketType === 'spot'"
-                        style="width: 100%"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div class="run-field run-field--note">
-                  <a-icon type="info-circle" />
-                  <span>{{ text.runNote }}</span>
-                </div>
-                <div class="run-field run-field--note run-field--boundary-note">
-                  <a-icon type="partition" />
-                  <span>{{ text.strategyBoundaryNote }}</span>
-                </div>
+              <div class="toolbar-right">
+                <a-button
+                  v-if="currentAssetType === 'portfolio_strategy'"
+                  class="universe-library-button"
+                  :class="{ 'universe-library-button--selected': currentAssetType === 'portfolio_strategy' && !!selectedUniverseId }"
+                  @click="showUniverseLibrary = true"
+                >
+                  <a-icon type="cluster" />
+                  {{ currentUniverseSummary || text.universeLibrary }}
+                </a-button>
+                <a-button
+                  v-if="currentAssetType === 'script'"
+                  class="robot-template-button"
+                  @click="showRobotBuilder = true"
+                >
+                  <a-icon type="control" />
+                  {{ text.robotTemplates }}
+                </a-button>
+                <a-button class="factor-library-button" @click="showFactorLibrary = true">
+                  <a-icon type="database" />
+                  {{ text.factorLibrary }}
+                </a-button>
+                <a-button
+                  v-if="currentAssetType === 'script'"
+                  class="indicator-convert-button"
+                  :loading="indicatorConvertIndicatorLoading"
+                  @click="openIndicatorConvertPicker"
+                >
+                  <a-icon type="branches" />
+                  {{ text.indicatorConvertEntry }}
+                </a-button>
+                <a-button class="script-backtest-button" @click="openBacktestCenter">
+                  <a-icon type="bar-chart" />
+                  {{ text.backtestTitle }}
+                </a-button>
+                <a-button
+                  class="script-live-button"
+                  type="primary"
+                  :loading="savingScriptMode === 'live'"
+                  :disabled="(!currentSourceId && scriptCodeHidden) || (savingScript && savingScriptMode !== 'live') || deletingScript"
+                  @click="createLiveFromScript"
+                >
+                  <a-icon type="thunderbolt" />
+                  {{ text.createLive }}
+                </a-button>
               </div>
-
-              <strategy-backtest-panel
-                ref="scriptBacktestPanel"
-                :strategy-id="null"
-                :script-source-id="scriptDraftStrategyId"
-                :strategy="scriptBacktestStrategy"
-                :is-dark="isDarkTheme"
-                :prepare-run="prepareScriptBacktest"
-                :script-code="scriptCode"
-                class="script-backtest-panel"
-                @backtested="loadScriptStrategies"
-                @apply-tune-params="applyScriptTuneParams"
-              />
-            </section>
-          </div>
-        </a-tab-pane>
-      </a-tabs>
+            </div>
+          </template>
+        </strategy-editor>
+      </section>
     </div>
 
     <a-modal
-      :title="text.publishModalTitle"
       :visible="showPublishModal"
+      :title="text.publishModalTitle"
+      :width="620"
       :confirmLoading="publishingScript"
       :ok-text="text.publishConfirm"
       :cancel-text="text.cancel"
       :wrap-class-name="isDarkTheme ? 'script-publish-modal script-publish-modal--dark' : 'script-publish-modal'"
-      @ok="confirmPublishScriptSource"
-      @cancel="closePublishScriptModal"
+      @ok="confirmPublish"
+      @cancel="closePublishModal"
     >
-      <a-alert type="info" show-icon :message="text.publishHint" style="margin-bottom: 16px" />
       <div class="publish-form">
-        <label class="field-label">{{ text.publishName }}</label>
-        <a-input v-model="publishForm.name" :placeholder="text.publishNamePlaceholder" />
-
-        <label class="field-label field-label--spaced">{{ text.publishPricingType }}</label>
-        <a-radio-group v-model="publishForm.pricingType">
-          <a-radio value="free">{{ text.publishFree }}</a-radio>
-          <a-radio value="paid">{{ text.publishPaid }}</a-radio>
-        </a-radio-group>
-
-        <div v-if="publishForm.pricingType === 'paid'" class="publish-field">
-          <label class="field-label">{{ text.publishPrice }}</label>
-          <a-input-number v-model="publishForm.price" :min="0" :precision="2" style="width: 100%" />
+        <div class="publish-summary-card">
+          <div class="publish-summary-icon">
+            <a-icon type="shop" />
+          </div>
+          <div class="publish-summary-main">
+            <div class="publish-summary-label">{{ text.publishModalTitle }}</div>
+            <div class="publish-summary-name">{{ publishForm.name || deriveScriptName() }}</div>
+          </div>
+          <a-tag class="publish-summary-tag" color="red">{{ text.marketTag }}</a-tag>
         </div>
 
-        <label class="field-label field-label--spaced">{{ text.publishDescription }}</label>
+        <div class="publish-note">
+          <a-icon type="info-circle" />
+          <span>{{ text.publishHint }}</span>
+        </div>
+
+        <div class="publish-section">
+          <div class="publish-section-title">{{ text.publishName }}</div>
+          <a-input v-model="publishForm.name" :placeholder="text.publishNamePlaceholder" />
+        </div>
+
+        <div class="publish-section">
+          <div class="publish-section-title">{{ text.publishPricingType }}</div>
+          <a-radio-group v-model="publishForm.pricingType" class="publish-pricing-group">
+            <a-radio-button value="free">
+              <a-icon type="gift" />
+              {{ text.publishFree }}
+            </a-radio-button>
+            <a-radio-button value="paid">
+              <a-icon type="pay-circle" />
+              {{ text.publishPaid }}
+            </a-radio-button>
+          </a-radio-group>
+          <div v-if="publishForm.pricingType === 'paid'" class="publish-price-box">
+            <div class="field-label">{{ text.publishPrice }}</div>
+            <a-input-number v-model="publishForm.price" :min="0" :precision="2" class="publish-price-input" />
+          </div>
+        </div>
+
+        <div class="publish-option-grid">
+          <div class="publish-option-card" :class="{ active: publishForm.pricingType === 'paid' && publishForm.vipFree }">
+            <div class="publish-option-head">
+              <span>{{ text.publishVipFree }}</span>
+              <a-switch v-model="publishForm.vipFree" :disabled="publishForm.pricingType !== 'paid'" />
+            </div>
+            <div class="publish-hint">{{ text.publishVipFreeHint }}</div>
+          </div>
+          <div class="publish-option-card" :class="{ active: publishForm.codeHidden }">
+            <div class="publish-option-head">
+              <span>{{ text.publishHideCode }}</span>
+              <a-switch v-model="publishForm.codeHidden" />
+            </div>
+            <div class="publish-hint">{{ text.publishHideCodeHint }}</div>
+          </div>
+        </div>
+
+        <div class="publish-section">
+          <div class="publish-section-title">{{ text.publishDescription }}</div>
+          <a-textarea
+            v-model="publishForm.description"
+            class="publish-description-input"
+            :placeholder="text.publishDescriptionPlaceholder"
+            :auto-size="{ minRows: 4, maxRows: 7 }"
+          />
+        </div>
+      </div>
+    </a-modal>
+
+    <a-modal
+      :visible="showIndicatorConvertModal"
+      :title="text.indicatorConvertTitle"
+      :confirmLoading="indicatorConvertLoading"
+      :ok-text="text.indicatorConvertConfirm"
+      :cancel-text="text.cancel"
+      :wrap-class-name="isDarkTheme ? 'indicator-convert-modal indicator-convert-modal--dark' : 'indicator-convert-modal'"
+      @ok="confirmIndicatorToStrategy"
+      @cancel="closeIndicatorConvertModal"
+    >
+      <div class="indicator-convert-box">
+        <div class="indicator-convert-selector">
+          <label class="field-label">{{ text.indicatorConvertSelect }}</label>
+          <a-select
+            v-model="selectedIndicatorConvertId"
+            show-search
+            option-filter-prop="children"
+            style="width: 100%"
+            :loading="indicatorConvertIndicatorLoading"
+            :placeholder="text.indicatorConvertSelectPlaceholder"
+            @change="handleIndicatorConvertSelect"
+          >
+            <a-select-option
+              v-for="item in indicatorConvertIndicators"
+              :key="String(item.indicatorId)"
+              :value="String(item.indicatorId)"
+              :disabled="item.codeHidden || !item.code"
+            >
+              {{ item.name || text.defaultIndicatorName }}
+              <template v-if="item.symbol"> - {{ item.symbol }}</template>
+              <template v-if="item.codeHidden || !item.code"> - {{ text.indicatorConvertNoCodeShort }}</template>
+            </a-select-option>
+          </a-select>
+        </div>
+
+        <div v-if="indicatorConvertContext" class="indicator-convert-current">
+          <div>
+            <span>{{ text.indicatorConvertSource }}</span>
+            <strong>{{ indicatorConvertContext.name || text.defaultIndicatorName }}</strong>
+          </div>
+          <small>
+            {{ marketLabel(indicatorConvertContext.market) }}
+            <template v-if="indicatorConvertContext.symbol"> / {{ indicatorConvertContext.symbol }}</template>
+            <template v-if="indicatorConvertContext.timeframe"> / {{ indicatorConvertContext.timeframe }}</template>
+          </small>
+        </div>
+
+        <a-alert
+          v-else
+          type="info"
+          show-icon
+          :message="text.indicatorConvertSelectFirst"
+        />
+
+        <label class="field-label field-label--spaced">{{ text.indicatorConvertInstruction }}</label>
         <a-textarea
-          v-model="publishForm.description"
-          :rows="4"
-          :placeholder="text.publishDescriptionPlaceholder"
+          v-model="indicatorConvertInstruction"
+          :auto-size="{ minRows: 5, maxRows: 8 }"
+          :placeholder="text.indicatorConvertPlaceholder"
+        />
+        <div class="indicator-convert-note">
+          <a-icon type="info-circle" />
+          <span>{{ text.indicatorConvertBoundary }}</span>
+        </div>
+        <a-alert
+          v-if="indicatorConvertError"
+          type="error"
+          show-icon
+          :message="indicatorConvertError"
         />
       </div>
     </a-modal>
 
+    <factor-library-modal
+      :visible="showFactorLibrary"
+      :is-dark="isDarkTheme"
+      :asset-type="currentAssetType"
+      @close="showFactorLibrary = false"
+    />
+
+    <universe-library-modal
+      :visible="showUniverseLibrary"
+      :is-dark="isDarkTheme"
+      :asset-type="currentAssetType"
+      :selected-universe-id="selectedUniverseId"
+      @use="handleUniverseUse"
+      @close="showUniverseLibrary = false"
+    />
+
     <a-drawer
-      :title="text.versionHistory"
-      :visible="showScriptVersionDrawer"
-      :width="560"
-      :wrap-class-name="isDarkTheme ? 'script-version-drawer script-version-drawer--dark' : 'script-version-drawer'"
-      @close="showScriptVersionDrawer = false"
+      :visible="showRobotBuilder"
+      :title="text.robotTemplates"
+      width="96vw"
+      :destroy-on-close="true"
+      :wrap-class-name="isDarkTheme ? 'robot-builder-drawer robot-builder-drawer--dark' : 'robot-builder-drawer'"
+      @close="showRobotBuilder = false"
     >
-      <div class="code-version-toolbar">
-        <span>{{ scriptName || text.defaultName }}</span>
-        <a-button size="small" icon="reload" :loading="scriptVersionLoading" @click="loadScriptVersions">
-          {{ text.refreshScripts }}
-        </a-button>
-      </div>
+      <div class="robot-builder-intro">{{ text.robotTemplatesDesc }}</div>
+      <executor-strategies embedded @generated="applyGeneratedRobot" />
+    </a-drawer>
+
+    <a-drawer
+      :visible="showVersionDrawer"
+      :title="text.versionHistory"
+      :width="640"
+      :wrap-class-name="isDarkTheme ? 'script-version-drawer script-version-drawer--dark' : 'script-version-drawer'"
+      @close="showVersionDrawer = false"
+    >
       <a-spin :spinning="scriptVersionLoading">
+        <div class="code-version-toolbar">
+          <span>{{ currentSourceName || text.defaultName }}</span>
+          <a-button size="small" icon="reload" @click="loadScriptVersions">{{ text.refreshScripts }}</a-button>
+        </div>
         <a-empty v-if="!scriptVersions.length" :description="text.versionEmpty" />
         <div v-else class="code-version-list">
           <div v-for="item in scriptVersions" :key="item.id" class="code-version-item">
             <div class="code-version-item__main">
               <strong>{{ text.versionNo.replace('{version}', item.version_no) }}</strong>
-              <span>{{ formatScriptVersionTime(item.created_at) }}</span>
-              <small>{{ item.name || scriptName || text.defaultName }}</small>
+              <span>{{ item.name || currentSourceName }}</span>
+              <small>{{ formatTime(item.created_at) }}</small>
             </div>
             <div class="code-version-item__actions">
-              <a-button size="small" @click="previewScriptVersion(item)">{{ text.versionPreview }}</a-button>
+              <a-button
+                size="small"
+                :disabled="scriptCodeHidden || item.code_hidden || item.hidden_source"
+                @click="previewScriptVersion(item)"
+              >
+                {{ text.versionPreview }}
+              </a-button>
               <a-button
                 size="small"
                 type="primary"
                 :loading="restoringScriptVersionId === item.id"
+                :disabled="scriptCodeHidden || item.code_hidden || item.hidden_source || item.restore_disabled"
                 @click="confirmRestoreScriptVersion(item)"
               >
                 {{ text.versionRestore }}
@@ -322,12 +392,18 @@
           </div>
         </div>
       </a-spin>
+
       <div v-if="scriptVersionPreview" class="code-version-preview">
         <div class="code-version-preview__head">
           <strong>{{ text.versionPreviewTitle.replace('{version}', scriptVersionPreview.version_no) }}</strong>
-          <a-button size="small" icon="close" @click="scriptVersionPreview = null">{{ text.close }}</a-button>
+          <a-button size="small" icon="close" @click="scriptVersionPreview = null" />
         </div>
-        <pre>{{ scriptVersionPreview.code }}</pre>
+        <div v-if="scriptVersionPreview.code_hidden || scriptVersionPreview.hidden_source" class="code-version-hidden">
+          <a-icon type="lock" />
+          <strong>{{ text.hiddenScriptTitle }}</strong>
+          <span>{{ text.versionHiddenBlocked }}</span>
+        </div>
+        <pre v-else>{{ scriptVersionPreview.code }}</pre>
       </div>
     </a-drawer>
   </div>
@@ -335,85 +411,131 @@
 
 <script>
 import { mapState } from 'vuex'
-import IndicatorIde from '@/views/indicator-ide'
-import StrategyEditor from '@/views/trading-assistant/components/StrategyEditor.vue'
-import StrategyBacktestPanel from '@/components/StrategyBacktestPanel.vue'
+import StrategyEditor from './components/StrategyEditor.vue'
+import FactorLibraryModal from './FactorLibraryModal.vue'
+import UniverseLibraryModal from './UniverseLibraryModal.vue'
+import ExecutorStrategies from '@/views/executor-strategies'
 import {
+  aiGenerateStrategy,
   createScriptSource,
   deleteScriptSource,
+  getUnifiedBacktestHistory,
+  getIndicatorListForStrategy,
   getScriptSourceDetail,
   getScriptSourceList,
   getScriptSourceVersion,
   getScriptSourceVersions,
   publishScriptSource,
   restoreScriptSourceVersion,
-  updateScriptSource
+  updateScriptSource,
+  verifyStrategyCode
 } from '@/api/strategy'
-import { getWatchlist } from '@/api/market'
 
 const DEFAULT_SCRIPT_CODE = `"""
 My Custom Strategy
+
+Describe the strategy logic, supported markets, entry/exit rules, and risk controls here.
 """
 
 def on_init(ctx):
-    # Initialize strategy parameters via ctx.param('name', default)
+    # Declare strategy-owned parameters here.
+    # Symbol, investment amount, market type, leverage and direction come from the run panel.
     pass
 
 def on_bar(ctx, bar):
-    # Core trading logic, called on each K-line bar
+    # Core trading logic, called on each K-line bar.
     # bar: { open, high, low, close, volume, timestamp }
     pass
 `
 
+const DEFAULT_PORTFOLIO_CODE = `"""
+My Portfolio Strategy
+
+Rank the eligible point-in-time universe by momentum and hold an equal-weight Top-N portfolio.
+"""
+
+def on_init(ctx):
+    ctx.param("top_n", 10, min=1, max=100, step=1)
+    ctx.param("lookback", 126, min=20, max=252, step=1)
+
+def on_rebalance(ctx, panel):
+    top_n = int(ctx.param("top_n", 10))
+    lookback = int(ctx.param("lookback", 126))
+    scores = {}
+    for symbol, frame in panel.items():
+        if len(frame) <= lookback:
+            continue
+        start = float(frame["close"].iloc[-lookback - 1])
+        end = float(frame["close"].iloc[-1])
+        if start > 0:
+            scores[symbol] = end / start - 1.0
+    ctx.long_only_top_n(scores, n=top_n)
+`
+
 export default {
-  name: 'StrategyIDE',
-  components: { IndicatorIde, StrategyEditor, StrategyBacktestPanel },
+  name: 'StrategyIde',
+  components: {
+    StrategyEditor,
+    FactorLibraryModal,
+    UniverseLibraryModal,
+    ExecutorStrategies
+  },
   data () {
     return {
-      activeMode: 'indicator',
+      scriptSources: [],
       loadingScripts: false,
-      scriptStrategies: [],
       selectedScriptId: undefined,
+      currentSourceId: null,
+      currentSource: null,
+      currentAssetType: 'script',
       scriptCode: DEFAULT_SCRIPT_CODE,
-      scriptName: '',
+      scriptCodeHidden: false,
       scriptTemplateKey: '',
       scriptTemplateParams: {},
+      scriptParamSchema: {},
       editorInitialTemplateKey: '',
-      scriptEditorKeySeed: 0,
+      editorKeySeed: 0,
       scriptVerified: false,
       savingScript: false,
+      savingScriptMode: '',
+      deletingScript: false,
       publishingScript: false,
       showPublishModal: false,
-      showScriptVersionDrawer: false,
-      scriptVersionLoading: false,
-      scriptVersions: [],
-      scriptVersionPreview: null,
-      restoringScriptVersionId: null,
       publishForm: {
         name: '',
         description: '',
         pricingType: 'free',
-        price: 0
+        price: 0,
+        vipFree: false,
+        codeHidden: false
       },
-      preparingBacktest: false,
-      scriptDraftStrategyId: null,
-      scriptRuntimeStrategyId: null,
-      scriptDraftStrategy: null,
-      investmentAmountMin: 10,
-      investmentAmountMax: 1000000,
-      lastSavedScriptSnapshot: '',
-      loadingWatchlist: false,
-      selectedWatchKey: '',
-      watchlist: [],
-      runForm: {
-        marketCategory: 'Crypto',
+      showVersionDrawer: false,
+      scriptVersionLoading: false,
+      scriptVersions: [],
+      scriptVersionPreview: null,
+      restoringScriptVersionId: null,
+      showFactorLibrary: false,
+      showUniverseLibrary: false,
+      showRobotBuilder: false,
+      showIndicatorConvertModal: false,
+      indicatorConvertLoading: false,
+      indicatorConvertIndicatorLoading: false,
+      indicatorConvertIndicators: [],
+      selectedIndicatorConvertId: undefined,
+      indicatorConvertContext: null,
+      indicatorConvertInstruction: '',
+      indicatorConvertError: '',
+      runConfig: {
+        market_category: 'Crypto',
+        exchange_id: 'binance',
         symbol: 'BTC/USDT',
         timeframe: '1m',
-        marketType: 'swap',
-        tradeDirection: 'long',
-        initialCapital: 10000,
+        market_type: 'swap',
+        trade_direction: 'long',
+        initial_capital: 10000,
         leverage: 5
-      }
+      },
+      lastSavedSnapshot: ''
     }
   },
   computed: {
@@ -433,589 +555,680 @@ export default {
       const userInfo = this.$store && this.$store.getters && this.$store.getters.userInfo
       return (userInfo && userInfo.id) || 1
     },
-    scriptStrategyOptions () {
-      return (this.scriptStrategies || []).map(item => {
-        const id = item.id || item.source_id || item.sourceId
-        const pieces = [item.name || item.strategy_name || `Script #${id}`]
+    editorKey () {
+      return `script-editor-${this.currentSourceId || 'draft'}-${this.editorKeySeed}`
+    },
+    currentSourceName () {
+      return (this.currentSource && (this.currentSource.name || this.currentSource.strategy_name)) ||
+        this.extractScriptMetadataFromCode(this.scriptCode).name ||
+        ''
+    },
+    currentSourceParamSchema () {
+      if (this.scriptParamSchema && Array.isArray(this.scriptParamSchema.params) && this.scriptParamSchema.params.length) {
+        return this.scriptParamSchema
+      }
+      const source = this.currentSource || {}
+      const direct = this.parseObject(source.param_schema || source.paramSchema)
+      if (Array.isArray(direct.params) && direct.params.length) return direct
+      if (Array.isArray(source.params) && source.params.length) return { params: source.params }
+      const metadata = this.parseObject(source.metadata)
+      const metaSchema = this.parseObject(metadata.param_schema || metadata.paramSchema)
+      if (Array.isArray(metaSchema.params) && metaSchema.params.length) return metaSchema
+      return direct
+    },
+    allScriptOptions () {
+      return (this.scriptSources || []).map(item => {
+        const id = this.getScriptSourceId(item)
         return {
           ...item,
           id,
-          optionLabel: pieces.join(' - ')
+          optionLabel: item.name || item.strategy_name || `Script #${id}`
         }
-      })
+      }).filter(item => item.id)
     },
-    watchlistOptions () {
-      const list = (this.watchlist || []).map(item => {
-        const market = this.normalizeMarket(item.market || item.market_category || 'Crypto')
-        const symbol = String(item.symbol || '').trim()
-        if (!symbol) return null
-        const name = String(item.name || item.display_name || '').trim()
-        const value = `${market}:${symbol}`
-        const label = name
-          ? `${symbol} - ${name} - ${this.marketLabel(market)}`
-          : `${symbol} - ${this.marketLabel(market)}`
-        return { ...item, market, symbol, name, value, label }
-      }).filter(Boolean)
-      if (!list.length && this.runForm.symbol) {
-        const market = this.runForm.marketCategory || 'Crypto'
-        const symbol = this.runForm.symbol
-        return [{ market, symbol, name: '', value: `${market}:${symbol}`, label: `${symbol} - ${this.marketLabel(market)}` }]
-      }
-      return list
+    scriptOptions () {
+      return this.allScriptOptions.filter(item => item.asset_type === this.currentAssetType)
     },
-    selectedWatchItem () {
-      return (this.watchlistOptions || []).find(item => item.value === this.selectedWatchKey) || null
+    selectedUniverseId () {
+      return Number(this.runConfig && (this.runConfig.universe_id || this.runConfig.universeId)) || undefined
     },
-    supportsSwap () {
-      return String(this.runForm.marketCategory || '') === 'Crypto'
+    currentUniverseSummary () {
+      if (this.currentAssetType !== 'portfolio_strategy' || !this.selectedUniverseId) return ''
+      const label = String((this.runConfig && (this.runConfig.universe_name || this.runConfig.universeName || this.runConfig.universe_code || this.runConfig.universeCode)) || this.selectedUniverseId)
+      return this.text.universeSelected.replace('{name}', label)
     },
-    scriptBacktestStrategy () {
-      return {
-        id: null,
-        strategy_name: this.deriveScriptName(),
-        strategy_type: 'ScriptStrategy',
-        strategy_mode: 'script',
-        strategy_code: '',
-        market_category: this.runForm.marketCategory || 'Crypto',
-        status: 'draft',
-        trading_config: {
-          ...this.buildTradingConfig(),
-          script_source_id: this.scriptDraftStrategyId ? Number(this.scriptDraftStrategyId) : null
-        }
-      }
+    currentWorkspaceTitle () {
+      return this.currentAssetType === 'portfolio_strategy' ? this.text.portfolioWorkspaceTitle : this.text.ctaWorkspaceTitle
     },
-    scriptEditorKey () {
-      return `script-editor-${this.selectedScriptId || 'new'}-${this.scriptEditorKeySeed}`
+    currentWorkspaceDescription () {
+      return this.currentAssetType === 'portfolio_strategy' ? this.text.portfolioWorkspaceDescription : this.text.ctaWorkspaceDescription
+    },
+    currentNewScriptLabel () {
+      return this.currentAssetType === 'portfolio_strategy' ? this.text.newPortfolioStrategy : this.text.newCtaStrategy
+    },
+    hasUnsavedScriptChanges () {
+      if (this.scriptCodeHidden) return false
+      if (!this.currentSourceId) return !!String(this.scriptCode || '').trim()
+      return this.lastSavedSnapshot !== this.scriptSnapshot()
     },
     text () {
-      const zh = {
-        indicator: '指标编写',
-        script: '交易脚本',
-        libraryTitle: '脚本源码库',
-        libraryDesc: '在这里切换、编辑、回测和发布脚本源码。运行时选择标的、现货/合约、方向、投入金额和杠杆。',
-        selectScriptLabel: '当前脚本',
-        selectScriptPlaceholder: '选择已保存脚本源码',
-        newScript: '新建脚本',
-        codeTitle: '脚本代码',
-        codeDesc: '这里只保存脚本逻辑。运行标的、现货/合约、方向、投入金额、杠杆、账户和通知在回测或实盘启动时选择。',
-        backtestTitle: '脚本回测',
-        backtestDesc: '从自选标的发起回测，市场自动识别；系统固定使用 1m on_bar 和 10s 价格检查。',
-        strategyNamePlaceholder: '可选策略名，留空自动生成',
-        saveScript: '保存脚本',
-        updateScript: '更新脚本',
-        saveAsNew: '另存为新脚本',
-        createLive: '创建实盘',
-        publishScript: '发布到市场',
-        deleteScript: '删除',
-        refreshScripts: '刷新脚本列表',
-        versionHistory: '历史版本',
-        versionEmpty: '暂无历史版本',
-        versionNo: '版本 #{version}',
-        versionPreview: '查看',
-        versionRestore: '恢复',
-        versionRestoreTitle: '恢复历史版本？',
-        versionRestoreContent: '将当前脚本恢复到版本 #{version}，恢复后会自动生成一个新的历史版本。',
-        versionPreviewTitle: '版本 #{version} 预览',
-        versionRestored: '已恢复历史版本',
-        versionLoadFailed: '加载历史版本失败',
-        versionRestoreFailed: '恢复历史版本失败',
-        close: '关闭',
-        deleteConfirmTitle: '删除脚本源码？',
-        deleteConfirmDesc: '删除后不会删除已创建的实盘策略，但这些策略如果仍引用该源码将无法继续回测或运行。',
-        deleteSuccess: '脚本源码已删除',
-        deleteFailed: '删除脚本源码失败',
-        publishSuccess: '已提交到策略市场',
-        publishFailed: '发布脚本源码失败',
-        publishModalTitle: '发布脚本源码到市场',
-        publishConfirm: '确认发布',
-        cancel: '取消',
-        publishHint: '发布后用户购买的是脚本源码，可以再用该源码创建自己的策略实例。',
-        publishName: '市场展示名称',
-        publishNamePlaceholder: '例如 BTC 趋势跟随脚本',
-        publishPricingType: '价格类型',
-        publishFree: '免费',
-        publishPaid: '付费',
-        publishPrice: '价格',
-        publishDescription: '策略说明',
-        publishDescriptionPlaceholder: '说明适用市场、核心逻辑、风险边界和建议用法',
-        priceRequired: '付费发布需要填写大于 0 的价格',
-        draftReady: '已选择脚本',
-        runTarget: '本次运行标的',
-        watchlistSymbol: '自选标的',
-        watchlistPlaceholder: '从自选列表选择标的',
-        noSymbol: '未选择标的',
-        accountDirection: '账户与方向',
-        timeframe: '脚本触发周期',
-        runtimeCadence: '运行频率',
-        marketType: '市场类型',
-        spot: '现货',
-        swap: '合约',
-        direction: '交易方向',
-        long: '做多',
-        short: '做空',
-        both: '双向',
-        initialCapital: '投入金额',
-        leverage: '杠杆',
-        spotDirectionHint: '现货只能做多，系统会固定方向为做多、杠杆为 1x。',
-        timeframeBoundary: '固定 1m 触发 on_bar，实盘每 10s 检查一次最新价格。',
-        strategyBoundaryNote: '边界：这里仅选择标的、现货/合约、方向、投入金额和杠杆；分仓、间距、马丁倍数、止盈止损等高级设置由脚本代码决定。',
-        runNote: '运行回测时会先同步当前脚本源码；实盘账户、通知和账户级风控仍在策略实盘页绑定。',
-        codeRequired: '请先编写交易脚本代码',
-        symbolRequired: '请选择回测标的',
-        saveSuccess: '脚本源码已保存',
-        saveFailed: '保存脚本源码失败',
-        preparing: '正在同步脚本源码...',
-        loadScriptsFailed: '加载脚本源码列表失败',
-        loadScriptFailed: '加载脚本源码失败',
-        runningEditBlocked: '策略正在运行，请先停止后再修改代码',
-        autoNameSuffix: '脚本源码',
-        defaultName: '未命名脚本',
-        noScriptChanges: '脚本已是最新'
-      }
-      const en = {
-        indicator: 'Indicator Builder',
-        script: 'Trading Script',
-        libraryTitle: 'Script Source Library',
-        libraryDesc: 'Switch, edit, backtest, and publish script source here. Runs ask for symbol, spot/swap, direction, investment amount, and leverage.',
-        selectScriptLabel: 'Script',
-        selectScriptPlaceholder: 'Select a saved script source',
-        newScript: 'New Script',
-        codeTitle: 'Script Code',
-        codeDesc: 'Save only script logic here. Choose symbol, spot/swap, direction, investment amount, leverage, account, and notifications when backtesting or going live.',
-        backtestTitle: 'Script Backtest',
-        backtestDesc: 'Choose a watchlist symbol for this run. Market is inferred automatically; scripts use fixed 1m on_bar and 10s price checks.',
-        strategyNamePlaceholder: 'Optional name, auto-generated if empty',
-        saveScript: 'Save Script',
-        updateScript: 'Update Script',
-        saveAsNew: 'Save as New',
-        createLive: 'Create Live',
-        publishScript: 'Publish',
-        deleteScript: 'Delete',
-        refreshScripts: 'Refresh scripts',
-        versionHistory: 'Version History',
-        versionEmpty: 'No version history yet',
-        versionNo: 'Version #{version}',
-        versionPreview: 'View',
-        versionRestore: 'Restore',
-        versionRestoreTitle: 'Restore this version?',
-        versionRestoreContent: 'Restore the current script to version #{version}. This restore will be saved as a new version.',
-        versionPreviewTitle: 'Version #{version} Preview',
-        versionRestored: 'Version restored',
-        versionLoadFailed: 'Failed to load version history',
-        versionRestoreFailed: 'Failed to restore version',
-        close: 'Close',
-        deleteConfirmTitle: 'Delete script source?',
-        deleteConfirmDesc: 'Existing live strategies are not deleted, but strategies still referencing this source will no longer backtest or run.',
-        deleteSuccess: 'Script source deleted',
-        deleteFailed: 'Failed to delete script source',
-        publishSuccess: 'Submitted to marketplace',
-        publishFailed: 'Failed to publish script source',
-        publishModalTitle: 'Publish Script Source',
-        publishConfirm: 'Publish',
-        cancel: 'Cancel',
-        publishHint: 'Buyers receive the script source and can create their own strategy instance from it.',
-        publishName: 'Marketplace Name',
-        publishNamePlaceholder: 'Example: BTC Trend Script',
-        publishPricingType: 'Pricing',
-        publishFree: 'Free',
-        publishPaid: 'Paid',
-        publishPrice: 'Price',
-        publishDescription: 'Description',
-        publishDescriptionPlaceholder: 'Describe supported markets, core logic, risk limits, and suggested usage',
-        priceRequired: 'Paid publishing requires a price greater than 0',
-        draftReady: 'Script selected',
-        runTarget: 'Run Target',
-        watchlistSymbol: 'Watchlist Symbol',
-        watchlistPlaceholder: 'Select from watchlist',
-        noSymbol: 'No symbol selected',
-        accountDirection: 'Account & Direction',
-        timeframe: 'Trigger Interval',
-        runtimeCadence: 'Runtime Cadence',
-        marketType: 'Market Type',
-        spot: 'Spot',
-        swap: 'Swap',
-        direction: 'Direction',
-        long: 'Long',
-        short: 'Short',
-        both: 'Both',
-        initialCapital: 'Investment Amount',
-        investmentAmountRange: 'Investment amount must be between 10 and 1,000,000',
-        leverage: 'Leverage',
-        spotDirectionHint: 'Spot can only run long; direction is fixed to Long and leverage to 1x.',
-        timeframeBoundary: 'Fixed 1m on_bar trigger; live mode checks the latest price every 10s.',
-        strategyBoundaryNote: 'Boundary: this panel only chooses symbol, spot/swap, direction, investment amount, and leverage. Layers, spacing, martingale sizing, exits, and other advanced settings belong in script code.',
-        runNote: 'Backtest syncs the current script source first. Live account, notifications, and account-level risk remain bound in Strategy Live.',
-        codeRequired: 'Write trading script code first',
-        symbolRequired: 'Select a backtest symbol',
-        saveSuccess: 'Script source saved',
-        saveFailed: 'Failed to save script source',
-        preparing: 'Syncing script source...',
-        loadScriptsFailed: 'Failed to load script sources',
-        loadScriptFailed: 'Failed to load script source',
-        runningEditBlocked: 'Stop the running strategy before editing its code',
-        autoNameSuffix: 'Script Source',
-        defaultName: 'Untitled Script',
-        noScriptChanges: 'Script is already up to date'
-      }
-      const bundle = this.isZh ? zh : en
-      bundle.selectScriptLabel = this.$t('strategyIde.selectScriptLabel')
-      bundle.investmentAmountRange = this.$t('trading-assistant.validation.initialCapitalRange')
-      return bundle
-    }
-  },
-  mounted () {
-    this._scriptSaveShortcutListener = (event) => this.handleScriptSaveShortcut(event)
-    window.addEventListener('keydown', this._scriptSaveShortcutListener, true)
-    const tab = String((this.$route.query && this.$route.query.tab) || '').toLowerCase()
-    if (tab === 'script') this.activeMode = 'script'
-    const template = String((this.$route.query && this.$route.query.template) || '').trim()
-    if (template) {
-      this.scriptTemplateKey = template
-      this.editorInitialTemplateKey = template
-    }
-    this.applyCopilotScriptDraft()
-    this.loadWatchlist()
-    this.loadScriptStrategies()
-  },
-  beforeDestroy () {
-    if (this._scriptSaveShortcutListener) {
-      window.removeEventListener('keydown', this._scriptSaveShortcutListener, true)
-      this._scriptSaveShortcutListener = null
+      return [
+        'selectScriptLabel',
+        'selectScriptPlaceholder',
+        'ctaStrategy',
+        'portfolioStrategy',
+        'newScript',
+        'refreshScripts',
+        'saveScript',
+        'saveAsNew',
+        'publishScript',
+        'deleteScript',
+        'createLive',
+        'backtestTitle',
+        'cancel',
+        'defaultName',
+        'autoNameSuffix',
+        'codeRequired',
+        'hiddenScriptTitle',
+        'hiddenScriptDesc',
+        'loadScriptsFailed',
+        'loadScriptFailed',
+        'saveSuccess',
+        'saveFailed',
+        'deleteSuccess',
+        'deleteFailed',
+        'deleteConfirmTitle',
+        'deleteConfirmDesc',
+        'runningEditBlocked',
+        'verifyPassed',
+        'verifyBlocked',
+        'verifyFailed',
+        'publishSuccess',
+        'publishFailed',
+        'publishBacktestRequired',
+        'publishModalTitle',
+        'publishConfirm',
+        'marketTag',
+        'publishHint',
+        'publishName',
+        'publishNamePlaceholder',
+        'publishPricingType',
+        'publishFree',
+        'publishPaid',
+        'publishPrice',
+        'publishDescription',
+        'publishDescriptionPlaceholder',
+        'priceRequired',
+        'publishVipFree',
+        'publishVipFreeHint',
+        'publishHideCode',
+        'publishHideCodeHint',
+        'versionHistory',
+        'versionEmpty',
+        'versionNo',
+        'versionPreview',
+        'versionRestore',
+        'versionRestoreTitle',
+        'versionRestoreContent',
+        'versionPreviewTitle',
+        'versionRestored',
+        'versionHiddenBlocked',
+        'versionLoadFailed',
+        'versionRestoreFailed',
+        'indicatorConvertEntry',
+        'indicatorConvertTitle',
+        'indicatorConvertConfirm',
+        'indicatorConvertSelect',
+        'indicatorConvertSelectPlaceholder',
+        'indicatorConvertSelectFirst',
+        'indicatorConvertSource',
+        'indicatorConvertInstruction',
+        'indicatorConvertPlaceholder',
+        'indicatorConvertBoundary',
+        'indicatorConvertNoCodeShort',
+        'indicatorConvertNoCode',
+        'indicatorConvertHiddenBlocked',
+        'indicatorConvertFailed',
+        'indicatorConvertSuccess',
+        'defaultIndicatorName',
+        'noChangesToSave',
+        'factorLibrary',
+        'universeLibrary',
+        'universeSelected',
+        'workspaceLabel',
+        'ctaWorkspaceTitle',
+        'ctaWorkspaceDescription',
+        'portfolioWorkspaceTitle',
+        'portfolioWorkspaceDescription',
+        'newCtaStrategy',
+        'newPortfolioStrategy',
+        'switchWorkspaceTitle',
+        'switchWorkspaceContent',
+        'universeApplied',
+        'robotTemplates',
+        'robotTemplatesDesc',
+        'robotGenerated'
+      ].reduce((acc, key) => {
+        acc[key] = this.$t(`strategyIde.${key}`)
+        return acc
+      }, {})
     }
   },
   watch: {
-    activeMode (mode) {
-      const query = { ...(this.$route.query || {}) }
-      if (mode === 'script') query.tab = 'script'
-      else delete query.tab
-      this.$router.replace({ path: '/strategy-ide', query }).catch(() => {})
-    },
-    '$route.query.source_id' (id) {
-      if (id && String(id) !== String(this.selectedScriptId || '')) {
-        this.selectedScriptId = String(id)
-        this.handleScriptSelect(this.selectedScriptId)
-      }
-    },
-    'runForm.marketType' (value) {
-      if (value === 'spot') {
-        this.runForm.tradeDirection = 'long'
-        this.runForm.leverage = 1
-      }
-    },
-    'runForm.marketCategory' () {
-      if (!this.supportsSwap) {
-        this.runForm.marketType = 'spot'
-        this.runForm.tradeDirection = 'long'
-        this.runForm.leverage = 1
-      }
+    scriptCode () {
+      this.scriptVerified = false
+    }
+  },
+  mounted () {
+    this._saveShortcut = (event) => this.handleSaveShortcut(event)
+    window.addEventListener('keydown', this._saveShortcut, true)
+    this.initPage()
+  },
+  beforeDestroy () {
+    if (this._saveShortcut) {
+      window.removeEventListener('keydown', this._saveShortcut, true)
+      this._saveShortcut = null
     }
   },
   methods: {
-    applyCopilotScriptDraft () {
-      const query = this.$route.query || {}
-      const isScriptDraft = String(query.aiDraft || '') === '1' && String(query.tab || '').toLowerCase() === 'script'
-      if (!isScriptDraft || typeof sessionStorage === 'undefined') return
-      const code = String(sessionStorage.getItem('qd_copilot_script_strategy_code') || '').trim()
-      if (!code) return
-
-      let meta = {}
-      try {
-        meta = JSON.parse(sessionStorage.getItem('qd_copilot_script_strategy_meta') || '{}') || {}
-      } catch (_) {
-        meta = {}
-      }
-
-      this.activeMode = 'script'
-      this.selectedScriptId = undefined
-      this.scriptDraftStrategyId = null
-      this.scriptRuntimeStrategyId = null
-      this.scriptDraftStrategy = null
-      this.scriptCode = code
-      this.scriptName = String(meta.name || '').trim() || this.extractScriptTitleFromCode(code) || this.text.defaultName
-      this.scriptTemplateKey = ''
-      this.scriptTemplateParams = {}
-      this.editorInitialTemplateKey = ''
-      this.scriptVerified = false
-      this.lastSavedScriptSnapshot = ''
-      this.scriptEditorKeySeed += 1
-
-      const market = meta.market || query.market
-      const symbol = meta.symbol || query.symbol
-      if (market) this.runForm.marketCategory = this.normalizeMarket(market)
-      if (symbol) this.runForm.symbol = String(symbol).trim()
-      this.syncSelectedWatchKey()
-    },
-    hasCopilotScriptDraft () {
-      return String((this.$route.query && this.$route.query.aiDraft) || '') === '1' &&
-        String((this.$route.query && this.$route.query.tab) || '').toLowerCase() === 'script' &&
-        !this.scriptDraftStrategyId &&
-        String(this.scriptCode || '').trim() &&
-        String(this.scriptCode || '').trim() !== String(DEFAULT_SCRIPT_CODE || '').trim()
-    },
-    handleScriptSaveShortcut (event) {
-      if (!event || (!event.ctrlKey && !event.metaKey) || String(event.key || '').toLowerCase() !== 's') return
-      if (this.activeMode !== 'script') return
-      event.preventDefault()
-      event.stopPropagation()
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation()
-      this.saveScriptFromShortcut()
-    },
-    async saveScriptFromShortcut () {
-      if (this.savingScript) return
-      if (this.scriptDraftStrategyId && this.lastSavedScriptSnapshot === this.scriptSourceSnapshot()) {
-        this.$message.info(this.text.noScriptChanges || this.text.saveSuccess)
+    async initPage () {
+      await this.loadSources()
+      if (this.isDraftRoute() || this.hasCopilotScriptDraft()) {
+        this.createNewDraft({
+          openTemplate: this.shouldOpenTemplateFromRoute(),
+          updateRoute: false,
+          assetType: this.getRouteAssetType()
+        })
+        this.applyCopilotScriptDraft()
+        if (this.isLegacyAiDraftRoute() || this.hasRouteSourceId()) {
+          this.writeDraftRoute({ openTemplate: this.shouldOpenTemplateFromRoute() })
+        }
+        this.applyIndicatorConvertRouteOnce()
         return
       }
-      await this.saveScriptStrategy(false)
-    },
-    marketLabel (market) {
-      const key = String(market || '').trim()
-      const labels = {
-        Crypto: this.isZh ? '加密货币' : 'Crypto',
-        USStock: this.isZh ? '美股' : 'US Stocks',
-        CNStock: this.isZh ? 'A 股' : 'China A-Shares',
-        HKStock: this.isZh ? 'H 股' : 'Hong Kong Stocks',
-        Forex: this.isZh ? '外汇' : 'Forex',
-        Futures: this.isZh ? '期货' : 'Futures',
-        MOEX: 'MOEX'
+      const routeId = this.getInitialRouteSourceId()
+      const hasRouteSource = routeId && this.allScriptOptions.some(item => String(item.id) === String(routeId))
+      const firstId = this.scriptOptions.length ? this.scriptOptions[0].id : ''
+      if (hasRouteSource) {
+        await this.openSource(routeId, { updateRoute: false })
+      } else if (firstId) {
+        await this.openSource(firstId, { updateRoute: true })
+      } else {
+        this.createNewDraft({ openTemplate: false })
       }
-      return labels[key] || key || (this.isZh ? '未知市场' : 'Unknown')
+      this.applyIndicatorConvertRouteOnce()
     },
-    normalizeMarket (market) {
-      const raw = String(market || 'Crypto').trim()
-      const aliases = {
-        crypto: 'Crypto',
-        usstock: 'USStock',
-        usstocks: 'USStock',
-        stock: 'USStock',
-        cnstock: 'CNStock',
-        ashare: 'CNStock',
-        hkstock: 'HKStock',
-        forex: 'Forex',
-        futures: 'Futures',
-        moex: 'MOEX'
-      }
-      return aliases[raw.toLowerCase()] || raw
-    },
-    normalizeWatchItem (item) {
-      if (!item || typeof item !== 'object') return null
-      const market = this.normalizeMarket(item.market || item.market_category || 'Crypto')
-      const symbol = String(item.symbol || '').trim()
-      if (!symbol) return null
-      return {
-        ...item,
-        market,
-        symbol,
-        name: String(item.name || item.display_name || '').trim()
-      }
-    },
-    extractStrategies (res) {
-      const data = res && res.data
-      if (Array.isArray(data)) return data
-      if (data && Array.isArray(data.strategies)) return data.strategies
-      if (data && Array.isArray(data.sources)) return data.sources
-      if (data && Array.isArray(data.items)) return data.items
-      return []
-    },
-    isScriptStrategy (item) {
-      return item && (item.strategy_type === 'ScriptStrategy' || item.strategy_mode === 'script')
-    },
-    async loadScriptStrategies () {
+    async loadSources () {
       this.loadingScripts = true
       try {
         const res = await getScriptSourceList()
-        this.scriptStrategies = this.extractStrategies(res)
-        const queryId = this.$route.query && (this.$route.query.source_id || this.$route.query.strategy_id)
-        const currentId = this.selectedScriptId || this.scriptDraftStrategyId
-        const currentExists = currentId && this.scriptStrategies.some(item => {
-          const id = item && (item.id || item.source_id || item.sourceId)
-          return String(id) === String(currentId)
-        })
-        const firstScript = this.scriptStrategies[0]
-        const firstId = firstScript && (firstScript.id || firstScript.source_id || firstScript.sourceId)
-        const targetId = queryId || (currentExists ? currentId : (this.hasCopilotScriptDraft() ? null : firstId))
-
-        if (targetId && String(targetId) !== String(this.scriptDraftStrategyId || '')) {
-          this.selectedScriptId = String(targetId)
-          await this.handleScriptSelect(this.selectedScriptId, { silentRoute: !!queryId })
-        } else if (targetId) {
-          this.selectedScriptId = String(targetId)
-        }
+        this.scriptSources = this.extractSources(res)
       } catch (e) {
         this.$message.warning(this.text.loadScriptsFailed)
       } finally {
         this.loadingScripts = false
       }
     },
-    applyStrategyToEditor (strategy) {
-      const metadata = strategy.metadata || {}
-      const tc = metadata.last_run_config || {}
-      this.scriptDraftStrategyId = strategy.id || strategy.source_id || null
-      this.selectedScriptId = this.scriptDraftStrategyId ? String(this.scriptDraftStrategyId) : undefined
-      this.scriptRuntimeStrategyId = null
-      this.scriptDraftStrategy = strategy
-      this.scriptName = strategy.name || strategy.strategy_name || ''
-      this.scriptCode = strategy.code || strategy.strategy_code || DEFAULT_SCRIPT_CODE
-      this.scriptTemplateKey = strategy.template_key || tc.script_template_key || ''
-      this.scriptTemplateParams = {
-        ...((metadata && metadata.script_template_params) || {}),
-        ...((tc && tc.script_template_params) || {})
+    async refreshSources () {
+      await this.loadSources()
+      if (this.currentSourceId) {
+        await this.openSource(this.currentSourceId, { updateRoute: false })
       }
-      this.editorInitialTemplateKey = ''
-      this.scriptVerified = !!(metadata.lifecycle_verified || metadata.script_verified)
-      this.scriptEditorKeySeed += 1
-      this.runForm.marketCategory = this.normalizeMarket(tc.market_category || 'Crypto')
-      this.runForm.symbol = tc.symbol || this.runForm.symbol || 'BTC/USDT'
-      this.runForm.timeframe = '1m'
-      this.runForm.marketType = this.supportsSwap && (tc.market_type === 'swap' || tc.market_type === 'futures') ? 'swap' : 'spot'
-      this.runForm.tradeDirection = this.supportsSwap
-        ? (tc.trade_direction || this.runForm.tradeDirection || 'long')
-        : 'long'
-      this.runForm.initialCapital = Number(tc.initial_capital || strategy.initial_capital || this.runForm.initialCapital || 10000)
-      this.runForm.leverage = !this.supportsSwap
-        ? 1
-        : Number(tc.leverage || strategy.leverage || this.runForm.leverage || 5)
-      this.syncSelectedWatchKey()
-      this.lastSavedScriptSnapshot = this.scriptSourceSnapshot()
     },
-    async handleScriptSelect (id, opts = {}) {
-      if (!id) {
-        this.newScriptDraft()
-        return
-      }
+    extractSources (res) {
+      const data = res && res.data
+      if (Array.isArray(data)) return data
+      if (data && Array.isArray(data.sources)) return data.sources
+      if (data && Array.isArray(data.strategies)) return data.strategies
+      if (data && Array.isArray(data.items)) return data.items
+      return []
+    },
+    getInitialRouteSourceId () {
+      const query = this.$route.query || {}
+      const value = query.source_id || query.sourceId || query.strategy_id || query.strategyId
+      return value ? String(value).trim() : ''
+    },
+    getRouteAssetType () {
+      const query = this.$route.query || {}
+      return String(query.asset_type || query.assetType || '').trim() === 'portfolio_strategy' ? 'portfolio_strategy' : 'script'
+    },
+    isDraftRoute () {
+      const query = this.$route.query || {}
+      return String(query.draft || '') === '1' || this.isLegacyAiDraftRoute()
+    },
+    isLegacyAiDraftRoute () {
+      const query = this.$route.query || {}
+      return String(query.aiDraft || '') === '1'
+    },
+    hasRouteSourceId () {
+      return !!this.getInitialRouteSourceId()
+    },
+    hasCopilotScriptDraft () {
+      if (typeof sessionStorage === 'undefined') return false
       try {
-        const res = await getScriptSourceDetail(id)
-        const strategy = (res && res.data) || res
-        if (!strategy || !strategy.id) throw new Error('Not a script source')
-        this.applyStrategyToEditor(strategy)
-        if (!opts.silentRoute) {
-          const query = { ...(this.$route.query || {}), tab: 'script', source_id: String(id) }
-          delete query.strategy_id
-          this.$router.replace({ path: '/strategy-ide', query }).catch(() => {})
-        }
-      } catch (e) {
-        this.$message.error(this.text.loadScriptFailed)
+        return !!String(sessionStorage.getItem('qd_copilot_script_strategy_code') || '').trim()
+      } catch (_) {
+        return false
       }
     },
-    newScriptDraft () {
+    applyCopilotScriptDraft () {
+      if (typeof sessionStorage === 'undefined') return
+      let code = ''
+      let meta = {}
+      try {
+        code = String(sessionStorage.getItem('qd_copilot_script_strategy_code') || '').trim()
+        const rawMeta = sessionStorage.getItem('qd_copilot_script_strategy_meta') || ''
+        meta = rawMeta ? JSON.parse(rawMeta) : {}
+        if (code) {
+          sessionStorage.removeItem('qd_copilot_script_strategy_code')
+          sessionStorage.removeItem('qd_copilot_script_strategy_meta')
+        }
+      } catch (_) {
+        meta = {}
+      }
+      if (!code) return
+      this.currentSource = null
+      this.currentSourceId = null
       this.selectedScriptId = undefined
-      this.scriptDraftStrategyId = null
-      this.scriptRuntimeStrategyId = null
-      this.scriptDraftStrategy = null
-      this.scriptName = ''
-      this.scriptCode = DEFAULT_SCRIPT_CODE
+      this.scriptCodeHidden = false
+      this.scriptCode = code
       this.scriptTemplateKey = ''
       this.scriptTemplateParams = {}
+      this.scriptParamSchema = {}
       this.editorInitialTemplateKey = ''
-      this.scriptEditorKeySeed += 1
       this.scriptVerified = false
-      this.lastSavedScriptSnapshot = ''
-      const query = { ...(this.$route.query || {}), tab: 'script' }
-      delete query.strategy_id
-      delete query.source_id
-      this.$router.replace({ path: '/strategy-ide', query }).catch(() => {})
-    },
-    onWatchSymbolChange (value) {
-      const selected = (this.watchlistOptions || []).find(item => item.value === value)
-      if (!selected) return
-      this.runForm.marketCategory = this.normalizeMarket(selected.market || 'Crypto')
-      this.runForm.symbol = selected.symbol || ''
-    },
-    syncSelectedWatchKey () {
-      const current = `${this.runForm.marketCategory || 'Crypto'}:${this.runForm.symbol || ''}`
-      const options = this.watchlistOptions || []
-      const matched = options.find(item => item.value === current) || options[0]
-      if (matched) {
-        this.selectedWatchKey = matched.value
-        this.onWatchSymbolChange(matched.value)
+      this.lastSavedSnapshot = ''
+      this.runConfig = {
+        ...this.runConfig,
+        market_category: meta.market || this.runConfig.market_category,
+        symbol: meta.symbol || this.runConfig.symbol
       }
     },
-    async loadWatchlist () {
-      this.loadingWatchlist = true
+    shouldOpenTemplateFromRoute () {
+      const query = this.$route.query || {}
+      return String(query.template_picker || '') === '1'
+    },
+    getScriptSourceId (item) {
+      if (!item) return ''
+      return String(item.id || item.source_id || item.sourceId || '').trim()
+    },
+    async handleScriptSelect (id) {
+      if (!id) {
+        this.createNewDraft({ openTemplate: false })
+        return
+      }
+      await this.openSource(id, { updateRoute: true })
+    },
+    async openSource (id, options = {}) {
+      const sourceId = String(id || '').trim()
+      if (!sourceId) return
       try {
-        const res = await getWatchlist({ userid: this.userId })
-        const raw = Array.isArray(res && res.data)
-          ? res.data
-          : ((res && res.data && (res.data.watchlist || res.data.items)) || [])
-        this.watchlist = raw.map(this.normalizeWatchItem).filter(Boolean)
+        const res = await getScriptSourceDetail(sourceId)
+        const source = (res && res.data) || res
+        if (!source || !this.getScriptSourceId(source)) {
+          throw new Error(this.text.loadScriptFailed)
+        }
+        this.applySource(source)
+        if (options.updateRoute !== false) {
+          this.writeRouteSource(this.currentSourceId)
+        }
       } catch (e) {
-        this.watchlist = []
-      } finally {
-        this.loadingWatchlist = false
-        this.syncSelectedWatchKey()
+        this.$message.error(e.backendMessage || e.message || this.text.loadScriptFailed)
+      }
+    },
+    applySource (source) {
+      const metadata = this.parseObject(source.metadata)
+      const runConfig = this.parseObject(metadata.last_run_config)
+      this.currentSource = source
+      this.currentAssetType = source.asset_type === 'portfolio_strategy' ? 'portfolio_strategy' : 'script'
+      this.currentSourceId = this.getScriptSourceId(source)
+      this.selectedScriptId = this.currentSourceId ? String(this.currentSourceId) : undefined
+      this.scriptCodeHidden = !!(source.code_hidden || metadata.code_hidden || metadata.hide_code)
+      this.scriptCode = this.scriptCodeHidden
+        ? ''
+        : String(source.code || source.strategy_code || (this.currentAssetType === 'portfolio_strategy' ? DEFAULT_PORTFOLIO_CODE : DEFAULT_SCRIPT_CODE))
+      this.scriptTemplateKey = source.template_key || runConfig.script_template_key || ''
+      this.scriptTemplateParams = {
+        ...this.parseObject(metadata.script_template_params),
+        ...this.parseObject(runConfig.script_template_params)
+      }
+      this.scriptParamSchema = this.parseObject(source.param_schema || source.paramSchema)
+      this.runConfig = {
+        ...this.runConfig,
+        ...runConfig
+      }
+      const universeReference = this.extractUniverseReferenceFromCode(this.scriptCode)
+      if (universeReference.id && !this.runConfig.universe_id) {
+        this.runConfig = {
+          ...this.runConfig,
+          universe_id: universeReference.id,
+          universe_code: universeReference.code
+        }
+      }
+      this.editorInitialTemplateKey = ''
+      this.editorKeySeed += 1
+      this.scriptVerified = !!(metadata.lifecycle_verified || metadata.script_verified)
+      this.lastSavedSnapshot = this.scriptSnapshot()
+    },
+    createNewDraft ({ openTemplate = false, updateRoute = true, assetType = this.currentAssetType } = {}) {
+      this.currentSource = null
+      this.currentSourceId = null
+      this.selectedScriptId = undefined
+      this.currentAssetType = assetType === 'portfolio_strategy' ? 'portfolio_strategy' : 'script'
+      this.scriptCode = this.currentAssetType === 'portfolio_strategy' ? DEFAULT_PORTFOLIO_CODE : DEFAULT_SCRIPT_CODE
+      this.scriptCodeHidden = false
+      this.scriptTemplateKey = ''
+      this.scriptTemplateParams = {}
+      this.scriptParamSchema = {}
+      this.editorInitialTemplateKey = ''
+      this.scriptVerified = false
+      this.runConfig = {
+        ...this.runConfig,
+        universe_id: undefined,
+        universe_code: '',
+        universe_name: ''
+      }
+      this.lastSavedSnapshot = ''
+      this.editorKeySeed += 1
+      if (updateRoute) this.writeDraftRoute({ openTemplate })
+      if (openTemplate) {
+        this.$nextTick(() => {
+          const editor = this.$refs.scriptEditor
+          if (editor && typeof editor.openTemplatePicker === 'function') {
+            editor.openTemplatePicker()
+          }
+        })
+      }
+    },
+    handleAssetTypeChange (assetType) {
+      const target = assetType === 'portfolio_strategy' ? 'portfolio_strategy' : 'script'
+      if (target === this.currentAssetType) return
+      const switchWorkspace = async () => {
+        this.currentAssetType = target
+        const first = this.allScriptOptions.find(item => item.asset_type === target)
+        if (first) await this.openSource(first.id, { updateRoute: true })
+        else this.createNewDraft({ openTemplate: false, updateRoute: true, assetType: target })
+      }
+      const defaultCode = this.currentAssetType === 'portfolio_strategy' ? DEFAULT_PORTFOLIO_CODE : DEFAULT_SCRIPT_CODE
+      const shouldConfirm = this.currentSourceId
+        ? this.hasUnsavedScriptChanges
+        : String(this.scriptCode || '').trim() !== String(defaultCode).trim()
+      if (shouldConfirm) {
+        this.$confirm({
+          title: this.text.switchWorkspaceTitle,
+          content: this.text.switchWorkspaceContent,
+          okText: this.text.switchWorkspaceTitle,
+          cancelText: this.text.cancel,
+          onOk: switchWorkspace
+        })
+        return
+      }
+      switchWorkspace()
+    },
+    extractUniverseReferenceFromCode (code) {
+      const match = String(code || '').match(/^\s*#\s*@universe\s+(\d+)(?:\s+([^\s#]+))?/im)
+      return match ? { id: Number(match[1]), code: String(match[2] || '').trim() } : { id: undefined, code: '' }
+    },
+    applyUniverseReferenceToCode (item) {
+      if (this.scriptCodeHidden) return
+      const line = `# @universe ${Number(item.id)} ${String(item.code || '').trim()}`
+      const pattern = /^\s*#\s*@universe\s+\d+(?:\s+[^\s#]+)?\s*$/im
+      const code = String(this.scriptCode || '')
+      if (pattern.test(code)) {
+        this.scriptCode = code.replace(pattern, line)
+        return
+      }
+      const initPattern = /^def\s+on_init\s*\(/m
+      this.scriptCode = initPattern.test(code) ? code.replace(initPattern, `${line}\n\ndef on_init(`) : `${line}\n${code}`
+    },
+    handleUniverseUse (item) {
+      if (!item || this.currentAssetType !== 'portfolio_strategy') return
+      this.runConfig = {
+        ...this.runConfig,
+        universe_id: Number(item.id),
+        universe_code: item.code || '',
+        universe_name: item.name || item.code || ''
+      }
+      this.applyUniverseReferenceToCode(item)
+      this.showUniverseLibrary = false
+      this.$message.success(this.text.universeApplied.replace('{name}', item.name || item.code || ''))
+    },
+    async applyGeneratedRobot (generated) {
+      if (!generated || !generated.strategy_code) return
+      const generatedCode = String(generated.strategy_code)
+      this.currentSource = null
+      this.currentSourceId = null
+      this.selectedScriptId = undefined
+      this.currentAssetType = 'script'
+      this.scriptCodeHidden = false
+      this.scriptTemplateKey = ''
+      this.scriptTemplateParams = {}
+      this.scriptParamSchema = {}
+      this.editorInitialTemplateKey = ''
+      this.scriptVerified = false
+      this.runConfig = {
+        ...this.runConfig,
+        ...(generated.trading_config || {}),
+        universe_id: undefined,
+        universe_code: '',
+        universe_name: '',
+        market_category: generated.market_category || 'Crypto',
+        symbol: generated.symbol || this.runConfig.symbol,
+        timeframe: generated.timeframe || this.runConfig.timeframe,
+        market_type: generated.market_type || this.runConfig.market_type,
+        trade_direction: generated.trade_direction || this.runConfig.trade_direction,
+        leverage: Number(generated.leverage || this.runConfig.leverage || 1),
+        initial_capital: Number(generated.initial_capital || this.runConfig.initial_capital || 10000)
+      }
+      this.scriptCode = generatedCode
+      this.editorKeySeed += 1
+      await this.$nextTick()
+      const editor = this.$refs.scriptEditor
+      if (editor && typeof editor.setCode === 'function') {
+        editor.setCode(generatedCode)
+      }
+      this.lastSavedSnapshot = ''
+      this.showRobotBuilder = false
+      this.$message.success(this.text.robotGenerated.replace('{name}', generated.strategy_name || ''))
+    },
+    writeRouteSource (sourceId) {
+      if (!sourceId) return
+      const query = { ...(this.$route.query || {}), tab: 'script', source_id: String(sourceId) }
+      delete query.draft
+      delete query.template_picker
+      delete query.aiDraft
+      delete query.symbol
+      delete query.market
+      delete query.sourceId
+      delete query.strategy_id
+      delete query.strategyId
+      delete query.convert
+      delete query.convert_key
+      delete query.source_indicator_id
+      delete query.indicator_id
+      delete query.indicatorId
+      delete query.timeframe
+      delete query.asset_type
+      delete query.assetType
+      this.replaceRouteQuery(query)
+    },
+    writeDraftRoute ({ openTemplate = false } = {}) {
+      const query = {
+        ...(this.$route.query || {}),
+        tab: 'script',
+        draft: '1',
+        asset_type: this.currentAssetType
+      }
+      delete query.assetType
+      if (openTemplate) query.template_picker = '1'
+      else delete query.template_picker
+      delete query.source_id
+      delete query.sourceId
+      delete query.strategy_id
+      delete query.strategyId
+      delete query.aiDraft
+      delete query.symbol
+      delete query.market
+      delete query.convert
+      delete query.convert_key
+      delete query.source_indicator_id
+      delete query.indicator_id
+      delete query.indicatorId
+      delete query.timeframe
+      this.replaceRouteQuery(query)
+    },
+    replaceRouteQuery (query) {
+      const clean = {}
+      Object.keys(query || {}).forEach(key => {
+        const value = query[key]
+        if (value !== undefined && value !== null && String(value) !== '') {
+          clean[key] = value
+        }
+      })
+      const current = JSON.stringify(this.$route.query || {})
+      const next = JSON.stringify(clean)
+      if (current !== next) {
+        this.$router.replace({ path: '/strategy-ide', query: clean }).catch(() => {})
+      }
+    },
+    parseObject (value) {
+      if (!value) return {}
+      if (typeof value === 'object' && !Array.isArray(value)) return { ...value }
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value)
+          return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+        } catch (_) {
+          return {}
+        }
+      }
+      return {}
+    },
+    handleTemplateChange (payload) {
+      this.scriptTemplateKey = (payload && payload.key) || ''
+      this.scriptTemplateParams = payload && payload.params && typeof payload.params === 'object'
+        ? { ...payload.params }
+        : {}
+      this.scriptParamSchema = payload && payload.param_schema && typeof payload.param_schema === 'object'
+        ? { ...payload.param_schema }
+        : {}
+      if (this.scriptCodeHidden) {
+        this.runConfig = {
+          ...this.runConfig,
+          script_template_key: this.scriptTemplateKey,
+          script_template_params: { ...this.scriptTemplateParams }
+        }
+      }
+      this.scriptVerified = false
+    },
+    handleSaveShortcut (event) {
+      if (!event || !(event.ctrlKey || event.metaKey) || String(event.key || '').toLowerCase() !== 's') return
+      event.preventDefault()
+      this.saveScript(false)
+    },
+    extractScriptMetadataFromCode (code) {
+      const source = String(code || '')
+      const doc = source.match(/^\s*(?:[rubfRUBF]*)("""|''')([\s\S]*?)\1/)
+      if (doc) {
+        const lines = String(doc[2] || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+        if (lines.length) {
+          return {
+            name: lines[0],
+            description: lines.slice(1).join('\n')
+          }
+        }
+      }
+      const nameMatch = source.match(/^\s*(?:my_strategy_name|strategy_name)\s*=\s*(['"])(.*?)\1\s*$/m)
+      const descMatch = source.match(/^\s*(?:my_strategy_description|strategy_description)\s*=\s*(['"])(.*?)\1\s*$/m)
+      return {
+        name: nameMatch ? nameMatch[2] : '',
+        description: descMatch ? descMatch[2] : ''
       }
     },
     deriveScriptName () {
-      const explicit = String(this.scriptName || '').trim()
-      if (explicit) return explicit
-      const codeTitle = this.extractScriptTitleFromCode(this.scriptCode)
-      if (codeTitle) return codeTitle
-      const symbol = String(this.runForm.symbol || '').trim()
-      return symbol ? `${symbol} ${this.text.autoNameSuffix}` : this.text.defaultName
+      const meta = this.extractScriptMetadataFromCode(this.scriptCode)
+      if (meta.name) return meta.name
+      if (this.currentSource && this.currentSource.name) return this.currentSource.name
+      return this.text.defaultName
     },
-    extractScriptTitleFromCode (code) {
+    getCurrentScriptCode () {
+      const editor = this.$refs.scriptEditor
+      if (editor && typeof editor.getCode === 'function') {
+        return String(editor.getCode() || '')
+      }
+      return String(this.scriptCode || '')
+    },
+    extractScriptTimeframeFromCode (code) {
       const source = String(code || '')
-      const match = source.match(/^\s*("""|''')([\s\S]*?)\1/)
+      const match = source.match(/(?:^|\n)\s*#\s*timeframe\s*:\s*([A-Za-z0-9_-]+)/i)
       if (!match) return ''
-      const lines = String(match[2] || '').split(/\r?\n/)
-      const title = lines.map(line => String(line || '').trim()).find(Boolean)
-      return title || ''
-    },
-    onScriptTemplateChange (payload) {
-      this.scriptTemplateKey = (payload && payload.key) || ''
-      this.scriptTemplateParams = (payload && payload.params && typeof payload.params === 'object') ? { ...payload.params } : {}
-      this.scriptVerified = false
-    },
-    validateScriptCode () {
-      if (!String(this.scriptCode || '').trim()) {
-        this.$message.warning(this.text.codeRequired)
-        return false
+      const raw = String(match[1] || '').trim()
+      const aliases = {
+        '1m': '1m',
+        '5m': '5m',
+        '15m': '15m',
+        '30m': '30m',
+        '1h': '1H',
+        '4h': '4H',
+        '1d': '1D',
+        '1w': '1W'
       }
-      return true
-    },
-    validateRunForm () {
-      if (!this.validateScriptCode()) return false
-      if (!String(this.runForm.symbol || '').trim()) {
-        this.$message.warning(this.text.symbolRequired)
-        return false
-      }
-      const investmentAmount = Number(this.runForm.initialCapital)
-      if (!Number.isFinite(investmentAmount) || investmentAmount < this.investmentAmountMin || investmentAmount > this.investmentAmountMax) {
-        this.$message.warning(this.text.investmentAmountRange)
-        return false
-      }
-      return true
+      return aliases[raw.toLowerCase()] || ''
     },
     buildTradingConfig () {
-      const marketSupportsSwap = String(this.runForm.marketCategory || '') === 'Crypto'
-      const marketType = marketSupportsSwap && this.runForm.marketType === 'swap' ? 'swap' : 'spot'
-      const tradeDirection = marketType === 'spot' ? 'long' : (this.runForm.tradeDirection || 'long')
-      const investmentAmount = Number(this.runForm.initialCapital || 10000)
-      const config = {
+      const cfg = this.runConfig || {}
+      const marketCategory = cfg.market_category || cfg.marketCategory || 'Crypto'
+      const marketType = marketCategory === 'Crypto' && cfg.market_type === 'swap' ? 'swap' : 'spot'
+      const tradeDirection = marketType === 'spot' ? 'long' : (cfg.trade_direction || 'long')
+      const investmentAmount = Number(cfg.initial_capital || cfg.investment_amount || 10000)
+      const codeTimeframe = this.extractScriptTimeframeFromCode(this.getCurrentScriptCode())
+      const out = {
         runtime_contract_version: 'simple_script_v1',
-        symbol: String(this.runForm.symbol || '').trim(),
-        timeframe: '1m',
+        market_category: marketCategory,
+        exchange_id: marketCategory === 'Crypto' ? String(cfg.exchange_id || 'binance').toLowerCase() : '',
+        symbol: String(cfg.symbol || 'BTC/USDT').trim(),
+        timeframe: codeTimeframe || cfg.timeframe || '1m',
         tick_interval_sec: 10,
         market_type: marketType,
         trade_direction: tradeDirection,
         initial_capital: investmentAmount,
         investment_amount: investmentAmount,
-        leverage: marketType === 'spot' ? 1 : Number(this.runForm.leverage || 1)
+        leverage: marketType === 'spot' ? 1 : Number(cfg.leverage || 5)
       }
-      if (this.scriptTemplateKey) config.script_template_key = this.scriptTemplateKey
+      ;['strategy_family', 'executor_type', 'executor_config', 'executor_preview', 'bot_type', 'bot_params'].forEach(key => {
+        if (cfg[key] !== undefined && cfg[key] !== null) out[key] = cfg[key]
+      })
+      if (cfg.tick_interval_sec) out.tick_interval_sec = Number(cfg.tick_interval_sec)
+      if (this.scriptTemplateKey) out.script_template_key = this.scriptTemplateKey
       if (this.scriptTemplateParams && Object.keys(this.scriptTemplateParams).length) {
-        config.script_template_params = { ...this.scriptTemplateParams }
+        out.script_template_params = { ...this.scriptTemplateParams }
       }
-      return config
+      if (this.currentAssetType === 'portfolio_strategy') {
+        const universeReference = this.extractUniverseReferenceFromCode(this.getCurrentScriptCode())
+        const universeId = Number(universeReference.id || cfg.universe_id || cfg.universeId) || undefined
+        if (universeId) {
+          out.universe_id = universeId
+          out.universe_code = universeReference.code || cfg.universe_code || cfg.universeCode || ''
+          out.universe_name = cfg.universe_name || cfg.universeName || ''
+        }
+      }
+      return out
     },
-    buildScriptPayload () {
+    buildPayload () {
+      const currentCode = this.getCurrentScriptCode()
+      const meta = this.extractScriptMetadataFromCode(currentCode)
+      const description = meta.description || (this.currentSource && this.currentSource.description) || ''
       return {
         user_id: this.userId,
-        name: this.deriveScriptName(),
-        code: this.scriptCode,
+        name: meta.name || this.deriveScriptName(),
+        description,
+        code: currentCode,
+        asset_type: this.currentAssetType,
         template_key: this.scriptTemplateKey,
+        param_schema: this.currentSourceParamSchema,
         template_params: { ...this.scriptTemplateParams },
         metadata: {
+          description,
           last_run_config: this.buildTradingConfig(),
           script_template_params: { ...this.scriptTemplateParams },
           lifecycle_verified: this.scriptVerified,
@@ -1023,40 +1236,129 @@ export default {
         }
       }
     },
-    scriptSourceSnapshot () {
-      return JSON.stringify(this.buildScriptPayload())
+    buildHiddenParamPayload () {
+      const existingMeta = this.parseObject(this.currentSource && this.currentSource.metadata)
+      const description = (this.currentSource && this.currentSource.description) || ''
+      const lastRunConfig = this.buildTradingConfig()
+      return {
+        user_id: this.userId,
+        name: this.currentSourceName || this.text.defaultName,
+        description,
+        asset_type: this.currentAssetType,
+        template_key: this.scriptTemplateKey || (this.currentSource && this.currentSource.template_key) || '',
+        param_schema: this.currentSourceParamSchema,
+        metadata: {
+          ...existingMeta,
+          description,
+          code_hidden: true,
+          hide_code: true,
+          last_run_config: lastRunConfig,
+          script_template_params: { ...this.scriptTemplateParams }
+        }
+      }
     },
-    applySavedStrategy (raw) {
-      const data = raw && raw.data ? raw.data : raw
-      const id = data && (data.id || data.source_id || data.sourceId)
-      if (id) this.scriptDraftStrategyId = id
-      this.scriptName = this.deriveScriptName()
-      this.selectedScriptId = this.scriptDraftStrategyId ? String(this.scriptDraftStrategyId) : undefined
-      const query = { ...(this.$route.query || {}), tab: 'script', source_id: String(this.scriptDraftStrategyId) }
-      delete query.strategy_id
-      this.$router.replace({ path: '/strategy-ide', query }).catch(() => {})
-      this.lastSavedScriptSnapshot = this.scriptSourceSnapshot()
+    scriptSnapshot () {
+      if (this.scriptCodeHidden) {
+        return JSON.stringify({
+          id: this.currentSourceId,
+          code_hidden: true,
+          template_key: this.scriptTemplateKey || '',
+          template_params: { ...(this.scriptTemplateParams || {}) },
+          universe_id: this.selectedUniverseId || null
+        })
+      }
+      return JSON.stringify({
+        code: String(this.scriptCode || ''),
+        asset_type: this.currentAssetType,
+        template_key: this.scriptTemplateKey || '',
+        template_params: { ...(this.scriptTemplateParams || {}) },
+        universe_id: this.selectedUniverseId || null
+      })
     },
-    async saveScriptStrategy (forceCreate = false, opts = {}) {
+    validateScriptCode () {
+      if (this.scriptCodeHidden) return true
+      if (!String(this.scriptCode || '').trim()) {
+        this.$message.warning(this.text.codeRequired)
+        return false
+      }
+      return true
+    },
+    async verifyScriptCode (options = {}) {
+      const code = String(this.scriptCode || '').trim()
+      if (!code) {
+        this.$message.error(this.text.verifyBlocked.replace('{reason}', this.text.codeRequired))
+        return false
+      }
+      try {
+        const res = await verifyStrategyCode({
+          code,
+          assetType: this.currentAssetType,
+          user_id: this.userId,
+          strategyId: this.currentSourceId || undefined,
+          scriptSourceId: this.currentSourceId || undefined
+        })
+        const hints = Array.isArray(res && res.hints) ? res.hints : []
+        const blockers = hints.filter(item => {
+          const severity = String((item && item.severity) || '').toLowerCase()
+          return severity === 'error' || severity === 'fatal'
+        })
+        if (!(res && res.success) || blockers.length) {
+          const reason = this.formatVerifyHint(blockers[0]) || (res && (res.msg || res.message)) || this.text.verifyFailed
+          this.$message.error(this.text.verifyBlocked.replace('{reason}', reason))
+          return false
+        }
+        this.scriptVerified = true
+        if (!options.silentSuccess) this.$message.success(this.text.verifyPassed)
+        return true
+      } catch (e) {
+        this.$message.error(`${this.text.verifyFailed}: ${e.backendMessage || e.message || ''}`)
+        return false
+      }
+    },
+    formatVerifyHint (hint) {
+      if (!hint || !hint.code) return ''
+      const params = hint.params || {}
+      const calls = Array.isArray(params.calls) ? params.calls : []
+      const names = calls.map(item => item && item.name).filter(Boolean).join(', ')
+      const key = `strategyIde.verifyHints.${hint.code}`
+      const translated = this.$t(key, {
+        count: params.count || 0,
+        names
+      })
+      return translated && translated !== key ? translated : hint.code
+    },
+    async saveScript (forceCreate = false, options = {}) {
+      if (this.scriptCodeHidden) {
+        if (!options.silent) this.$message.info(this.text.hiddenScriptDesc)
+        return null
+      }
+      this.scriptCode = this.getCurrentScriptCode()
       if (!this.validateScriptCode()) return null
-      if (!forceCreate && this.scriptDraftStrategy && this.scriptDraftStrategy.status === 'running') {
+      if (!forceCreate && this.currentSource && this.currentSource.status === 'running') {
         this.$message.warning(this.text.runningEditBlocked)
         return null
       }
-      if (!forceCreate && opts.skipUnchanged && this.scriptDraftStrategyId && this.lastSavedScriptSnapshot === this.scriptSourceSnapshot()) {
-        return this.scriptDraftStrategyId
+      if (!forceCreate && this.currentSourceId && !this.hasUnsavedScriptChanges) {
+        if (!options.silent && !options.skipUnchanged) {
+          this.$message.info(this.text.noChangesToSave)
+        }
+        return this.currentSourceId
       }
+      if (this.savingScript) return null
       this.savingScript = true
+      this.savingScriptMode = options.loadingMode || (forceCreate ? 'copy' : 'save')
       try {
-        const payload = this.buildScriptPayload()
-        const res = (!forceCreate && this.scriptDraftStrategyId)
-          ? await updateScriptSource(this.scriptDraftStrategyId, payload)
+        const payload = this.buildPayload()
+        const res = (!forceCreate && this.currentSourceId)
+          ? await updateScriptSource(this.currentSourceId, payload)
           : await createScriptSource(payload)
         if (res && res.code === 1) {
-          this.applySavedStrategy(res)
-          await this.loadScriptStrategies()
-          if (!opts.silent) this.$message.success(this.text.saveSuccess)
-          return this.scriptDraftStrategyId
+          const saved = (res && res.data) || {}
+          const savedId = this.getScriptSourceId(saved) || this.currentSourceId
+          await this.loadSources()
+          await this.openSource(savedId, { updateRoute: true })
+          if (!options.silent) this.$message.success(this.text.saveSuccess)
+          return this.currentSourceId
         }
         this.$message.error((res && res.msg) || this.text.saveFailed)
         return null
@@ -1065,118 +1367,88 @@ export default {
         return null
       } finally {
         this.savingScript = false
+        this.savingScriptMode = ''
       }
     },
-    openScriptVersionDrawer () {
-      if (!this.scriptDraftStrategyId) return
-      this.showScriptVersionDrawer = true
-      this.scriptVersionPreview = null
-      this.loadScriptVersions()
-    },
-    async loadScriptVersions () {
-      if (!this.scriptDraftStrategyId) return
-      this.scriptVersionLoading = true
+    async saveHiddenScriptParams (options = {}) {
+      if (!this.scriptCodeHidden || !this.currentSourceId) return this.currentSourceId
+      if (this.savingScript) return null
+      this.savingScript = true
+      this.savingScriptMode = options.loadingMode || 'params'
       try {
-        const res = await getScriptSourceVersions(this.scriptDraftStrategyId)
+        const res = await updateScriptSource(this.currentSourceId, this.buildHiddenParamPayload())
         if (res && res.code === 1) {
-          this.scriptVersions = Array.isArray(res.data) ? res.data : []
-        } else {
-          this.$message.error((res && res.msg) || this.text.versionLoadFailed)
+          const saved = (res && res.data) || {}
+          const metadata = this.parseObject(saved.metadata || (this.currentSource && this.currentSource.metadata))
+          this.currentSource = {
+            ...(this.currentSource || {}),
+            ...saved,
+            code: '',
+            code_hidden: 1,
+            metadata: {
+              ...metadata,
+              code_hidden: true,
+              hide_code: true
+            }
+          }
+          this.lastSavedSnapshot = this.scriptSnapshot()
+          if (!options.silent) this.$message.success(this.text.saveSuccess)
+          return this.currentSourceId
         }
+        if (!options.silent) this.$message.error((res && res.msg) || this.text.saveFailed)
+        return null
       } catch (e) {
-        this.$message.error(e.backendMessage || e.message || this.text.versionLoadFailed)
+        if (!options.silent) this.$message.error(e.backendMessage || e.message || this.text.saveFailed)
+        return null
       } finally {
-        this.scriptVersionLoading = false
+        this.savingScript = false
+        this.savingScriptMode = ''
       }
     },
-    async previewScriptVersion (item) {
-      if (!item || !item.id) return
-      try {
-        const res = await getScriptSourceVersion(item.id)
-        if (res && res.code === 1) {
-          this.scriptVersionPreview = res.data || null
-        } else {
-          this.$message.error((res && res.msg) || this.text.versionLoadFailed)
-        }
-      } catch (e) {
-        this.$message.error(e.backendMessage || e.message || this.text.versionLoadFailed)
+    async openPublishModal () {
+      if (this.scriptCodeHidden) {
+        this.$message.warning(this.text.hiddenScriptDesc)
+        return
       }
-    },
-    confirmRestoreScriptVersion (item) {
-      if (!item || !item.id) return
-      this.$confirm({
-        title: this.text.versionRestoreTitle,
-        content: this.text.versionRestoreContent.replace('{version}', item.version_no),
-        okText: this.text.versionRestore,
-        cancelText: this.text.cancel,
-        onOk: () => this.restoreScriptVersion(item)
-      })
-    },
-    async restoreScriptVersion (item) {
-      if (!item || !item.id) return
-      this.restoringScriptVersionId = item.id
-      try {
-        const res = await restoreScriptSourceVersion(item.id)
-        if (res && res.code === 1 && res.data) {
-          this.applyStrategyToEditor(res.data)
-          await this.loadScriptStrategies()
-          await this.loadScriptVersions()
-          this.scriptVersionPreview = null
-          this.$message.success(this.text.versionRestored)
-        } else {
-          this.$message.error((res && res.msg) || this.text.versionRestoreFailed)
-        }
-      } catch (e) {
-        this.$message.error(e.backendMessage || e.message || this.text.versionRestoreFailed)
-      } finally {
-        this.restoringScriptVersionId = null
-      }
-    },
-    formatScriptVersionTime (value) {
-      if (!value) return ''
-      const date = new Date(value)
-      if (Number.isNaN(date.getTime())) return String(value)
-      return date.toLocaleString()
-    },
-    async openPublishScriptModal () {
-      const sourceId = await this.saveScriptStrategy(false)
+      if (!await this.verifyScriptCode()) return
+      const sourceId = await this.saveScript(false, { silent: true, loadingMode: 'publish' })
       if (!sourceId) return
-      const metadata = (this.scriptDraftStrategy && this.scriptDraftStrategy.metadata) || {}
+      if (!await this.hasSuccessfulBacktest(sourceId)) {
+        this.$message.warning(this.text.publishBacktestRequired)
+        return
+      }
+      const meta = this.extractScriptMetadataFromCode(this.scriptCode)
       this.publishForm = {
-        name: this.deriveScriptName(),
-        description: metadata.description || (this.scriptDraftStrategy && this.scriptDraftStrategy.description) || '',
+        name: meta.name || this.deriveScriptName(),
+        description: meta.description || (this.currentSource && this.currentSource.description) || '',
         pricingType: 'free',
-        price: 0
+        price: 0,
+        vipFree: false,
+        codeHidden: false
       }
       this.showPublishModal = true
     },
-    async createLiveFromScript () {
-      if (!this.validateScriptCode()) return
-      this.savingScript = true
+    async hasSuccessfulBacktest (sourceId) {
+      const id = Number(sourceId || 0)
+      if (!id) return false
       try {
-        const sourceId = await this.saveScriptStrategy(false, { skipUnchanged: true, silent: true })
-        if (!sourceId) return
-        const tradingConfig = this.buildTradingConfig()
-        this.$router.push({
-          path: '/strategy-script',
-          query: {
-            mode: 'create',
-            source_id: String(sourceId),
-            market_type: tradingConfig.market_type,
-            trade_direction: tradingConfig.trade_direction,
-            initial_capital: String(tradingConfig.initial_capital || 10000),
-            leverage: String(tradingConfig.leverage || 1)
-          }
-        }).catch(() => {})
-      } finally {
-        this.savingScript = false
+        const res = await getUnifiedBacktestHistory({
+          assetType: 'script',
+          assetId: id,
+          status: 'success',
+          limit: 1
+        })
+        const rows = Array.isArray(res && res.data) ? res.data : []
+        return res && res.code === 1 && rows.length > 0
+      } catch (_) {
+        return false
       }
     },
-    closePublishScriptModal () {
+    closePublishModal () {
       if (!this.publishingScript) this.showPublishModal = false
     },
-    async confirmPublishScriptSource () {
-      const sourceId = this.scriptDraftStrategyId || await this.saveScriptStrategy(false)
+    async confirmPublish () {
+      const sourceId = this.currentSourceId || await this.saveScript(false, { silent: true, loadingMode: 'publish' })
       if (!sourceId) return
       const pricingType = this.publishForm.pricingType === 'paid' ? 'paid' : 'free'
       const price = Number(this.publishForm.price || 0)
@@ -1186,12 +1458,15 @@ export default {
       }
       this.publishingScript = true
       try {
+        if (!await this.verifyScriptCode({ silentSuccess: true })) return
         const res = await publishScriptSource({
           sourceId,
           name: String(this.publishForm.name || '').trim() || this.deriveScriptName(),
           description: String(this.publishForm.description || '').trim(),
           pricingType,
-          price: pricingType === 'paid' ? price : 0
+          price: pricingType === 'paid' ? price : 0,
+          vipFree: pricingType === 'paid' ? !!this.publishForm.vipFree : false,
+          codeHidden: !!this.publishForm.codeHidden
         })
         if (res && res.code === 1) {
           this.$message.success(this.text.publishSuccess)
@@ -1205,76 +1480,439 @@ export default {
         this.publishingScript = false
       }
     },
-    deleteCurrentScriptSource () {
-      if (!this.scriptDraftStrategyId) return
+    deleteCurrentSource () {
+      if (!this.currentSourceId) return
       this.$confirm({
         title: this.text.deleteConfirmTitle,
         content: this.text.deleteConfirmDesc,
         okType: 'danger',
         onOk: async () => {
-          this.savingScript = true
+          this.deletingScript = true
           try {
-            const res = await deleteScriptSource(this.scriptDraftStrategyId)
+            const res = await deleteScriptSource(this.currentSourceId)
             if (res && res.code === 1) {
               this.$message.success(this.text.deleteSuccess)
-              this.newScriptDraft()
-              await this.loadScriptStrategies()
+              await this.loadSources()
+              const firstId = this.scriptOptions.length ? this.scriptOptions[0].id : ''
+              if (firstId) {
+                await this.openSource(firstId, { updateRoute: true })
+              } else {
+                this.createNewDraft({ openTemplate: false })
+              }
             } else {
               this.$message.error((res && res.msg) || this.text.deleteFailed)
             }
           } catch (e) {
             this.$message.error(e.backendMessage || e.message || this.text.deleteFailed)
           } finally {
-            this.savingScript = false
+            this.deletingScript = false
           }
         }
       })
     },
-    async prepareScriptBacktest () {
-      if (!this.validateRunForm()) return false
-      this.preparingBacktest = true
-      const hide = this.$message.loading(this.text.preparing, 0)
-      try {
-        const sourceId = await this.saveScriptStrategy(false, { skipUnchanged: true, silent: true })
-        if (!sourceId) return false
-        const tradingConfig = {
-          ...this.buildTradingConfig(),
-          script_source_id: Number(sourceId),
-          script_role: 'runtime'
-        }
-        this.scriptDraftStrategy = {
-          id: null,
-          strategy_name: this.deriveScriptName(),
-          strategy_type: 'ScriptStrategy',
-          strategy_mode: 'script',
-          strategy_code: '',
-          market_category: this.runForm.marketCategory || 'Crypto',
-          status: 'draft',
-          trading_config: tradingConfig
-        }
-        return {
-          scriptSourceId: Number(sourceId),
-          overrideConfig: {
-            ...tradingConfig,
-            market: this.runForm.marketCategory || 'Crypto',
-            market_category: this.runForm.marketCategory || 'Crypto',
-            strategy_name: this.deriveScriptName()
+    openBacktestCenter () {
+      const go = async () => {
+        const sourceId = this.scriptCodeHidden && this.currentSourceId
+          ? await this.saveHiddenScriptParams({ silent: true, loadingMode: 'backtest' })
+          : await this.saveScript(false, { skipUnchanged: true, silent: true, loadingMode: 'backtest' })
+        if (!sourceId) return
+        const cfg = this.buildTradingConfig()
+        this.$router.push({
+          path: '/backtest-center',
+          query: {
+            asset_type: this.currentAssetType,
+            source_id: String(sourceId),
+            exchange_id: cfg.exchange_id || '',
+            market_type: cfg.market_type,
+            universe_id: cfg.universe_id || ''
           }
+        }).catch(() => {})
+      }
+      go()
+    },
+    async createLiveFromScript () {
+      const sourceId = this.scriptCodeHidden && this.currentSourceId
+        ? await this.saveHiddenScriptParams({ silent: true, loadingMode: 'live' })
+        : await this.saveScript(false, { skipUnchanged: true, silent: true, loadingMode: 'live' })
+      if (!sourceId) return
+      const cfg = this.buildTradingConfig()
+      if (this.currentAssetType === 'portfolio_strategy') {
+        this.$router.push({
+          path: '/strategy-center',
+          query: {
+            mode: 'create',
+            asset_type: 'portfolio_strategy',
+            source_id: String(sourceId),
+            universe_id: cfg.universe_id || ''
+          }
+        }).catch(() => {})
+        return
+      }
+      this.$router.push({
+        path: '/strategy-center',
+        query: {
+          mode: 'create',
+          source_id: String(sourceId),
+          exchange_id: cfg.exchange_id || '',
+          market_type: cfg.market_type,
+          trade_direction: cfg.trade_direction,
+          initial_capital: String(cfg.initial_capital || 10000),
+          leverage: String(cfg.leverage || 1)
         }
+      }).catch(() => {})
+    },
+    openVersionDrawer () {
+      if (!this.currentSourceId) return
+      if (this.scriptCodeHidden) {
+        this.$message.info(this.text.versionHiddenBlocked)
+        return
+      }
+      this.showVersionDrawer = true
+      this.scriptVersionPreview = null
+      this.loadScriptVersions()
+    },
+    async loadScriptVersions () {
+      if (!this.currentSourceId) return
+      this.scriptVersionLoading = true
+      try {
+        const res = await getScriptSourceVersions(this.currentSourceId)
+        if (res && res.code === 1) {
+          this.scriptVersions = Array.isArray(res.data) ? res.data : []
+        } else {
+          this.$message.error((res && res.msg) || this.text.versionLoadFailed)
+        }
+      } catch (e) {
+        this.$message.error(e.backendMessage || e.message || this.text.versionLoadFailed)
       } finally {
-        this.preparingBacktest = false
-        if (typeof hide === 'function') hide()
+        this.scriptVersionLoading = false
       }
     },
-    applyScriptTuneParams (payload) {
-      if (!payload || !payload.code) return
-      this.scriptCode = payload.code
-      this.scriptVerified = false
-      this.$nextTick(() => {
-        if (this.$refs.scriptEditor && typeof this.$refs.scriptEditor.setCode === 'function') {
-          this.$refs.scriptEditor.setCode(payload.code)
+    async previewScriptVersion (item) {
+      if (!item || !item.id) return
+      if (this.scriptCodeHidden || item.code_hidden || item.hidden_source) {
+        this.$message.info(this.text.versionHiddenBlocked)
+        return
+      }
+      try {
+        const res = await getScriptSourceVersion(item.id)
+        if (res && res.code === 1) {
+          this.scriptVersionPreview = res.data || null
+        } else {
+          this.$message.error((res && res.msg) || this.text.versionLoadFailed)
         }
+      } catch (e) {
+        this.$message.error(e.backendMessage || e.message || this.text.versionLoadFailed)
+      }
+    },
+    confirmRestoreScriptVersion (item) {
+      if (!item || !item.id) return
+      if (this.scriptCodeHidden || item.code_hidden || item.hidden_source || item.restore_disabled) {
+        this.$message.info(this.text.versionHiddenBlocked)
+        return
+      }
+      this.$confirm({
+        title: this.text.versionRestoreTitle,
+        content: this.text.versionRestoreContent.replace('{version}', item.version_no),
+        okText: this.text.versionRestore,
+        cancelText: this.text.cancel,
+        onOk: () => this.restoreScriptVersion(item)
       })
+    },
+    async restoreScriptVersion (item) {
+      if (!item || !item.id) return
+      if (this.scriptCodeHidden || item.code_hidden || item.hidden_source || item.restore_disabled) {
+        this.$message.info(this.text.versionHiddenBlocked)
+        return
+      }
+      this.restoringScriptVersionId = item.id
+      try {
+        const res = await restoreScriptSourceVersion(item.id)
+        if (res && res.code === 1 && res.data) {
+          this.applySource(res.data)
+          await this.loadSources()
+          await this.loadScriptVersions()
+          this.scriptVersionPreview = null
+          this.$message.success(this.text.versionRestored)
+        } else {
+          this.$message.error((res && res.msg) || this.text.versionRestoreFailed)
+        }
+      } catch (e) {
+        this.$message.error(e.backendMessage || e.message || this.text.versionRestoreFailed)
+      } finally {
+        this.restoringScriptVersionId = null
+      }
+    },
+    async openIndicatorConvertPicker () {
+      this.indicatorConvertContext = null
+      this.selectedIndicatorConvertId = undefined
+      this.indicatorConvertInstruction = ''
+      this.indicatorConvertError = ''
+      this.showIndicatorConvertModal = true
+      await this.loadIndicatorOptions()
+    },
+    async loadIndicatorOptions () {
+      this.indicatorConvertIndicatorLoading = true
+      try {
+        const res = await getIndicatorListForStrategy({ userid: this.userId })
+        const list = this.extractIndicatorList(res)
+          .map(item => this.normalizeIndicator(item))
+          .filter(Boolean)
+        this.indicatorConvertIndicators = list
+      } catch (e) {
+        this.indicatorConvertIndicators = []
+        this.indicatorConvertError = e.backendMessage || e.message || this.text.indicatorConvertFailed
+      } finally {
+        this.indicatorConvertIndicatorLoading = false
+      }
+    },
+    extractIndicatorList (res) {
+      const data = res && res.data
+      if (Array.isArray(data)) return data
+      if (data && Array.isArray(data.items)) return data.items
+      if (data && Array.isArray(data.indicators)) return data.indicators
+      return []
+    },
+    normalizeIndicator (raw) {
+      if (!raw || typeof raw !== 'object') return null
+      const codeHidden = this.toBool(raw.codeHidden) || this.toBool(raw.code_hidden) || this.toBool(raw.is_encrypted)
+      return {
+        indicatorId: String(raw.indicatorId || raw.id || raw.indicator_id || '').trim(),
+        name: String(raw.name || raw.indicator_name || this.defaultIndicatorNameFromCode(raw.code || '') || '').trim(),
+        description: String(raw.description || '').trim(),
+        code: codeHidden ? '' : String(raw.code || '').trim(),
+        params: raw.params || {},
+        market: raw.market || raw.marketCategory || raw.market_category || 'Crypto',
+        symbol: raw.symbol || '',
+        exchangeId: raw.exchange_id || raw.exchangeId || '',
+        marketType: raw.market_type || raw.marketType || 'spot',
+        instrumentId: raw.instrument_id || raw.instrumentId || '',
+        timeframe: raw.timeframe || '1m',
+        codeHidden
+      }
+    },
+    toBool (value) {
+      if (value === true || value === 1) return true
+      return ['1', 'true', 'yes', 'y'].includes(String(value || '').trim().toLowerCase())
+    },
+    defaultIndicatorNameFromCode (code) {
+      const match = String(code || '').match(/^\s*my_indicator_name\s*=\s*(['"])(.*?)\1\s*$/m)
+      return match ? match[2] : ''
+    },
+    handleIndicatorConvertSelect (id) {
+      const target = (this.indicatorConvertIndicators || []).find(item => String(item.indicatorId) === String(id))
+      this.indicatorConvertContext = target || null
+      this.indicatorConvertError = ''
+      if (target) {
+        this.runConfig = {
+          ...this.runConfig,
+          market_category: target.market || 'Crypto',
+          exchange_id: target.exchangeId || this.runConfig.exchange_id,
+          market_type: target.marketType || this.runConfig.market_type,
+          symbol: target.symbol || this.runConfig.symbol,
+          timeframe: target.timeframe || '1m'
+        }
+      }
+    },
+    buildIndicatorConversionPrompt () {
+      const ctx = this.indicatorConvertContext || {}
+      const params = ctx.params && Object.keys(ctx.params).length ? JSON.stringify(ctx.params, null, 2) : '{}'
+      const instruction = String(this.indicatorConvertInstruction || '').trim() ||
+        'Convert the visible indicator signals into a conservative, event-based strategy. Confirm signals on closed bars and execute on the next bar to avoid look-ahead bias.'
+      return [
+        'Convert this QuantDinger chart-only indicator into executable QuantDinger Python ScriptStrategy code.',
+        '',
+        'Hard boundaries:',
+        '- Return ScriptStrategy code only. Do not return indicator backtest code, live-indicator code, indicator output, plots, layers, signals, or calculatedVars.',
+        '- Start the script with a triple-quoted metadata docstring. The first non-empty line is the strategy name, and the following non-empty lines are the strategy description. Do not put name or description in ctx.param.',
+        '- The strategy run panel owns symbol, spot/swap, direction, investment amount, leverage, and timeframe unless the source indicator has an explicit timeframe header. Do not define these with ctx.param and do not hard-code them.',
+        '- Declare every strategy parameter in on_init as ctx.name = ctx.param("name", default). Do not call ctx.param("name") without a default, and do not repeatedly read ctx.param inside on_bar.',
+        '- Preserve the indicator signal logic first. Map visual buy/entry markers to long entries, sell/exit markers to long exits, and warning markers to wait/risk states.',
+        '- Default to long-only unless the user explicitly asks for shorts and the indicator has clear bearish short-entry logic.',
+        '- First classify every marker as long entry, long exit, short entry, short exit, warning/wait, or visual-only. Marker color and type="sell" alone do not prove short-entry intent.',
+        '- Preserve composite event algebra exactly. For edge(A | B), compare the complete previous composite A_prev | B_prev; do not emit a duplicate event on the next bar.',
+        '- If the user explicitly requests symmetric shorts from a long-only indicator, derive and label them as new behavior; otherwise do not invent short entries.',
+        '- Confirm indicator conditions on the completed bar inside on_bar. Use # signal_timing: next_bar_open when code-owned timing is needed; the engine handles next-bar execution.',
+        '- Preserve recursive indicator parity. For EMA/ewm/MACD/Wilder-style smoothing, compute from all available bars with ctx.bars(ctx.current_index + 1), declare # startup_candle_count: N, and let the data engine own warmup readiness. Do not add a manual len(ctx.bars(...)) warmup gate inside on_bar.',
+        '- Prefer registered technical factors through ctx.factor(factor_id, **params) when the required calculation exists. CTA factors use only bars visible at the current index; fundamental factors are portfolio-only.',
+        '- Remove display-only params such as colors, visibility toggles, marker offsets, line extension, and plot layout. Every retained ctx.param must affect entry, exit, sizing, state, or risk.',
+        '- The chart timeframe below is UI context only. Do not emit a # timeframe header unless the indicator source code has an explicit timeframe header or the user explicitly requests one.',
+        '- For all-in compounding, size from ctx.available_capital and fall back to ctx.investment_amount. For proportional compounding, use current ctx.equity or available capital times an explicit allocation parameter.',
+        '- Use ScriptStrategy order APIs such as ctx.order_value, ctx.order_target, ctx.open_long, ctx.close_long, ctx.open_short, and ctx.close_short. Prevent duplicate orders on the same bar.',
+        '- Do not generate grid, DCA, or martingale executor logic unless the user explicitly asks for a ScriptStrategy version.',
+        '',
+        `Indicator name: ${ctx.name || this.text.defaultIndicatorName}`,
+        ctx.description ? `Indicator description: ${ctx.description}` : '',
+        `Market: ${ctx.market || ''}`,
+        `Symbol: ${ctx.symbol || ''}`,
+        `Chart timeframe UI context only (not a source-code header): ${ctx.timeframe || ''}`,
+        '',
+        `Indicator params JSON:\n${params}`,
+        '',
+        `User conversion request:\n${instruction}`,
+        '',
+        `Indicator source code:\n\`\`\`python\n${ctx.code || ''}\n\`\`\``
+      ].filter(Boolean).join('\n')
+    },
+    async confirmIndicatorToStrategy () {
+      const ctx = this.indicatorConvertContext || {}
+      if (!ctx.indicatorId) {
+        this.indicatorConvertError = this.text.indicatorConvertSelectFirst
+        return
+      }
+      if (ctx.codeHidden || !ctx.code) {
+        this.indicatorConvertError = ctx.codeHidden ? this.text.indicatorConvertHiddenBlocked : this.text.indicatorConvertNoCode
+        return
+      }
+      this.indicatorConvertLoading = true
+      this.indicatorConvertError = ''
+      try {
+        const res = await aiGenerateStrategy({
+          intent: 'indicator_to_strategy',
+          source: 'indicator_to_strategy',
+          prompt: this.buildIndicatorConversionPrompt(),
+          source_indicator_id: ctx.indicatorId || '',
+          save_script_source: true,
+          script_source_name: `${ctx.name || this.text.defaultIndicatorName} Strategy`,
+          script_source_description: `AI converted from indicator: ${ctx.name || this.text.defaultIndicatorName}`,
+          script_source_metadata: this.buildGeneratedMetadata(ctx)
+        })
+        const sourceId = this.extractGeneratedSourceId(res)
+        if (sourceId) {
+          await this.loadSources()
+          await this.openSource(sourceId, { updateRoute: false })
+          this.finishIndicatorConversion(sourceId)
+        } else {
+          const code = this.extractAiGeneratedCode(res)
+          if (!code) throw new Error((res && res.msg) || this.text.indicatorConvertFailed)
+          const fallback = await createScriptSource({
+            user_id: this.userId,
+            name: this.extractScriptMetadataFromCode(code).name || `${ctx.name || this.text.defaultIndicatorName} Strategy`,
+            description: this.extractScriptMetadataFromCode(code).description || `AI converted from indicator: ${ctx.name || this.text.defaultIndicatorName}`,
+            code,
+            metadata: this.buildGeneratedMetadata(ctx)
+          })
+          if (!(fallback && fallback.code === 1)) throw new Error((fallback && fallback.msg) || this.text.indicatorConvertFailed)
+          await this.loadSources()
+          const fallbackSourceId = this.getScriptSourceId(fallback.data)
+          await this.openSource(fallbackSourceId, { updateRoute: false })
+          this.finishIndicatorConversion(fallbackSourceId)
+        }
+        this.$message.success(this.text.indicatorConvertSuccess)
+      } catch (e) {
+        this.indicatorConvertError = e.backendMessage || e.message || this.text.indicatorConvertFailed
+      } finally {
+        this.indicatorConvertLoading = false
+      }
+    },
+    extractGeneratedSourceId (res) {
+      const data = (res && res.data) || {}
+      return data.source_id || data.sourceId || this.getScriptSourceId(data.source) || res.source_id || res.sourceId || ''
+    },
+    extractAiGeneratedCode (res) {
+      if (!res || typeof res !== 'object') return ''
+      const data = res.data || {}
+      const candidates = [res.code, res.script_code, res.strategy_code, data.code, data.script_code, data.strategy_code]
+      const code = candidates.find(item => typeof item === 'string' && item.trim())
+      return code ? String(code).trim() : ''
+    },
+    buildGeneratedMetadata (ctx = {}) {
+      return {
+        generated_by: 'ai_indicator_to_strategy',
+        source_indicator_id: ctx.indicatorId || '',
+        source_indicator_name: ctx.name || '',
+        source_indicator_market: ctx.market || '',
+        source_indicator_symbol: ctx.symbol || '',
+        source_indicator_timeframe: ctx.timeframe || '',
+        lifecycle_verified: false,
+        script_verified: false,
+        last_run_config: this.buildTradingConfig(),
+        script_template_params: {}
+      }
+    },
+    closeIndicatorConvertModal () {
+      if (this.indicatorConvertLoading) return
+      this.showIndicatorConvertModal = false
+      this.indicatorConvertError = ''
+      this.clearIndicatorConvertSession()
+      this.clearIndicatorConvertRoute()
+    },
+    finishIndicatorConversion (sourceId) {
+      this.showIndicatorConvertModal = false
+      this.indicatorConvertError = ''
+      this.clearIndicatorConvertSession()
+      this.writeRouteSource(sourceId)
+    },
+    clearIndicatorConvertSession () {
+      const key = String((this.$route.query || {}).convert_key || '').trim()
+      if (!key || typeof sessionStorage === 'undefined') return
+      try {
+        sessionStorage.removeItem(key)
+      } catch (_) {}
+    },
+    async applyIndicatorConvertRouteOnce () {
+      const query = this.$route.query || {}
+      const isConvert = String(query.convert || '').toLowerCase() === 'indicator' || !!query.convert_key || !!query.source_indicator_id
+      if (!isConvert) return
+      let context = null
+      const key = String(query.convert_key || '').trim()
+      if (key && typeof sessionStorage !== 'undefined') {
+        try {
+          context = JSON.parse(sessionStorage.getItem(key) || 'null')
+        } catch (_) {
+          context = null
+        }
+      }
+      if (!(this.indicatorConvertIndicators || []).length) {
+        await this.loadIndicatorOptions()
+      }
+      if (context) {
+        const storedContext = this.normalizeIndicator(context)
+        if (storedContext) {
+          const sourceIndex = (this.indicatorConvertIndicators || []).findIndex(item => String(item.indicatorId) === storedContext.indicatorId)
+          if (sourceIndex >= 0) {
+            const mergedContext = {
+              ...this.indicatorConvertIndicators[sourceIndex],
+              ...storedContext
+            }
+            this.indicatorConvertIndicators.splice(sourceIndex, 1, mergedContext)
+            context = mergedContext
+          } else {
+            this.indicatorConvertIndicators.unshift(storedContext)
+            context = storedContext
+          }
+        }
+      } else if (query.source_indicator_id || query.indicator_id) {
+        context = (this.indicatorConvertIndicators || []).find(item => String(item.indicatorId) === String(query.source_indicator_id || query.indicator_id))
+      }
+      if (!context) return
+      this.indicatorConvertContext = context
+      this.selectedIndicatorConvertId = context.indicatorId ? String(context.indicatorId) : undefined
+      this.showIndicatorConvertModal = true
+    },
+    clearIndicatorConvertRoute () {
+      const query = { ...(this.$route.query || {}) }
+      delete query.convert
+      delete query.convert_key
+      delete query.source_indicator_id
+      delete query.indicator_id
+      delete query.indicatorId
+      delete query.market
+      delete query.symbol
+      delete query.timeframe
+      this.replaceRouteQuery(query)
+    },
+    marketLabel (market) {
+      const text = String(market || '').trim()
+      if (!text) return '-'
+      const key = `dashboard.indicator.market.${text}`
+      const translated = this.$t(key)
+      return translated && translated !== key ? translated : text
+    },
+    formatTime (value) {
+      if (!value) return ''
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return String(value)
+      return date.toLocaleString()
     }
   }
 }
@@ -1282,185 +1920,142 @@ export default {
 
 <style lang="less" scoped>
 .strategy-ide-shell {
-  min-height: calc(100vh - 64px);
+  box-sizing: border-box;
+  height: calc(100vh - 64px);
+  padding: 12px;
   background: #f5f7fb;
-
-  ::v-deep .ant-tabs-bar {
-    margin: 0;
-    padding: 0 16px;
-    background: #fff;
-    border-bottom-color: #e5e7eb;
-  }
-
-  ::v-deep .ant-tabs-tab {
-    font-weight: 700;
-  }
+  overflow: hidden;
 }
 
-.script-select {
-  width: 260px;
-  max-width: 28vw;
+.strategy-ide-layout {
+  height: 100%;
+  min-height: 0;
+}
+
+.script-panel {
+  height: 100%;
+  min-height: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.script-panel ::v-deep .strategy-editor {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.script-panel ::v-deep .editor-top-toolbar {
+  flex: 0 0 auto;
+}
+
+.script-panel ::v-deep .editor-layout {
+  flex: 1 1 auto;
+  height: calc(100% - 57px);
+  min-height: 0;
+}
+
+.script-panel ::v-deep .code-col,
+.script-panel ::v-deep .side-col {
+  height: 100%;
+  min-height: 0;
+}
+
+.script-panel ::v-deep .code-section,
+.script-panel ::v-deep .side-tabs {
+  height: 100%;
+  min-height: 0;
+}
+
+.script-panel ::v-deep .code-editor-container {
+  min-height: 0;
+}
+
+.script-panel ::v-deep .CodeMirror {
+  height: 100% !important;
+}
+
+.ide-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.toolbar-left {
+  flex: 1 1 auto;
+}
+
+.toolbar-right {
+  flex: 0 0 auto;
+}
+
+.strategy-workspace-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 10px;
+  border-right: 1px solid #e5e7eb;
+}
+
+.strategy-workspace-copy {
+  display: flex;
+  width: 150px;
+  min-width: 0;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.strategy-workspace-copy strong {
+  color: #202735;
+  font-size: 13px;
+}
+
+.strategy-workspace-copy span {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #7b8494;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strategy-workspace-switcher .ant-radio-button-wrapper {
+  height: 36px;
+  padding: 0 13px;
+  line-height: 34px;
+  font-weight: 700;
 }
 
 .script-select-label {
   flex: 0 0 auto;
-  font-size: 12px;
+  color: #6b7280;
+  font-size: 13px;
   font-weight: 600;
-  color: #8c8c8c;
-  white-space: nowrap;
-  line-height: 34px;
 }
 
-.script-workspace {
-  display: grid;
-  grid-template-columns: minmax(680px, 1.2fr) minmax(560px, 0.95fr);
-  align-items: stretch;
-  gap: 12px;
-  padding: 12px;
-  height: calc(100vh - 118px);
-  overflow: hidden;
-}
-
-.script-panel {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-  overflow: hidden;
-}
-
-.script-panel--editor {
-  min-width: 0;
-  height: 100%;
-  max-height: none;
-  display: flex;
-  flex-direction: column;
-
-  ::v-deep .strategy-editor {
-    flex: 1 1 auto;
-    height: 100%;
-    min-height: 0;
-    padding: 10px;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-
-  ::v-deep .editor-layout {
-    height: calc(100% - 42px);
-    min-height: 0;
-    max-height: none;
-    overflow: hidden;
-  }
-
-  ::v-deep .code-editor-container {
-    height: 100%;
-    min-height: 0;
-  }
-
-  ::v-deep .code-col,
-  ::v-deep .code-section,
-  ::v-deep .side-col,
-  ::v-deep .side-tabs {
-    min-height: 0;
-  }
-
-  ::v-deep .CodeMirror {
-    height: 100% !important;
-  }
-
-  ::v-deep .CodeMirror-scroll {
-    min-height: 0 !important;
-  }
-
-  ::v-deep .CodeMirror-scroll::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  ::v-deep .CodeMirror-scroll::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: rgba(100, 116, 139, 0.46);
-  }
-
-  ::v-deep .CodeMirror-scroll::-webkit-scrollbar-track {
-    background: transparent;
-  }
-}
-
-.script-panel--backtest {
-  min-width: 0;
-  height: 100%;
-  max-height: none;
-  overflow-y: auto;
-
-  &::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: rgba(100, 116, 139, 0.46);
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-}
-
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-  border-bottom: 1px solid #eef2f7;
-  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
-}
-
-.panel-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 800;
-  color: #172033;
-
-  .anticon {
-    color: var(--primary-color, #1890ff);
-  }
-}
-
-.panel-desc {
-  margin-top: 4px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #64748b;
-}
-
-.script-code-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  width: 100%;
-  flex: 1 1 auto;
-  max-width: none;
-  justify-content: flex-end;
-}
-
-.script-live-button {
-  height: 34px;
-  padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.script-select {
+  width: 280px;
 }
 
 .ide-icon-btn {
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -1469,21 +2064,405 @@ export default {
 
 .ide-icon-btn--danger {
   color: #ff4d4f;
-  border-color: rgba(255, 77, 79, 0.65);
-  background: transparent;
+  border-color: rgba(255, 77, 79, 0.45);
+}
 
-  &:hover,
-  &:focus {
+.script-save-button,
+.script-live-button,
+.script-backtest-button,
+.indicator-convert-button,
+.factor-library-button,
+.universe-library-button {
+  height: 36px;
+  font-weight: 700;
+}
+
+.script-save-button,
+.script-live-button {
+  min-width: 76px;
+}
+
+.script-backtest-button,
+.indicator-convert-button {
+  min-width: 120px;
+}
+
+.universe-library-button--selected {
+  border-color: var(--primary-color, #52c41a);
+  color: var(--primary-color, #52c41a);
+  background: rgba(82, 196, 26, 0.08);
+}
+
+.theme-dark {
+  background: #0f0f0f;
+
+  .script-panel {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: #141414;
+  }
+
+  .ide-toolbar {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    background: #141414;
+  }
+
+  .script-select-label {
+    color: rgba(255, 255, 255, 0.62);
+  }
+
+  .strategy-workspace-copy strong {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .strategy-workspace-copy span {
+    color: rgba(255, 255, 255, 0.46);
+  }
+
+  .strategy-workspace-switcher {
+    border-right-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .strategy-workspace-switcher .ant-radio-button-wrapper {
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.68);
+    background: #202020;
+  }
+
+  .strategy-workspace-switcher .ant-radio-button-wrapper-checked {
+    border-color: var(--primary-color, #52c41a);
     color: #fff;
-    border-color: #ff4d4f;
-    background: #ff4d4f;
+    background: var(--primary-color, #52c41a);
+  }
+
+  ::v-deep .ant-select-selection,
+  ::v-deep .ant-input,
+  ::v-deep textarea.ant-input,
+  ::v-deep .ant-input-number,
+  ::v-deep .ant-input-number-input {
+    background: #111 !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: rgba(255, 255, 255, 0.86) !important;
   }
 }
 
-.action-divider {
-  width: 1px;
-  height: 20px;
-  background: #e5e7eb;
+@media (max-width: 1180px) {
+  .ide-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toolbar-left,
+  .toolbar-right {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .script-select {
+    flex: 1 1 260px;
+    width: auto;
+  }
+}
+</style>
+
+<style lang="less">
+.robot-builder-drawer {
+  .ant-drawer-body {
+    height: calc(100vh - 55px);
+    overflow: auto;
+    padding: 14px 18px 18px;
+    background: #f4f6f8;
+  }
+
+  .robot-builder-intro {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border: 1px solid #d9e2ec;
+    border-radius: 8px;
+    background: #fff;
+    color: #52606d;
+  }
+}
+
+.robot-builder-drawer--dark {
+  .ant-drawer-header,
+  .ant-drawer-content,
+  .ant-drawer-body {
+    border-color: #2b2b2b;
+    background: #0b0b0b;
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .ant-drawer-title,
+  .ant-drawer-close {
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .robot-builder-intro {
+    border-color: #2b2b2b;
+    background: #151515;
+    color: rgba(255, 255, 255, 0.58);
+  }
+}
+
+.script-publish-modal {
+  .ant-modal-content {
+    overflow: hidden;
+    border-radius: 12px;
+  }
+
+  .ant-modal-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid #edf0f5;
+  }
+
+  .ant-modal-body {
+    padding: 18px 24px 20px;
+    background: #f6f7f9;
+  }
+
+  .ant-modal-footer {
+    padding: 14px 24px;
+    border-top: 1px solid #edf0f5;
+    background: #fff;
+  }
+
+  .publish-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .publish-summary-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 74px;
+    padding: 14px;
+    border: 1px solid rgba(255, 77, 79, 0.22);
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(255, 77, 79, 0.1) 0%, #fff 72%);
+  }
+
+  .publish-summary-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #fff;
+    background: var(--primary-color, #ff4d4f);
+    box-shadow: 0 10px 24px rgba(255, 77, 79, 0.24);
+    font-size: 18px;
+  }
+
+  .publish-summary-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .publish-summary-label {
+    margin-bottom: 3px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b7280;
+  }
+
+  .publish-summary-name {
+    overflow: hidden;
+    color: #111827;
+    font-size: 16px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .publish-summary-tag {
+    margin: 0;
+    height: 24px;
+    line-height: 22px;
+    border-radius: 999px;
+    font-weight: 700;
+  }
+
+  .publish-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    color: #4b5563;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .publish-note .anticon {
+    margin-top: 3px;
+    color: var(--primary-color, #ff4d4f);
+  }
+
+  .publish-section,
+  .publish-option-card {
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .publish-section-title,
+  .field-label,
+  .publish-option-head {
+    color: #1f2937;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .publish-section-title {
+    margin-bottom: 10px;
+  }
+
+  .publish-pricing-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+
+  .publish-pricing-group .ant-radio-button-wrapper {
+    height: 40px;
+    line-height: 38px;
+    padding: 0 14px;
+    border: 1px solid #dfe3ea;
+    border-radius: 8px !important;
+    color: #4b5563;
+    text-align: center;
+    font-weight: 700;
+    background: #fafafa;
+    box-shadow: none;
+  }
+
+  .publish-pricing-group .ant-radio-button-wrapper::before {
+    display: none;
+  }
+
+  .publish-pricing-group .ant-radio-button-wrapper-checked {
+    color: #fff;
+    border-color: var(--primary-color, #ff4d4f);
+    background: var(--primary-color, #ff4d4f);
+    box-shadow: 0 8px 18px rgba(255, 77, 79, 0.24);
+  }
+
+  .publish-price-box {
+    margin-top: 12px;
+  }
+
+  .publish-price-input {
+    width: 100%;
+  }
+
+  .publish-option-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .publish-option-card.active {
+    border-color: var(--primary-color, #ff4d4f);
+    background: linear-gradient(135deg, rgba(255, 77, 79, 0.08) 0%, #fff 76%);
+    box-shadow: inset 0 0 0 1px rgba(255, 77, 79, 0.14);
+  }
+
+  .publish-option-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .publish-hint {
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+}
+
+.indicator-convert-modal {
+  .indicator-convert-box {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .indicator-convert-selector {
+    padding: 12px;
+    border: 1px solid rgba(239, 68, 68, 0.18);
+    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.06);
+  }
+
+  .field-label {
+    display: block;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .field-label--spaced {
+    margin-top: 4px;
+  }
+
+  .indicator-convert-current {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid rgba(239, 68, 68, 0.18);
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(255, 255, 255, 0.96));
+  }
+
+  .indicator-convert-current span {
+    display: block;
+    margin-bottom: 4px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .indicator-convert-current strong {
+    color: #111827;
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .indicator-convert-current small {
+    color: #64748b;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .indicator-convert-note {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid rgba(59, 130, 246, 0.16);
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.06);
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .indicator-convert-note .anticon {
+    margin-top: 3px;
+    color: #2563eb;
+  }
 }
 
 .code-version-toolbar {
@@ -1492,21 +2471,15 @@ export default {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
-  font-size: 13px;
   color: #64748b;
-
-  span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .code-version-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .code-version-item {
@@ -1514,9 +2487,9 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
 }
 
@@ -1524,33 +2497,32 @@ export default {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+}
 
-  strong {
-    color: #0f172a;
-  }
+.code-version-item__main strong {
+  color: #111827;
+}
 
-  span,
-  small {
-    color: #64748b;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+.code-version-item__main span,
+.code-version-item__main small {
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .code-version-item__actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
 .code-version-preview {
   margin-top: 16px;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
-  background: #0f172a;
 }
 
 .code-version-preview__head {
@@ -1558,13 +2530,9 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 10px;
-  background: transparent;
+  padding: 10px 12px;
   border-bottom: 1px solid #e5e7eb;
-
-  strong {
-    color: #0f172a;
-  }
+  background: #f8fafc;
 }
 
 .code-version-preview pre {
@@ -1572,589 +2540,101 @@ export default {
   margin: 0;
   padding: 12px;
   overflow: auto;
+  background: #0f172a;
   color: #e2e8f0;
-  font-size: 12px;
-  line-height: 1.55;
-  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
-  white-space: pre;
-}
-
-.run-config-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-  padding: 16px;
-  border-bottom: 1px solid #eef2f7;
-  background: #fbfdff;
-}
-
-.run-section {
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.run-section__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  font-size: 13px;
-  font-weight: 800;
-  color: #172033;
-
-  .anticon {
-    color: var(--primary-color, #1890ff);
-  }
-}
-
-.run-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(150px, 1fr));
-  gap: 12px;
-}
-
-.run-target-grid {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(132px, 180px);
-  align-items: end;
-  gap: 12px;
-}
-
-.run-fixed-cadence {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-}
-
-.run-field__hint {
-  margin-top: 6px;
-  color: #64748b;
-  font-size: 12px;
-}
-
-.target-summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 28px;
-  margin-top: 8px;
-  padding: 0;
-  background: #f8fafc;
-  color: #64748b;
-  font-size: 12px;
-
-  strong {
-    color: #172033;
-  }
-}
-
-.target-summary__divider {
-  width: 1px;
-  height: 14px;
-  background: #dbe3ef;
-}
-
-.run-field {
-  min-width: 0;
-
-  label {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 12px;
-    font-weight: 700;
-    color: #475569;
-  }
-
-  ::v-deep .ant-select,
-  ::v-deep .ant-input,
-  ::v-deep .ant-input-number {
-    width: 100%;
-  }
-
-  ::v-deep .ant-select-selection {
-    width: 100%;
-  }
-}
-
-.run-control {
-  width: 100%;
-}
-
-.run-control--symbol {
-  max-width: none;
-}
-
-.run-control--timeframe {
-  max-width: none;
-}
-
-.run-segment {
-  display: flex;
-
-  ::v-deep .ant-radio-button-wrapper {
-    flex: 1;
-    text-align: center;
-  }
-}
-
-.run-field--note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #eff6ff;
-  color: #2563eb;
   font-size: 12px;
   line-height: 1.6;
 }
 
-.run-field--template-note {
-  background: #eef2ff;
-  color: #1d39c4;
+.code-version-hidden {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 20px;
+  text-align: center;
+  color: #64748b;
+  background: #0f172a;
 }
 
-.run-field--boundary-note {
-  background: #f0fdf4;
-  color: #15803d;
+.code-version-hidden .anticon {
+  color: #52c41a;
+  font-size: 24px;
 }
 
-.script-backtest-panel {
-  padding: 14px 16px 16px;
-
-  ::v-deep .bt-toolbar {
-    gap: 12px;
-    padding: 12px;
-    margin-bottom: 12px;
-    border-radius: 8px;
-  }
-
-  ::v-deep .bt-toolbar__left {
-    flex-basis: 100%;
-  }
-
-  ::v-deep .bt-toolbar__dates {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    width: 100%;
-  }
-
-  ::v-deep .date-field .ant-calendar-picker {
-    width: 100%;
-  }
-
-  ::v-deep .bt-toolbar__actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: 100%;
-    margin-left: 0;
-  }
-
-  ::v-deep .bt-toolbar__actions .ant-btn {
-    width: 100%;
-  }
-
-  ::v-deep .bt-result-card,
-  ::v-deep .bt-trades-section,
-  ::v-deep .bt-history-section {
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  ::v-deep .bt-trades-table,
-  ::v-deep .bt-history-table {
-    max-width: 100%;
-  }
-
-  ::v-deep .ant-table-wrapper,
-  ::v-deep .ant-spin-nested-loading,
-  ::v-deep .ant-spin-container,
-  ::v-deep .ant-table,
-  ::v-deep .ant-table-content {
-    max-width: 100%;
-  }
-
-  ::v-deep .ant-table-content {
-    overflow-x: auto;
-    scrollbar-color: #cbd5e1 #f3f4f6;
-    scrollbar-width: thin;
-
-    &::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      border-radius: 999px;
-      background: #cbd5e1;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: #f3f4f6;
-    }
-  }
-
-  ::v-deep .ant-pagination {
-    max-width: 100%;
-    overflow-x: auto;
-    white-space: nowrap;
-  }
+.code-version-hidden strong {
+  color: #e2e8f0;
 }
 
-.theme-dark.strategy-ide-shell {
-  background: #0f0f10;
-
-  ::v-deep .ant-tabs-bar {
-    background: #0f0f10;
-    border-bottom-color: #303030;
-  }
-
-  ::v-deep .ant-tabs-tab {
-    color: rgba(255, 255, 255, 0.58) !important;
-  }
-
-  ::v-deep .ant-tabs-tab:hover {
-    color: rgba(255, 255, 255, 0.82) !important;
-  }
-
-  ::v-deep .ant-tabs-tab-active {
-    color: var(--primary-color-active, #177ddc) !important;
-  }
-
-  ::v-deep .ant-tabs-tab-disabled {
-    color: rgba(255, 255, 255, 0.25) !important;
-  }
-
-  .panel-title,
-  .run-section__title {
-    color: rgba(255, 255, 255, 0.88);
-  }
-
-  .panel-desc,
-  .run-field label {
-    color: rgba(255, 255, 255, 0.5);
-  }
-
-  .script-select-label {
-    color: rgba(255, 255, 255, 0.42);
-  }
-
-  .action-divider {
-    background: rgba(255, 255, 255, 0.12);
-  }
-
-  .script-panel {
-    background: #181818;
-    border-color: #303030;
-    box-shadow: none;
-  }
-
-  .script-backtest-panel {
-    ::v-deep .bt-toolbar,
-    ::v-deep .bt-tuner-card,
-    ::v-deep .bt-result-card,
-    ::v-deep .bt-history-empty {
-      background: #181818;
-      border-color: #303030;
-      box-shadow: none;
-    }
-
-    ::v-deep .ant-table {
-      background: transparent;
-      color: rgba(255, 255, 255, 0.74);
-    }
-
-    ::v-deep .ant-table-content {
-      scrollbar-color: #5b6472 #202020;
-
-      &::-webkit-scrollbar-thumb {
-        background: #5b6472;
-      }
-
-      &::-webkit-scrollbar-track {
-        background: #202020;
-      }
-    }
-
-    ::v-deep .ant-table-bordered,
-    ::v-deep .ant-table-bordered .ant-table-content,
-    ::v-deep .ant-table-bordered .ant-table-body,
-    ::v-deep .ant-table-small,
-    ::v-deep .ant-table-content,
-    ::v-deep .ant-table-body,
-    ::v-deep .ant-table-scroll,
-    ::v-deep .ant-table-header,
-    ::v-deep table {
-      border-color: #303030 !important;
-      box-shadow: none !important;
-    }
-
-    ::v-deep .ant-table-thead > tr > th {
-      background: #141414;
-      color: rgba(255, 255, 255, 0.72);
-      border-color: #303030 !important;
-    }
-
-    ::v-deep .ant-table-tbody > tr > td {
-      color: rgba(255, 255, 255, 0.74);
-      border-color: #282828 !important;
-      box-shadow: none !important;
-    }
-
-    ::v-deep .ant-table-tbody > tr:hover > td,
-    ::v-deep .bt-tuner-row--active td {
-      background: #1f2a33 !important;
-    }
-
-    ::v-deep .ant-pagination-item,
-    ::v-deep .ant-pagination-prev .ant-pagination-item-link,
-    ::v-deep .ant-pagination-next .ant-pagination-item-link {
-      background: #181818;
-      border-color: #303030;
-      color: rgba(255, 255, 255, 0.68);
-    }
-
-    ::v-deep .ant-pagination-item a {
-      color: rgba(255, 255, 255, 0.68);
-    }
-
-    ::v-deep .ant-pagination-item-active {
-      background: #0f5fb8;
-      border-color: var(--primary-color-active, #177ddc);
-    }
-
-    ::v-deep .ant-pagination-item-active a {
-      color: #fff;
-    }
-
-    ::v-deep .ant-badge-status-text {
-      color: rgba(255, 255, 255, 0.66) !important;
-    }
-  }
-
-  .panel-head {
-    background: #181818;
-  }
-
-  .panel-head,
-  .run-config-grid {
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .run-config-grid {
-    background: #121212;
-  }
-
-  .run-section {
-    background: #181818;
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .target-summary {
-    background: transparent;
-    color: rgba(255, 255, 255, 0.52);
-
-    strong {
-      color: rgba(255, 255, 255, 0.88);
-    }
-  }
-
-  .target-summary__divider {
-    background: rgba(255, 255, 255, 0.12);
-  }
-
-  .run-field--note {
-    background: rgba(24, 144, 255, 0.09);
-    color: #69c0ff;
-  }
-
-  .run-field--boundary-note {
-    background: rgba(82, 196, 26, 0.1);
-    color: #95de64;
-  }
-
-  ::v-deep .ant-input,
-  ::v-deep .ant-input-number,
-  ::v-deep .ant-input-number-input,
-  ::v-deep .ant-select-selection,
-  ::v-deep .ant-select-selection--single {
-    background: #141414 !important;
-    border-color: rgba(255, 255, 255, 0.12) !important;
-    color: #d1d4dc !important;
-  }
-
-  ::v-deep .ant-radio-button-wrapper {
-    background: #141414;
-    border-color: rgba(255, 255, 255, 0.12);
-    color: rgba(255, 255, 255, 0.72);
-  }
-
-  ::v-deep .ant-radio-button-wrapper-checked {
-    color: #fff;
-    background: var(--primary-color-active, #177ddc);
-    border-color: var(--primary-color-active, #177ddc);
-  }
-}
-
-@media (max-width: 1280px) {
-  .script-workspace {
-    grid-template-columns: 1fr;
-    height: auto;
-    overflow: visible;
-  }
-
-  .script-panel--backtest {
-    max-height: none;
-    overflow-y: visible;
-  }
-
-  .script-panel--editor {
-    max-height: none;
-
-    ::v-deep .editor-layout,
-    ::v-deep .code-editor-container {
-      height: 520px;
-      min-height: 420px;
-      max-height: 520px;
-    }
-  }
-}
-
-@media (max-width: 900px) {
-  .panel-head {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .script-code-actions {
-    width: 100%;
-    max-width: none;
-    min-width: 0;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-  }
-
-  .script-select {
-    width: 100%;
-    max-width: none;
-  }
-
-  .script-select-label {
-    width: 100%;
-    line-height: 1.4;
-  }
-
-  .run-control,
-  .run-control--symbol,
-  .run-control--timeframe {
-    max-width: none;
-  }
-
-  .run-target-grid,
-  .run-form-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
-
-<style lang="less">
-.script-publish-modal {
-  .publish-form {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .field-label {
-    margin-bottom: 6px;
-    color: #334155;
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  .field-label--spaced,
-  .publish-field {
-    margin-top: 16px;
-  }
-}
-
-.script-publish-modal--dark {
-  .ant-modal-content,
-  .ant-modal-header {
-    background: #181818;
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .ant-modal-title,
-  .field-label {
-    color: rgba(255, 255, 255, 0.88);
-  }
-
-  .ant-modal-close,
-  .ant-radio-wrapper {
-    color: rgba(255, 255, 255, 0.72);
-  }
-
-  .ant-input,
-  .ant-input-number,
-  .ant-input-number-input,
-  .ant-input-number-handler-wrap,
-  textarea.ant-input {
-    background: #141414;
-    border-color: rgba(255, 255, 255, 0.12);
-    color: #d1d4dc;
-  }
-}
-
+.script-publish-modal--dark,
+.indicator-convert-modal--dark,
 .script-version-drawer--dark {
-  .ant-drawer-content {
-    background: #181818;
-  }
-
+  .ant-modal-content,
+  .ant-modal-header,
+  .ant-modal-footer,
+  .ant-drawer-content,
   .ant-drawer-header {
     background: #181818;
     border-color: rgba(255, 255, 255, 0.08);
   }
 
+  .ant-modal-body {
+    background: #141414;
+  }
+
+  .ant-modal-title,
+  .ant-modal-close,
   .ant-drawer-title,
-  .ant-drawer-close {
+  .ant-drawer-close,
+  .publish-section-title,
+  .publish-option-head,
+  .field-label,
+  .code-version-item__main strong {
     color: rgba(255, 255, 255, 0.88);
   }
 
-  .code-version-toolbar {
-    color: rgba(255, 255, 255, 0.58);
+  .publish-summary-card,
+  .indicator-convert-current {
+    border-color: rgba(255, 77, 79, 0.32);
+    background: linear-gradient(135deg, rgba(255, 77, 79, 0.18) 0%, #1c1c1c 72%);
   }
 
-  .code-version-item {
-    background: #141414;
-    border-color: rgba(255, 255, 255, 0.08);
+  .publish-summary-name,
+  .indicator-convert-current strong {
+    color: rgba(255, 255, 255, 0.9);
   }
 
-  .code-version-item__main {
-    strong {
-      color: rgba(255, 255, 255, 0.88);
-    }
-
-    span,
-    small {
-      color: rgba(255, 255, 255, 0.52);
-    }
+  .publish-summary-label,
+  .publish-hint,
+  .indicator-convert-current span,
+  .indicator-convert-current small,
+  .code-version-toolbar,
+  .code-version-item__main span,
+  .code-version-item__main small {
+    color: rgba(255, 255, 255, 0.52);
   }
 
+  .publish-note,
+  .publish-section,
+  .publish-option-card,
+  .indicator-convert-selector,
+  .indicator-convert-note,
+  .code-version-item,
   .code-version-preview {
-    border-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.1);
+    background: #1f1f1f;
+  }
+
+  .publish-option-card.active {
+    border-color: var(--primary-color, #ff4d4f);
+    background: linear-gradient(135deg, rgba(255, 77, 79, 0.16) 0%, #1f1f1f 78%);
   }
 
   .code-version-preview__head {
-    background: #141414;
     border-color: rgba(255, 255, 255, 0.08);
-
-    strong {
-      color: rgba(255, 255, 255, 0.88);
-    }
+    background: #141414;
   }
 }
 </style>

@@ -118,13 +118,6 @@
       </template>
 
       <template v-if="addExchangeType === 'alpaca'">
-        <a-alert
-          type="info"
-          showIcon
-          style="margin-bottom: 16px"
-          :message="$t('profile.exchange.alpacaNoLocalTitle')"
-          :description="$t('profile.exchange.alpacaNoLocalHint')"
-        />
         <a-form-item :label="$t('profile.exchange.apiKey')">
           <a-input-password
             v-decorator="['api_key', { rules: [{ required: true, message: 'API Key is required' }] }]"
@@ -227,11 +220,7 @@ export default {
         { id: 'okx', name: 'OKX', docsUrl: 'https://www.okx.com/docs-v5/zh/#overview-v5-api-key-creation' },
         { id: 'bitget', name: 'Bitget', docsUrl: 'https://www.bitget.com/api-doc/common/quick-start' },
         { id: 'bybit', name: 'Bybit', docsUrl: 'https://www.bybit.com/en/help-center/article/How-to-create-your-API-key/' },
-        { id: 'coinbaseexchange', name: 'Coinbase', docsUrl: 'https://docs.cdp.coinbase.com/exchange/rest-api/authentication' },
-        { id: 'kraken', name: 'Kraken', docsUrl: 'https://support.kraken.com/articles/360000919966-how-to-create-an-api-key' },
-        { id: 'kucoin', name: 'KuCoin', docsUrl: 'https://www.kucoin.com/docs-new/authentication' },
         { id: 'gate', name: 'Gate.io', docsUrl: 'https://www.gate.com/docs/developers/apiv4/' },
-        { id: 'bitfinex', name: 'Bitfinex', docsUrl: 'https://docs.bitfinex.com/docs/create-an-api-key' },
         { id: 'htx', name: 'HTX', docsUrl: 'https://www.htx.com/en-us/opend/newApiPages/?id=414' }
       ]
     }
@@ -252,7 +241,7 @@ export default {
       return this.isDarkTheme ? `${base} profile-exchange-select-dropdown-dark` : base
     },
     addExchangeNeedsPassphrase () {
-      return ['okx', 'bitget', 'kucoin'].includes(this.selectedExchangeId)
+      return ['okx', 'bitget'].includes(this.selectedExchangeId)
     },
     selectedCryptoExchangeMeta () {
       return this.cryptoExchangeList.find(item => item.id === this.selectedExchangeId) || null
@@ -294,11 +283,7 @@ export default {
         okx: 'OKX',
         bitget: 'Bitget',
         bybit: 'Bybit',
-        coinbaseexchange: 'Coinbase',
-        kraken: 'Kraken',
-        kucoin: 'KuCoin',
         gate: 'Gate.io',
-        bitfinex: 'Bitfinex',
         htx: 'HTX',
         ibkr: 'IBKR',
         alpaca: 'Alpaca'

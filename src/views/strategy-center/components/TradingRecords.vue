@@ -1,7 +1,7 @@
 <template>
   <div class="trading-records strategy-tab-pane-inner" :class="{ 'theme-dark': isDark }">
     <div v-if="records.length === 0 && !loading" class="empty-state strategy-tab-empty">
-      <a-empty :description="$t('trading-assistant.table.noPositions')" />
+      <a-empty :image="false" :description="$t('trading-assistant.table.noTrades')" />
     </div>
     <a-table
       v-else

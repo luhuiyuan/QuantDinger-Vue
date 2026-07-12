@@ -13,13 +13,10 @@ const DEFAULT_POLICY = {
     bybit: { Crypto: ['spot', 'swap'] },
     bitget: { Crypto: ['spot', 'swap'] },
     gate: { Crypto: ['spot', 'swap'] },
-    mexc: { Crypto: ['spot', 'swap'] },
-    kraken: { Crypto: ['spot'] },
-    coinbase: { Crypto: ['spot'] },
-    huobi: { Crypto: ['spot'] },
-    bingx: { Crypto: ['spot'] },
+    htx: { Crypto: ['spot', 'swap'] },
+    huobi: { Crypto: ['spot', 'swap'] },
     ibkr: { USStock: ['spot'] },
-    alpaca: { USStock: ['spot'], Crypto: ['spot'] }
+    alpaca: { USStock: ['spot'] }
   },
   long_only_brokers: ['alpaca', 'ibkr'],
   bot_type_markets: {

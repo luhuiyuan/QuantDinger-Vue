@@ -19,19 +19,24 @@ const api = {
   accountPositions: '/api/account/positions',
   accountSnapshot: '/api/account/snapshot',
   equityCurve: '/api/strategies/equityCurve',
-  dryRunDeviation: '/api/strategies/dry-run-deviation',
   notifications: '/api/strategies/notifications',
   unreadNotificationCount: '/api/strategies/notifications/unread-count',
   verifyCode: '/api/strategies/verify-code',
   aiGenerate: '/api/strategies/ai-generate',
-  performance: '/api/strategies/performance',
+  scriptTemplates: '/api/strategies/script-templates',
   reviewReport: '/api/strategies/review-report',
   reviewReportHistory: '/api/strategies/review-report/history',
   logs: '/api/strategies/logs',
   gridRestingOrders: '/api/strategies/grid-resting-orders',
-  backtest: '/api/strategies/backtest',
-  backtestHistory: '/api/strategies/backtest/history',
-  backtestGet: '/api/strategies/backtest/get',
+  executorTemplates: '/api/strategies/executors/templates',
+  executorPreview: '/api/strategies/executors/preview',
+  executorGenerate: '/api/strategies/executors/generate',
+  executorCreate: '/api/strategies/executors/create',
+  strategyAssets: '/api/strategy-assets',
+  unifiedBacktestRun: '/api/backtest/run',
+  unifiedBacktestTune: '/api/backtest/tune',
+  unifiedBacktestHistory: '/api/backtest/history',
+  unifiedBacktestGet: '/api/backtest/get',
   scriptSources: '/api/strategies/script-sources',
   scriptSourceDetail: '/api/strategies/script-sources/detail',
   createScriptSource: '/api/strategies/script-sources/create',
@@ -41,7 +46,7 @@ const api = {
   scriptSourceVersions: '/api/strategies/script-sources/versions',
   restoreScriptSourceVersion: '/api/strategies/script-sources/versions/restore',
   publishTemplate: '/api/strategies/publish-template',
-  publishBotPreset: '/api/strategies/publish-bot-preset'
+  indicators: '/api/indicator/getIndicators'
 }
 
 export function getStrategyList (params = {}) {
@@ -187,19 +192,42 @@ export function getGridRestingOrders (id, opts = {}) {
   })
 }
 
+export function getExecutorTemplates () {
+  return request({
+    url: api.executorTemplates,
+    method: 'get'
+  })
+}
+
+export function previewExecutorStrategy (data) {
+  return request({
+    url: api.executorPreview,
+    method: 'post',
+    data
+  })
+}
+
+export function generateExecutorStrategy (data) {
+  return request({
+    url: api.executorGenerate,
+    method: 'post',
+    data
+  })
+}
+
+export function createExecutorStrategy (data) {
+  return request({
+    url: api.executorCreate,
+    method: 'post',
+    data
+  })
+}
+
 export function getStrategyEquityCurve (id) {
   return request({
     url: api.equityCurve,
     method: 'get',
     params: { id }
-  })
-}
-
-export function getStrategyDryRunDeviation (id, limit = 200) {
-  return request({
-    url: api.dryRunDeviation,
-    method: 'get',
-    params: { id, limit }
   })
 }
 
@@ -234,11 +262,19 @@ export function aiGenerateStrategy (data) {
   })
 }
 
-export function getStrategyPerformance (id) {
+export function getScriptTemplateList (params = {}) {
   return request({
-    url: api.performance,
+    url: api.scriptTemplates,
     method: 'get',
-    params: { id }
+    params
+  })
+}
+
+export function getIndicatorListForStrategy (params = {}) {
+  return request({
+    url: api.indicators,
+    method: 'get',
+    params
   })
 }
 
@@ -267,29 +303,58 @@ export function getStrategyLogs (id, params = {}) {
   })
 }
 
-export function runStrategyBacktest (data) {
+export function getStrategyAssetList (params = {}) {
+  return request({
+    url: api.strategyAssets,
+    method: 'get',
+    params
+  })
+}
+
+export function runUnifiedBacktest (data) {
   const payload = { ...(data || {}) }
   const timeout = payload.timeout
   delete payload.timeout
   return request({
-    url: api.backtest,
+    url: api.unifiedBacktestRun,
     method: 'post',
     data: payload,
     timeout
   })
 }
 
-export function getStrategyBacktestHistory (params = {}) {
+export function tuneUnifiedBacktest (data) {
+  const payload = { ...(data || {}) }
+  const timeout = payload.timeout
+  delete payload.timeout
+  const config = {
+    url: api.unifiedBacktestTune,
+    method: 'post',
+    data: payload,
+    timeout
+  }
+  return request(config).catch(error => {
+    if (error && error.response && error.response.status === 404) {
+      return request({
+        ...config,
+        url: '/api/experiment/structured-tune'
+      })
+    }
+    throw error
+  })
+}
+
+export function getUnifiedBacktestHistory (params = {}) {
   return request({
-    url: api.backtestHistory,
+    url: api.unifiedBacktestHistory,
     method: 'get',
     params
   })
 }
 
-export function getStrategyBacktestRun (runId) {
+export function getUnifiedBacktestRun (runId) {
   return request({
-    url: api.backtestGet,
+    url: api.unifiedBacktestGet,
     method: 'get',
     params: { runId }
   })
@@ -370,14 +435,6 @@ export function restoreScriptSourceVersion (versionId) {
 export function publishStrategyTemplate (data) {
   return request({
     url: api.publishTemplate,
-    method: 'post',
-    data
-  })
-}
-
-export function publishBotPreset (data) {
-  return request({
-    url: api.publishBotPreset,
     method: 'post',
     data
   })

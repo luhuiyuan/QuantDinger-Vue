@@ -4,6 +4,8 @@ import storage from 'store'
 import moment from 'moment'
 import enUS from './lang/en-US'
 import copilotOverrides from './copilot-overrides'
+import profileSecurityMessages from './lang/profile-security'
+import brokerAccountWorkspaceMessages from './lang/broker-account-workspace'
 
 Vue.use(VueI18n)
 
@@ -12,7 +14,9 @@ export const defaultLang = 'en-US'
 const messages = {
   [defaultLang]: {
     ...enUS,
-    ...(copilotOverrides[defaultLang] || {})
+    ...(copilotOverrides[defaultLang] || {}),
+    ...(profileSecurityMessages[defaultLang] || {}),
+    ...(brokerAccountWorkspaceMessages[defaultLang] || {})
   }
 }
 
@@ -79,8 +83,11 @@ function setI18nLanguage (lang) {
 }
 
 function mergeLocaleOverrides (lang) {
-  const overrides = copilotOverrides[lang]
-  if (!overrides) return
+  const overrides = {
+    ...(copilotOverrides[lang] || {}),
+    ...(profileSecurityMessages[lang] || {}),
+    ...(brokerAccountWorkspaceMessages[lang] || {})
+  }
   i18n.setLocaleMessage(lang, {
     ...(i18n.getLocaleMessage(lang) || {}),
     ...overrides
@@ -101,7 +108,9 @@ export async function loadLanguageAsync (lang = defaultLang) {
     const msg = await loadLocale()
     const locale = sanitizeLocaleMessage({
       ...msg.default,
-      ...(copilotOverrides[lang] || {})
+      ...(copilotOverrides[lang] || {}),
+      ...(profileSecurityMessages[lang] || {}),
+      ...(brokerAccountWorkspaceMessages[lang] || {})
     })
     i18n.setLocaleMessage(lang, locale)
     loadedLanguages.push(lang)
