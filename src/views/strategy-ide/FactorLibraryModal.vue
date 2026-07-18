@@ -54,9 +54,14 @@
 
     <a-spin :spinning="loading">
       <div class="factor-library-workspace">
-        <div class="factor-library-list">
+        <div
+          ref="factorList"
+          class="factor-library-list"
+          @scroll.passive="handleListScroll"
+        >
+          <div class="factor-library-list__spacer" :style="{ height: `${virtualTopSpacer}px` }"></div>
           <button
-            v-for="factor in filteredFactors"
+            v-for="factor in virtualFactors"
             :key="factor.factor_id"
             type="button"
             class="factor-card"
@@ -78,6 +83,7 @@
               </span>
             </span>
           </button>
+          <div class="factor-library-list__spacer" :style="{ height: `${virtualBottomSpacer}px` }"></div>
           <a-empty v-if="!filteredFactors.length" :description="$t('factorLibrary.empty')" />
         </div>
 
@@ -204,7 +210,7 @@
 </template>
 
 <script>
-import { getFactorCatalog, getFactorDetail } from '@/api/factor'
+import { getFactorCatalog } from '@/api/factor'
 
 export default {
   name: 'FactorLibraryModal',
@@ -232,7 +238,12 @@ export default {
       search: '',
       typeFilter: 'all',
       scopeFilter: 'current',
-      parameterValues: {}
+      parameterValues: {},
+      listScrollTop: 0,
+      factorRowHeight: 133,
+      factorWindowSize: 18,
+      preloadHandle: null,
+      preloadHandleType: ''
     }
   },
   computed: {
@@ -252,6 +263,22 @@ export default {
           ...(factor.required_fields || [])
         ].some(value => String(value || '').toLowerCase().includes(query))
       })
+    },
+    virtualStartIndex () {
+      const rawStart = Math.floor(this.listScrollTop / this.factorRowHeight) - 4
+      return Math.max(0, Math.min(this.filteredFactors.length, rawStart))
+    },
+    virtualEndIndex () {
+      return Math.min(this.filteredFactors.length, this.virtualStartIndex + this.factorWindowSize)
+    },
+    virtualFactors () {
+      return this.filteredFactors.slice(this.virtualStartIndex, this.virtualEndIndex)
+    },
+    virtualTopSpacer () {
+      return this.virtualStartIndex * this.factorRowHeight
+    },
+    virtualBottomSpacer () {
+      return Math.max(0, (this.filteredFactors.length - this.virtualEndIndex) * this.factorRowHeight)
     },
     currentContext () {
       return this.assetType === 'portfolio_strategy' ? 'portfolio' : 'cta'
@@ -273,48 +300,93 @@ export default {
   },
   watch: {
     visible (value) {
-      if (value && !this.loaded) this.loadFactors()
+      if (value && !this.loaded && !this.loading) this.loadFactors()
     },
     assetType () {
       this.scopeFilter = 'current'
-      this.ensureVisibleSelection()
+      this.handleFactorFilterChange()
     },
     scopeFilter () {
-      this.ensureVisibleSelection()
+      this.handleFactorFilterChange()
     },
     typeFilter () {
-      this.ensureVisibleSelection()
+      this.handleFactorFilterChange()
+    },
+    search () {
+      this.handleFactorFilterChange()
     }
   },
+  mounted () {
+    this.schedulePreload()
+  },
+  beforeDestroy () {
+    this.cancelPreload()
+  },
   methods: {
-    async loadFactors () {
+    schedulePreload () {
+      if (this.loaded || this.loading || this.preloadHandle !== null) return
+      const preload = () => {
+        this.preloadHandle = null
+        this.preloadHandleType = ''
+        if (!this.loaded && !this.loading) this.loadFactors({ silent: true })
+      }
+      if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+        this.preloadHandleType = 'idle'
+        this.preloadHandle = window.requestIdleCallback(preload, { timeout: 1200 })
+      } else {
+        this.preloadHandleType = 'timeout'
+        this.preloadHandle = setTimeout(preload, 400)
+      }
+    },
+    cancelPreload () {
+      if (this.preloadHandle === null) return
+      if (this.preloadHandleType === 'idle' && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(this.preloadHandle)
+      } else {
+        clearTimeout(this.preloadHandle)
+      }
+      this.preloadHandle = null
+      this.preloadHandleType = ''
+    },
+    async loadFactors (options = {}) {
+      if (this.loading) return
+      this.cancelPreload()
       this.loading = true
       try {
         const res = await getFactorCatalog()
         if (!(res && res.code === 1)) throw new Error((res && res.msg) || this.$t('factorLibrary.loadFailed'))
         this.factors = Array.isArray(res.data) ? res.data : []
         this.loaded = true
+        this.resetVirtualList()
         const preferred = this.filteredFactors.find(item => item.factor_id === this.selectedId) || this.filteredFactors[0]
-        if (preferred) await this.selectFactor(preferred)
+        if (preferred) this.selectFactor(preferred)
       } catch (error) {
         this.factors = []
-        this.$message.error(error.backendMessage || error.message || this.$t('factorLibrary.loadFailed'))
+        if (!options.silent || this.visible) {
+          this.$message.error(error.backendMessage || error.message || this.$t('factorLibrary.loadFailed'))
+        }
       } finally {
         this.loading = false
       }
     },
-    async selectFactor (factor) {
+    selectFactor (factor) {
       if (!factor) return
       this.selectedId = factor.factor_id
       this.selectedFactor = factor
       this.resetParameters(factor)
-      try {
-        const res = await getFactorDetail(factor.factor_id)
-        if (res && res.code === 1 && res.data && this.selectedId === factor.factor_id) {
-          this.selectedFactor = res.data
-          this.resetParameters(res.data)
-        }
-      } catch (_) {}
+    },
+    handleListScroll (event) {
+      this.listScrollTop = Math.max(0, Number(event && event.target && event.target.scrollTop) || 0)
+    },
+    resetVirtualList () {
+      this.listScrollTop = 0
+      this.$nextTick(() => {
+        if (this.$refs.factorList) this.$refs.factorList.scrollTop = 0
+      })
+    },
+    handleFactorFilterChange () {
+      this.resetVirtualList()
+      this.ensureVisibleSelection()
     },
     ensureVisibleSelection () {
       this.$nextTick(() => {
@@ -569,11 +641,19 @@ export default {
   background: #f7f8fa;
 }
 
+.factor-library-list__spacer {
+  width: 1px;
+  pointer-events: none;
+}
+
 .factor-card {
+  box-sizing: border-box;
   display: block;
   width: 100%;
+  height: 124px;
   margin: 0 0 9px;
   padding: 12px;
+  overflow: hidden;
   border: 1px solid #e2e6ec;
   border-radius: 8px;
   color: inherit;

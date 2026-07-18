@@ -78,7 +78,7 @@
         <broker-positions-table :broker-id="broker.id" :is-dark-theme="isDarkTheme" />
       </a-tab-pane>
 
-      <!-- Open orders -->
+      <!-- Recent orders -->
       <a-tab-pane key="orders" :tab="$t('brokerAccounts.tabOrders')" :disabled="!isConnected">
         <broker-orders-table
           :broker-id="broker.id"

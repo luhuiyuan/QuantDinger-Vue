@@ -92,13 +92,13 @@ export const asyncRouterMap = [
         hidden: true,
         meta: { title: 'menu.dashboard.analysis', keepAlive: false, icon: 'thunderbolt', permission: ['dashboard'] }
       },
-      // Hidden portfolio route.
+      // Legacy portfolio bookmarks now open the unified live workspace.
       {
         path: '/portfolio',
         name: 'Portfolio',
-        component: () => import('@/views/portfolio'),
+        redirect: '/strategy-center',
         hidden: true,
-        meta: { title: 'menu.dashboard.portfolio', keepAlive: true, icon: 'fund', permission: ['dashboard'] }
+        meta: { title: 'menu.dashboard.portfolio', keepAlive: false, icon: 'fund', permission: ['dashboard'] }
       },
       // Billing.
       {
@@ -179,6 +179,7 @@ export const constantRouterMap = [
 
   {
     path: '/404',
+    meta: { title: 'menu.exception.not-find' },
     component: () => import(/* webpackChunkName: "fail" */ '@/views/exception/404')
   }
 ]

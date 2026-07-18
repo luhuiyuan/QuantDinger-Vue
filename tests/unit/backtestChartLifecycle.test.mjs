@@ -18,3 +18,26 @@ test('backtest center submits only the Strategy API V2 request contract', () => 
   assert.match(source, /runStrategyBacktest\(\{[\s\S]*?sourceId: this\.form\.sourceId[\s\S]*?startDate:[\s\S]*?endDate:[\s\S]*?params: this\.params/)
   assert.doesNotMatch(source, /strategy_config|script_params|strict_mode|strategy_code/)
 })
+
+test('closed trades expose lifecycle, prices, wallet equity, and profit tone', () => {
+  for (const field of ['entry_time', 'exit_time', 'entry_price', 'exit_price', 'balance']) {
+    assert.match(source, new RegExp(`dataIndex: '${field}'`))
+  }
+  assert.match(source, /dataIndex: 'profit'[\s\S]*?profitTone\(value\)/)
+  assert.match(source, /number > 0\) return 'positive'/)
+  assert.match(source, /number < 0\) return 'negative'/)
+})
+
+test('backtest workbench keeps execution controls visible and moves history into a drawer', () => {
+  assert.match(source, /class="run-action-bar"/)
+  assert.match(source, /class="config-scroll"/)
+  assert.match(source, /<a-drawer[\s\S]*?backtest-history-drawer/)
+  assert.match(source, /v-for="item in history"/)
+  assert.doesNotMatch(source, /class="panel history-panel"/)
+})
+
+test('CTA source summary exposes the concrete instrument instead of only its count', () => {
+  assert.match(source, /this\.manifest\.strategyType === 'cta' && instruments\.length/)
+  assert.match(source, /instruments\.map\(this\.formatInstrument\)\.join\(', '\)/)
+  assert.match(source, /marketContext\.\$\{marketType\}/)
+})

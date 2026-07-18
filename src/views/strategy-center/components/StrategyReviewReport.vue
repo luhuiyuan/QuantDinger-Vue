@@ -701,12 +701,12 @@ export default {
 .theme-dark .ai-summary-panel,
 .theme-dark .review-panel,
 .theme-dark .metric-card {
-  background: #1f1f1f;
-  border-color: #333b48;
+  background: #202020;
+  border-color: #363636;
 }
 
 .theme-dark .ai-summary-panel {
-  background: linear-gradient(135deg, #182538 0%, #1f1f1f 70%);
+  background: linear-gradient(145deg, #222422 0%, #202020 72%);
 }
 
 .theme-dark .summary-text {
@@ -715,7 +715,25 @@ export default {
 
 .theme-dark .ai-list-block,
 .theme-dark .review-item {
-  background: rgba(255, 255, 255, 0.06);
+  background: #292929;
+}
+
+.theme-dark .history-meta {
+  background: rgba(82, 196, 26, 0.1);
+  color: #8fd96a;
+}
+
+.theme-dark .list-title {
+  color: #a6dc8d;
+}
+
+.theme-dark .review-actions ::v-deep .ant-checkbox-wrapper-disabled,
+.theme-dark .review-actions ::v-deep .ant-checkbox-disabled + span {
+  color: #737373;
+}
+
+.theme-dark .review-actions ::v-deep .ant-checkbox-wrapper:not(.ant-checkbox-wrapper-disabled) {
+  color: #a3a3a3;
 }
 
 @media (max-width: 1100px) {

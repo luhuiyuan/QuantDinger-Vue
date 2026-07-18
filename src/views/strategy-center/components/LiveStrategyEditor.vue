@@ -47,7 +47,12 @@
               <span v-if="parameterDefinitions.length">{{ $t('trading-assistant.editor.paramsTab') }} · {{ parameterDefinitions.length }}</span>
             </div>
           </div>
-          <div v-if="isStrategyV2" class="strategy-v2-summary">
+          <a-alert
+            v-if="model.scriptSourceId && sourceContractError"
+            show-icon
+            type="error"
+            :message="$t('strategyV2.compileFailed')" />
+          <div v-if="hasCurrentContract" class="strategy-v2-summary">
             <div class="strategy-v2-summary__head"><a-tag color="green">{{ $t('strategyV2.apiBadge') }}</a-tag><strong>{{ $t('strategyV2.manifestTitle') }}</strong></div>
             <p>{{ $t('strategyV2.manifestHint') }}</p>
             <div class="strategy-v2-summary__grid">
@@ -104,8 +109,15 @@
           </a-form-item>
           <template>
             <a-alert show-icon type="info" :message="$t('strategyV2.runtimeTitle')" :description="$t('strategyV2.runtimeHint')" />
-            <a-form-item :label="$t('trading-assistant.form.initialCapital')" required>
+            <a-form-item :label="$t(capitalIsMargin ? 'trading-assistant.form.initialMargin' : 'trading-assistant.form.initialCapital')" required>
               <a-input-number v-model="model.initialCapital" :min="1" :max="1000000000" :precision="2" :step="1000" />
+              <div v-if="capitalIsMargin" class="field-hint field-hint--notional">
+                {{ $t('trading-assistant.form.marginNotionalCapacity', {
+                  margin: formattedInitialCapital,
+                  leverage: effectiveLeverage,
+                  notional: formattedNotionalCapacity
+                }) }}
+              </div>
             </a-form-item>
             <a-form-item :label="$t('strategyV2.leverageEnabled')">
               <a-switch v-model="model.leverageEnabled" :disabled="!supportsStrategyV2Leverage" />
@@ -114,6 +126,33 @@
             <a-form-item v-if="model.leverageEnabled" :label="$t('strategyV2.leverageMultiplier')" required>
               <a-input-number v-model="model.leverage" :min="1" :max="Number(strategyManifest.maxLeverage || 1)" :step="1" />
             </a-form-item>
+            <div v-if="requiresPositionSide" class="account-risk-panel">
+              <div class="account-risk-panel__head">
+                <strong>{{ $t('strategyCenter.editor.accountRiskTitle') }}</strong>
+                <span>{{ $t('strategyCenter.editor.accountRiskHint') }}</span>
+              </div>
+              <div class="account-risk-grid">
+                <a-form-item :label="$t('strategyCenter.editor.maxGrossNotional')">
+                  <a-input-number v-model="model.accountRisk.max_gross_notional" :min="0" :precision="2" />
+                </a-form-item>
+                <a-form-item :label="$t('strategyCenter.editor.maxSymbolGrossNotional')">
+                  <a-input-number v-model="model.accountRisk.max_symbol_gross_notional" :min="0" :precision="2" />
+                </a-form-item>
+                <a-form-item :label="$t('strategyCenter.editor.maxMarginEstimate')">
+                  <a-input-number v-model="model.accountRisk.max_margin_estimate" :min="0" :precision="2" />
+                </a-form-item>
+                <a-form-item :label="$t('strategyCenter.editor.maxGrossLeverage')">
+                  <a-input-number v-model="model.accountRisk.max_gross_leverage" :min="0" :precision="2" />
+                </a-form-item>
+                <a-form-item :label="$t('strategyCenter.editor.maxRoundTripFee')">
+                  <a-input-number v-model="model.accountRisk.max_round_trip_fee" :min="0" :precision="2" />
+                </a-form-item>
+                <a-form-item :label="$t('strategyCenter.editor.maxFundingPerInterval')">
+                  <a-input-number v-model="model.accountRisk.max_funding_per_interval" :min="0" :precision="4" />
+                </a-form-item>
+              </div>
+              <div class="field-hint">{{ $t('strategyCenter.editor.accountRiskAutoHint') }}</div>
+            </div>
           </template>
         </a-form>
       </section>
@@ -140,8 +179,7 @@
               <a-select
                 v-model="model.credentialId"
                 :loading="loadingCredentials"
-                :placeholder="$t('trading-assistant.placeholders.selectSavedCredential')"
-                >
+                :placeholder="$t('trading-assistant.placeholders.selectSavedCredential')">
                 <a-select-option v-for="credential in compatibleCredentials" :key="credential.id" :value="credential.id">
                   {{ credentialLabel(credential) }}
                 </a-select-option>
@@ -150,6 +188,13 @@
                 {{ $t('trading-assistant.noCredentialForLive.title') }}
                 <router-link :to="{ path: '/broker-accounts' }">{{ $t('trading-assistant.form.goToProfile') }}</router-link>
               </div>
+            </a-form-item>
+            <a-form-item v-if="requiresPositionSide" :label="$t('strategyCenter.editor.positionSide')" required>
+              <a-radio-group v-model="model.positionSide" button-style="solid">
+                <a-radio-button value="long">{{ $t('strategyCenter.editor.positionSideLong') }}</a-radio-button>
+                <a-radio-button value="short">{{ $t('strategyCenter.editor.positionSideShort') }}</a-radio-button>
+              </a-radio-group>
+              <div class="field-hint">{{ $t('strategyCenter.editor.positionSideHint') }}</div>
             </a-form-item>
             <div v-if="selectedCredentialExchange" class="execution-summary">
               <span>{{ $t('trading-assistant.form.exchange') }}</span>
@@ -172,7 +217,7 @@
     <template #footer>
       <a-button @click="close">{{ $t('trading-assistant.form.cancel') }}</a-button>
       <a-button v-if="step > 0" @click="step -= 1">{{ $t('trading-assistant.form.prev') }}</a-button>
-      <a-button v-if="step < 2" type="primary" @click="next">{{ $t('trading-assistant.form.next') }}</a-button>
+      <a-button v-if="step < 2" type="primary" :loading="step === 0 && sourceContractLoading" @click="next">{{ $t('trading-assistant.form.next') }}</a-button>
       <a-button v-else type="primary" :loading="saving" @click="save">
         {{ $t(isEdit ? 'trading-assistant.form.confirmEdit' : 'trading-assistant.form.confirmCreate') }}
       </a-button>
@@ -181,7 +226,7 @@
 </template>
 
 <script>
-import { createStrategy, getScriptSourceDetail, getScriptSourceList, getStrategyDetail, updateStrategy } from '@/api/strategy'
+import { compileScriptSource, createStrategy, getScriptSourceDetail, getScriptSourceList, getStrategyDetail, updateStrategy } from '@/api/strategy'
 import { mapState } from 'vuex'
 import { listExchangeCredentials } from '@/api/credentials'
 import { getNotificationSettings } from '@/api/user'
@@ -219,6 +264,9 @@ export default {
       sources: [],
       credentials: [],
       sourceDetail: {},
+      compiledManifest: {},
+      sourceContractLoading: false,
+      sourceContractError: false,
       originalStrategy: null,
       notificationSettings: {},
       notificationChannels: ['browser', 'email', 'telegram', 'discord', 'webhook', 'phone'],
@@ -242,10 +290,10 @@ export default {
       return this.strategyManifest.strategyType === 'portfolio'
     },
     strategyManifest () {
-      return this.parseObject(this.sourceMetadata.strategy_manifest || this.sourceMetadata.strategyManifest)
+      return this.parseObject(this.compiledManifest)
     },
-    isStrategyV2 () {
-      return Number(this.strategyManifest.apiVersion || this.strategyManifest.api_version || 0) === 2
+    hasCurrentContract () {
+      return Object.keys(this.strategyManifest).length > 0
     },
     manifestFrequency () {
       const subscriptions = Array.isArray(this.strategyManifest.subscriptions) ? this.strategyManifest.subscriptions : []
@@ -270,9 +318,31 @@ export default {
         return String(item.market || '') === 'Crypto' && marketType === 'swap'
       })
     },
+    capitalIsMargin () {
+      return this.supportsStrategyV2Leverage
+    },
+    effectiveLeverage () {
+      if (!this.capitalIsMargin || !this.model.leverageEnabled) return 1
+      return Math.max(1, Number(this.model.leverage) || 1)
+    },
+    formattedInitialCapital () {
+      return (Math.max(0, Number(this.model.initialCapital) || 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })
+    },
+    formattedNotionalCapacity () {
+      const value = Math.max(0, Number(this.model.initialCapital) || 0) * this.effectiveLeverage
+      return value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    },
     supportsLive () {
       if (this.isPortfolioStrategy) return this.marketCategory === 'USStock'
       return ['Crypto', 'USStock'].includes(this.marketCategory)
+    },
+    requiresPositionSide () {
+      if (this.marketCategory !== 'Crypto') return false
+      const universe = this.parseObject(this.strategyManifest.universe)
+      const instruments = Array.isArray(universe.instruments) ? universe.instruments : []
+      return instruments.length > 0 && instruments.every(item => {
+        return String(item.market_type || '').toLowerCase() === 'swap'
+      })
     },
     sourceMetadata () {
       return this.parseObject(this.sourceDetail.metadata)
@@ -327,6 +397,15 @@ export default {
         leverage: Number(config.leverage) > 0 ? Number(config.leverage) : 1,
         executionMode: 'signal',
         credentialId: undefined,
+        positionSide: '',
+        accountRisk: {
+          max_gross_notional: 0,
+          max_symbol_gross_notional: 0,
+          max_margin_estimate: 0,
+          max_gross_leverage: 0,
+          max_round_trip_fee: 0,
+          max_funding_per_interval: 0
+        },
         disclaimer: false,
         notifyChannels: [...DEFAULT_CHANNELS],
         templateParams: {}
@@ -346,6 +425,8 @@ export default {
       this.step = 0
       this.model = this.defaultModel()
       this.sourceDetail = {}
+      this.compiledManifest = {}
+      this.sourceContractError = false
       this.originalStrategy = null
       this.loading = true
       try {
@@ -392,17 +473,37 @@ export default {
     },
     async loadSourceDetail (id, applyDefaults = true) {
       if (!id) return
-      const res = await getScriptSourceDetail(id)
-      this.sourceDetail = (res && res.data) || res || {}
-      if (!this.model.name || (applyDefaults && !this.isEdit)) {
-        this.model.name = this.sourceDetail.name || this.sourceDetail.title || ''
-      }
-      if (applyDefaults && !this.isEdit) {
-        this.model.timeframe = this.manifestFrequency
-        this.model.templateParams = this.buildParameterValues(this.sourceParameterValues)
-        this.model.leverageEnabled = false
-        this.model.leverage = 1
-        this.normalizeExecutionFields()
+      const sourceId = String(id)
+      this.compiledManifest = {}
+      this.sourceContractError = false
+      this.sourceContractLoading = true
+      const contractRequest = compileScriptSource({ sourceId: Number(sourceId) })
+        .then(response => ({ response }))
+        .catch(error => ({ error }))
+      try {
+        const res = await getScriptSourceDetail(sourceId)
+        const contractResult = await contractRequest
+        if (String(this.model.scriptSourceId) !== sourceId) return
+        this.sourceDetail = (res && res.data) || res || {}
+        const manifest = this.parseObject(contractResult.response && contractResult.response.data && contractResult.response.data.manifest)
+        this.compiledManifest = manifest
+        this.sourceContractError = Boolean(contractResult.error) || !Object.keys(manifest).length
+        if (!this.model.positionSide) this.model.positionSide = this.inferPositionSide()
+        if (!this.model.name || (applyDefaults && !this.isEdit)) {
+          this.model.name = this.sourceDetail.name || this.sourceDetail.title || ''
+        }
+        if (applyDefaults && !this.isEdit) {
+          this.model.timeframe = this.manifestFrequency
+          this.model.templateParams = this.buildParameterValues(this.sourceParameterValues)
+          this.model.leverageEnabled = false
+          this.model.leverage = 1
+          this.normalizeExecutionFields()
+        }
+      } catch (error) {
+        if (String(this.model.scriptSourceId) === sourceId) this.sourceContractError = true
+        throw error
+      } finally {
+        if (String(this.model.scriptSourceId) === sourceId) this.sourceContractLoading = false
       }
     },
     async loadStrategy () {
@@ -410,7 +511,7 @@ export default {
       const strategy = (res && res.data) || res || {}
       this.originalStrategy = strategy
       const config = this.parseObject(strategy.trading_config)
-      if (Number(config.api_version || 0) !== 2) throw new Error('strategyV2.contractInvalid')
+      const accountRisk = this.parseObject(config.account_risk)
       this.model = {
         ...this.defaultModel(),
         scriptSourceId: String(config.script_source_id || ''),
@@ -421,6 +522,11 @@ export default {
         leverage: Number(config.leverage || 1),
         executionMode: strategy.execution_mode === 'live' ? 'live' : 'signal',
         credentialId: config.credential_id || undefined,
+        positionSide: config.position_side || '',
+        accountRisk: {
+          ...this.defaultModel().accountRisk,
+          ...accountRisk
+        },
         disclaimer: strategy.execution_mode === 'live',
         notifyChannels: (strategy.notification_config && strategy.notification_config.channels) || [...DEFAULT_CHANNELS],
         templateParams: { ...this.parseObject(config.params) }
@@ -443,12 +549,23 @@ export default {
     credentialLabel (credential) {
       return formatExchangeCredentialLabel(credential)
     },
+    inferPositionSide () {
+      const metadata = this.parseObject(this.strategyManifest.metadata)
+      const explicit = String(metadata.position_side || metadata.trade_direction || metadata.side || '').toLowerCase()
+      if (explicit === 'long' || explicit === 'short') return explicit
+      const code = String(this.sourceDetail.code || '')
+      const match = code.match(/^\s*DIRECTION\s*=\s*(-?1(?:\.0)?)\s*$/m)
+      if (!match) return ''
+      return Number(match[1]) < 0 ? 'short' : 'long'
+    },
     exchangeName (exchangeId) {
       return getExchangeDisplayName(exchangeId)
     },
     sourceTypeLabel (source) {
       const metadata = this.parseObject(source && source.metadata)
-      const manifest = this.parseObject(metadata.strategy_manifest)
+      const manifest = source === this.sourceDetail
+        ? this.strategyManifest
+        : this.parseObject(metadata.strategy_manifest)
       return this.$t(manifest.strategyType === 'portfolio'
         ? 'strategyCenter.editor.portfolioStrategy'
         : 'strategyCenter.editor.ctaStrategy')
@@ -468,12 +585,15 @@ export default {
     setParameter (name, value) {
       this.$set(this.model.templateParams, name, value)
     },
-    next () {
+    async next () {
       if (this.step === 0 && !this.model.scriptSourceId) {
         this.$message.warning(this.$t('trading-assistant.form.scriptSourceRequired'))
         return
       }
-      if (this.step === 0 && !this.isStrategyV2) {
+      if (this.step === 0 && !this.hasCurrentContract) {
+        await this.loadSourceContract(this.model.scriptSourceId)
+      }
+      if (this.step === 0 && !this.hasCurrentContract) {
         this.$message.warning(this.$t('strategyV2.sourceContractRequired'))
         return
       }
@@ -489,6 +609,28 @@ export default {
       }
       this.step += 1
     },
+    async loadSourceContract (id) {
+      if (!id) return false
+      const sourceId = String(id)
+      this.sourceContractLoading = true
+      this.sourceContractError = false
+      try {
+        const res = await compileScriptSource({ sourceId: Number(sourceId) })
+        if (String(this.model.scriptSourceId) !== sourceId) return false
+        const manifest = this.parseObject(res && res.data && res.data.manifest)
+        this.compiledManifest = manifest
+        this.sourceContractError = !Object.keys(manifest).length
+        return !this.sourceContractError
+      } catch (error) {
+        if (String(this.model.scriptSourceId) === sourceId) {
+          this.compiledManifest = {}
+          this.sourceContractError = true
+        }
+        return false
+      } finally {
+        if (String(this.model.scriptSourceId) === sourceId) this.sourceContractLoading = false
+      }
+    },
     validateFinal () {
       if (!this.model.notifyChannels.length) {
         this.$message.warning(this.$t('trading-assistant.validation.notifyChannelRequired'))
@@ -500,6 +642,10 @@ export default {
       }
       if (this.model.executionMode === 'live' && !this.model.credentialId) {
         this.$message.warning(this.$t('trading-assistant.validation.credentialRequired'))
+        return false
+      }
+      if (this.model.executionMode === 'live' && this.requiresPositionSide && !this.model.positionSide) {
+        this.$message.warning(this.$t('strategyCenter.editor.positionSideRequired'))
         return false
       }
       return true
@@ -516,6 +662,8 @@ export default {
           leverage: this.model.leverageEnabled ? Number(this.model.leverage || 1) : 1,
           executionMode: this.model.executionMode,
           credentialId: this.model.executionMode === 'live' ? this.model.credentialId : undefined,
+          positionSide: this.requiresPositionSide ? this.model.positionSide : undefined,
+          accountRisk: this.requiresPositionSide ? { ...this.model.accountRisk } : undefined,
           params: { ...this.model.templateParams },
           notificationChannels: [...this.model.notifyChannels],
           notificationTargets: notificationTargets(this.notificationSettings)
@@ -596,6 +744,11 @@ export default {
   .parameter-panel__head strong { display: block; color: #202938; font-size: 14px; }
   .parameter-panel__head span { display: block; margin-top: 3px; color: #7d8794; font-size: 12px; }
   .parameter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+  .account-risk-panel { margin-top: 18px; padding: 16px 16px 4px; border: 1px solid #e4e8ee; border-radius: 9px; background: #fafbfc; }
+  .account-risk-panel__head { margin-bottom: 14px; }
+  .account-risk-panel__head strong { display: block; color: #202938; font-size: 14px; }
+  .account-risk-panel__head span { display: block; margin-top: 4px; color: #7d8794; font-size: 12px; line-height: 1.5; }
+  .account-risk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
   .disclaimer-check { margin: 16px 0 18px; }
   .notification-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; }
   .notification-grid .ant-checkbox-wrapper { margin-left: 0; }
@@ -606,6 +759,7 @@ export default {
     .ant-modal-title,
     .source-summary strong,
     .parameter-panel__head strong,
+    .account-risk-panel__head strong,
     .strategy-defaults strong,
     .execution-summary strong,
     .ant-form-item-label > label,
@@ -616,6 +770,7 @@ export default {
     .source-summary,
     .strategy-v2-summary,
     .parameter-panel,
+    .account-risk-panel,
     .strategy-defaults,
     .execution-summary { border-color: #30343a; background: #121416; }
     .source-summary__icon { background: color-mix(in srgb, var(--primary-color, #52c41a) 16%, #121416); color: var(--primary-color, #52c41a); }
@@ -623,6 +778,7 @@ export default {
     .source-summary span,
     .field-hint,
     .parameter-panel__head span,
+    .account-risk-panel__head span,
     .strategy-defaults,
     .execution-summary { color: #8c949f; }
     .strategy-v2-summary { border-color: color-mix(in srgb, var(--primary-color, #52c41a) 32%, #30343a); background: color-mix(in srgb, var(--primary-color, #52c41a) 6%, #121416); }
@@ -662,6 +818,7 @@ export default {
     .ant-modal { width: calc(100vw - 20px) !important; margin: 0 10px; }
     .ant-modal-body { padding: 18px; }
     .parameter-grid,
+    .account-risk-grid,
     .notification-grid { grid-template-columns: 1fr; }
   }
 }

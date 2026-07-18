@@ -116,7 +116,12 @@ export default {
       try {
         const res = await startStrategy(strategy.id)
         if (res && res.code === 1) {
-          this.$message.success(this.$t('trading-assistant.messages.startSuccess'))
+          const status = String((res.data && res.data.status) || '')
+          if (status === 'starting') {
+            this.$message.info(this.$t('strategyV2.startQueued'))
+          } else {
+            this.$message.success(this.$t('trading-assistant.messages.startSuccess'))
+          }
           await this.loadStrategies()
         } else {
           this.$message.error((res && res.msg) || this.$t('trading-assistant.messages.startFailed'))
@@ -127,13 +132,16 @@ export default {
         this.controlLoadingId = null
       }
     },
-    async handleStop (strategy) {
+    async handleStop (strategy, options = {}) {
       if (!strategy || !strategy.id || this.controlLoadingId) return
       this.controlLoadingId = strategy.id
       try {
-        const res = await stopStrategy(strategy.id)
+        const closePositions = Boolean(options && options.closePositions)
+        const res = await stopStrategy(strategy.id, closePositions)
         if (res && res.code === 1) {
-          this.$message.success(this.$t('trading-assistant.messages.stopSuccess'))
+          this.$message.success(this.$t(closePositions
+            ? 'strategyCenter.console.stopAndCloseQueued'
+            : 'strategyCenter.console.pauseSuccess'))
           await this.loadStrategies()
         } else {
           this.$message.error((res && res.msg) || this.$t('trading-assistant.messages.stopFailed'))

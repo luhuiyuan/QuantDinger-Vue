@@ -175,7 +175,7 @@ import { listExchangeCredentials, deleteExchangeCredential } from '@/api/credent
 import { getAccountSnapshot } from '@/api/strategy'
 import ExchangeAccountModal from '@/components/ExchangeAccountModal/ExchangeAccountModal.vue'
 import RenameCredentialModal from '@/components/RenameCredentialModal/RenameCredentialModal.vue'
-import { CRYPTO_EXCHANGE_IDS, getExchangeDisplayName } from '@/utils/exchangeCredential'
+import { filterCryptoExchangeCredentials, getExchangeDisplayName } from '@/utils/exchangeCredential'
 import moment from 'moment'
 
 const DISPLAY_NAMES = {
@@ -200,7 +200,8 @@ export default {
   name: 'CryptoExchangeAccountsCard',
   components: { ExchangeAccountModal, RenameCredentialModal },
   props: {
-    isDarkTheme: { type: Boolean, default: false }
+    isDarkTheme: { type: Boolean, default: false },
+    exchangeId: { type: String, default: '' }
   },
   data () {
     return {
@@ -223,7 +224,7 @@ export default {
   },
   computed: {
     filteredItems () {
-      return this.items.filter(it => CRYPTO_EXCHANGE_IDS.has(String(it.exchange_id || '').toLowerCase()))
+      return filterCryptoExchangeCredentials(this.items, this.exchangeId)
     },
     snapshotModalTitle () {
       const item = this.snapshotTarget
@@ -280,7 +281,7 @@ export default {
   methods: {
     emitSummary () {
       this.$emit('summary-change', {
-        items: this.filteredItems.map(item => ({
+        items: this.items.map(item => ({
           id: item.id,
           exchange_id: item.exchange_id,
           name: item.name || ''

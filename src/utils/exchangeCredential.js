@@ -32,6 +32,15 @@ export function isCryptoExchangeCredential (cred) {
   return CRYPTO_EXCHANGE_IDS.has(String(cred?.exchange_id || '').trim().toLowerCase())
 }
 
+export function filterCryptoExchangeCredentials (credentials, exchangeId) {
+  const selectedExchangeId = String(exchangeId || '').trim().toLowerCase()
+  return (Array.isArray(credentials) ? credentials : []).filter(cred => {
+    const credentialExchangeId = String(cred?.exchange_id || '').trim().toLowerCase()
+    return CRYPTO_EXCHANGE_IDS.has(credentialExchangeId) &&
+      (!selectedExchangeId || credentialExchangeId === selectedExchangeId)
+  })
+}
+
 export function isQuickTradeExchangeCredential (cred) {
   return QUICK_TRADE_EXCHANGE_IDS.has(String(cred?.exchange_id || '').trim().toLowerCase())
 }

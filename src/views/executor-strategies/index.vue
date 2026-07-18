@@ -15,10 +15,10 @@
     <main class="executor-workbench">
       <aside class="executor-catalog">
         <div class="panel-title panel-title--between">
-          <span><a-icon type="appstore" />{{ t('executorStrategies.catalog') }}</span>
+          <span><b class="panel-step">1</b><a-icon type="appstore" />{{ t('executorStrategies.catalog') }}</span>
           <span v-if="embedded" class="safe-mode-pill">
             <a-icon type="safety-certificate" />
-            {{ t('executorStrategies.signal') }}
+            {{ t('executorStrategies.compatibility.badge') }}
           </span>
         </div>
         <button
@@ -42,13 +42,13 @@
 
       <section class="executor-config-panel">
         <div class="panel-title panel-title--between">
-          <span><a-icon type="setting" />{{ t('executorStrategies.config') }}</span>
+          <span><b class="panel-step">2</b><a-icon type="setting" />{{ t('executorStrategies.config') }}</span>
           <a-tag color="green">{{ executorTypeText(form.executor_type) }}</a-tag>
         </div>
 
         <div class="executor-config-scroll">
           <div class="section-title">{{ t('executorStrategies.section.market') }}</div>
-          <div class="field-grid">
+          <div class="market-compact-grid">
             <div class="field-block">
               <label>{{ t('executorStrategies.symbol') }}</label>
               <a-select
@@ -65,36 +65,39 @@
                 </a-select-option>
               </a-select>
             </div>
-            <div v-if="!embedded" class="field-block">
-              <label>{{ t('executorStrategies.executionMode') }}</label>
-              <a-radio-group v-model="form.execution_mode" button-style="solid">
-                <a-radio-button value="signal">{{ t('executorStrategies.signal') }}</a-radio-button>
-                <a-radio-button value="live">{{ t('executorStrategies.live') }}</a-radio-button>
-              </a-radio-group>
-            </div>
-          </div>
-
-          <div class="field-grid">
             <div class="field-block">
               <label>{{ t('executorStrategies.side') }}</label>
-              <a-radio-group v-model="form.side" button-style="solid" @change="handleSideChange">
+              <a-radio-group v-model="form.side" class="compact-segmented" button-style="solid" @change="handleSideChange">
                 <a-radio-button value="long">{{ t('executorStrategies.long') }}</a-radio-button>
                 <a-radio-button value="short" :disabled="form.market_type === 'spot'">{{ t('executorStrategies.short') }}</a-radio-button>
                 <a-radio-button
                   v-if="form.executor_type === 'grid'"
                   value="neutral"
-                  :disabled="form.market_type === 'spot'">
+                  disabled
+                  :title="t('executorStrategies.neutralUnsupported')">
                   {{ t('executorStrategies.neutral') }}
                 </a-radio-button>
               </a-radio-group>
             </div>
             <div class="field-block">
               <label>{{ t('executorStrategies.marketType') }}</label>
-              <a-select v-model="form.market_type" @change="handleMarketTypeChange">
-                <a-select-option value="swap">{{ t('executorStrategies.swap') }}</a-select-option>
-                <a-select-option value="spot">{{ t('executorStrategies.spot') }}</a-select-option>
-              </a-select>
+              <a-radio-group
+                v-model="form.market_type"
+                class="compact-segmented"
+                button-style="solid"
+                @change="handleMarketTypeChange">
+                <a-radio-button value="swap">{{ t('executorStrategies.swap') }}</a-radio-button>
+                <a-radio-button value="spot">{{ t('executorStrategies.spot') }}</a-radio-button>
+              </a-radio-group>
             </div>
+          </div>
+
+          <div v-if="!embedded" class="field-block">
+            <label>{{ t('executorStrategies.executionMode') }}</label>
+            <a-radio-group v-model="form.execution_mode" class="compact-segmented compact-segmented--auto" button-style="solid">
+              <a-radio-button value="signal">{{ t('executorStrategies.signal') }}</a-radio-button>
+              <a-radio-button value="live">{{ t('executorStrategies.live') }}</a-radio-button>
+            </a-radio-group>
           </div>
 
           <div v-if="!embedded && form.execution_mode === 'live'" class="executor-live-account">
@@ -131,17 +134,6 @@
           <div class="section-title">{{ t('executorStrategies.section.capitalRisk') }}</div>
           <div class="field-grid">
             <div class="field-block">
-              <label>{{ t('executorStrategies.initialCapital') }}</label>
-              <a-input-number v-model="form.initial_capital" :min="10" :step="100" :precision="2" style="width: 100%" />
-            </div>
-            <div class="field-block">
-              <label>{{ t('executorStrategies.leverage') }}</label>
-              <a-input-number v-model="form.leverage" :min="1" :max="form.market_type === 'spot' ? 1 : 125" :disabled="form.market_type === 'spot'" style="width: 100%" />
-            </div>
-          </div>
-
-          <div class="field-grid">
-            <div class="field-block">
               <label>{{ t('executorStrategies.takeProfitPct') }}</label>
               <a-input-number
                 v-model="takeProfitPctDisplay"
@@ -166,8 +158,39 @@
           </div>
 
           <div class="section-title">{{ t('executorStrategies.section.executor') }}</div>
+          <div class="anchor-setting">
+            <div>
+              <label>{{ t('executorStrategies.dynamicAnchor') }}</label>
+              <small>{{ t('executorStrategies.dynamicAnchorHint') }}</small>
+            </div>
+            <a-switch v-model="form.dynamic_anchor" />
+          </div>
           <div v-if="form.executor_type === 'grid'" class="executor-specific">
-            <div class="field-grid">
+            <div v-if="form.dynamic_anchor" class="field-grid">
+              <div class="field-block">
+                <label>{{ t('executorStrategies.lowerOffsetPct') }}</label>
+                <a-input-number
+                  v-model="lowerOffsetPctDisplay"
+                  :min="0.1"
+                  :max="50"
+                  :step="0.1"
+                  :precision="2"
+                  style="width: 100%"
+                  @change="value => setRatio('lower_offset_pct', value)" />
+              </div>
+              <div class="field-block">
+                <label>{{ t('executorStrategies.upperOffsetPct') }}</label>
+                <a-input-number
+                  v-model="upperOffsetPctDisplay"
+                  :min="0.1"
+                  :max="50"
+                  :step="0.1"
+                  :precision="2"
+                  style="width: 100%"
+                  @change="value => setRatio('upper_offset_pct', value)" />
+              </div>
+            </div>
+            <div v-else class="field-grid">
               <div class="field-block">
                 <label>{{ t('executorStrategies.startPrice') }}</label>
                 <a-input-number v-model="form.start_price" :min="0" :step="100" :precision="4" style="width: 100%" />
@@ -177,14 +200,10 @@
                 <a-input-number v-model="form.end_price" :min="0" :step="100" :precision="4" style="width: 100%" />
               </div>
             </div>
-            <div class="field-grid field-grid--three">
-              <div class="field-block">
-                <label>{{ t('executorStrategies.totalAmount') }}</label>
-                <a-input-number v-model="form.total_amount_quote" :min="0" :step="100" :precision="2" style="width: 100%" />
-              </div>
+            <div class="field-grid">
               <div class="field-block">
                 <label>{{ t('executorStrategies.gridCount') }}</label>
-                <a-input-number v-model="form.grid_count" :min="1" :max="200" style="width: 100%" />
+                <a-input-number v-model="form.grid_count" :min="2" :max="200" style="width: 100%" />
               </div>
               <div class="field-block">
                 <label>
@@ -202,7 +221,7 @@
                   @change="value => setRatio('initial_position_pct', value)" />
               </div>
             </div>
-            <div class="field-grid">
+            <div class="field-grid field-grid--three">
               <div class="field-block">
                 <label>{{ t('executorStrategies.maxOpenOrders') }}</label>
                 <a-input-number v-model="form.max_open_orders" :min="1" :max="50" style="width: 100%" />
@@ -218,19 +237,19 @@
                   style="width: 100%"
                   @change="value => setRatio('min_spread_between_orders', value)" />
               </div>
-            </div>
-            <div class="field-block">
-              <label>{{ t('executorStrategies.gridMode') }}</label>
-              <a-radio-group v-model="form.grid_mode" button-style="solid">
-                <a-radio-button value="arithmetic">{{ t('executorStrategies.arithmetic') }}</a-radio-button>
-                <a-radio-button value="geometric">{{ t('executorStrategies.geometric') }}</a-radio-button>
-              </a-radio-group>
+              <div class="field-block">
+                <label>{{ t('executorStrategies.gridMode') }}</label>
+                <a-radio-group v-model="form.grid_mode" class="compact-segmented" button-style="solid">
+                  <a-radio-button value="arithmetic">{{ t('executorStrategies.arithmetic') }}</a-radio-button>
+                  <a-radio-button value="geometric">{{ t('executorStrategies.geometric') }}</a-radio-button>
+                </a-radio-group>
+              </div>
             </div>
           </div>
 
           <div v-else-if="form.executor_type === 'layered_martingale'" class="executor-specific">
             <div class="field-grid">
-              <div class="field-block">
+              <div v-if="!form.dynamic_anchor" class="field-block">
                 <label>{{ t('executorStrategies.entryPrice') }}</label>
                 <a-input-number v-model="form.entry_price" :min="0" :step="100" :precision="4" style="width: 100%" />
               </div>
@@ -246,7 +265,7 @@
               </div>
               <div class="field-block">
                 <label>{{ t('executorStrategies.baseOrder') }}</label>
-                <a-input-number v-model="form.base_order_size" :min="0" :step="10" :precision="2" style="width: 100%" />
+                <a-input-number v-model="form.base_order_size" :min="0.01" :step="0.1" :precision="2" style="width: 100%" />
               </div>
             </div>
             <div class="field-grid">
@@ -335,7 +354,7 @@
 
           <div v-else class="executor-specific">
             <div class="field-grid">
-              <div class="field-block">
+              <div v-if="!form.dynamic_anchor" class="field-block">
                 <label>{{ t('executorStrategies.entryPrice') }}</label>
                 <a-input-number v-model="form.entry_price" :min="0" :step="100" :precision="4" style="width: 100%" />
               </div>
@@ -347,11 +366,11 @@
             <div class="field-grid">
               <div class="field-block">
                 <label>{{ t('executorStrategies.baseOrder') }}</label>
-                <a-input-number v-model="form.base_order_size" :min="0" :step="10" :precision="2" style="width: 100%" />
+                <a-input-number v-model="form.base_order_size" :min="0.01" :step="0.1" :precision="2" style="width: 100%" />
               </div>
               <div class="field-block">
                 <label>{{ t('executorStrategies.safetyOrder') }}</label>
-                <a-input-number v-model="form.safety_order_size" :min="0" :step="10" :precision="2" style="width: 100%" />
+                <a-input-number v-model="form.safety_order_size" :min="0.01" :step="0.1" :precision="2" style="width: 100%" />
               </div>
             </div>
             <div class="field-grid">
@@ -411,16 +430,22 @@
         </div>
 
         <div class="config-actions">
-          <a-button icon="eye" :loading="previewing" @click="refreshPreview">{{ t('executorStrategies.preview') }}</a-button>
-          <a-button type="primary" icon="code" :loading="creating" :disabled="!canCreate" @click="createStrategy">
-            {{ t(embedded ? 'executorStrategies.generateCode' : 'executorStrategies.create') }}
-          </a-button>
+          <div class="config-actions__status" :class="{ 'has-error': !canCreate }" :title="primaryValidationText">
+            <a-icon :type="canCreate ? 'check-circle' : 'exclamation-circle'" />
+            <span>{{ primaryValidationText }}</span>
+          </div>
+          <div class="config-actions__buttons">
+            <a-button icon="eye" :loading="previewing" @click="refreshPreview">{{ t('executorStrategies.preview') }}</a-button>
+            <a-button type="primary" icon="code" :loading="creating" :disabled="!canCreate" @click="createStrategy">
+              {{ t(embedded ? 'executorStrategies.generateCode' : 'executorStrategies.create') }}
+            </a-button>
+          </div>
         </div>
       </section>
 
       <section class="executor-preview-panel">
         <div class="panel-title panel-title--between">
-          <span><a-icon type="profile" />{{ t('executorStrategies.previewTitle') }}</span>
+          <span><b class="panel-step">3</b><a-icon type="profile" />{{ t('executorStrategies.previewTitle') }}</span>
           <a-tag v-if="preview.executor_type" color="green">{{ executorTypeText(preview.executor_type) }}</a-tag>
         </div>
 
@@ -431,7 +456,7 @@
           </div>
           <div class="summary-cell">
             <span>{{ t('executorStrategies.summary.amount') }}</span>
-            <strong>{{ fmtMoney(summary.total_amount_quote) }}</strong>
+            <strong>100%</strong>
           </div>
           <div class="summary-cell">
             <span>{{ t('executorStrategies.summary.first') }}</span>
@@ -470,7 +495,7 @@
             <a-tag :color="text === 'short' ? 'red' : 'green'">{{ sideText(text) }}</a-tag>
           </template>
           <template slot="money" slot-scope="text">
-            <span class="mono">{{ fmtMoney(text) }}</span>
+            <span class="mono">{{ fmtWeight(text) }}</span>
           </template>
           <template slot="price" slot-scope="text">
             <span class="mono">{{ fmtPrice(text) }}</span>
@@ -480,16 +505,6 @@
           </template>
         </a-table>
 
-        <div class="executor-notes">
-          <div>
-            <a-icon type="safety-certificate" />
-            <span>{{ t('executorStrategies.note.stateMachine') }}</span>
-          </div>
-          <div>
-            <a-icon type="branches" />
-            <span>{{ t('executorStrategies.note.sharedRuntime') }}</span>
-          </div>
-        </div>
       </section>
     </main>
   </div>
@@ -521,6 +536,7 @@ export default {
       previewRequestId: 0,
       creating: false,
       templates: [],
+      compatibility: {},
       credentials: [],
       watchlist: [],
       preview: {},
@@ -574,7 +590,26 @@ export default {
     canCreate () {
       const hasSymbol = Boolean(String(this.form.symbol || '').trim())
       const hasLiveCredential = this.form.execution_mode !== 'live' || Boolean(this.selectedCredential)
-      return hasSymbol && hasLiveCredential
+      return hasSymbol && hasLiveCredential && this.validationIssues.length === 0
+    },
+    validationIssues () {
+      const issues = []
+      if (!String(this.form.symbol || '').trim()) issues.push('symbol')
+      if (this.form.side === 'neutral') issues.push('neutral')
+      if (this.form.executor_type === 'grid') {
+        const start = Number(this.form.start_price || 0)
+        const end = Number(this.form.end_price || 0)
+        if (start <= 0 || end <= 0 || start === end) issues.push('priceBounds')
+      } else {
+        if (Number(this.form.entry_price || 0) <= 0) issues.push('entryPrice')
+        if (Number(this.form.base_order_size || 0) <= 0) issues.push('baseOrder')
+      }
+      if (this.form.execution_mode === 'live' && !this.selectedCredential) issues.push('credential')
+      return issues
+    },
+    primaryValidationText () {
+      const issue = this.validationIssues[0]
+      return this.t(issue ? `executorStrategies.validation.${issue}` : 'executorStrategies.validation.ready')
     },
     takeProfitPctDisplay: {
       get () { return Number(this.form.take_profit_pct || 0) * 100 },
@@ -595,6 +630,14 @@ export default {
     initialPositionPctDisplay: {
       get () { return Number(this.form.initial_position_pct || 0) * 100 },
       set (value) { this.setRatio('initial_position_pct', value) }
+    },
+    lowerOffsetPctDisplay: {
+      get () { return Math.abs(1 - Number(this.form.start_price || 0)) * 100 },
+      set (value) { this.setRatio('lower_offset_pct', value) }
+    },
+    upperOffsetPctDisplay: {
+      get () { return Math.abs(Number(this.form.end_price || 0) - 1) * 100 },
+      set (value) { this.setRatio('upper_offset_pct', value) }
     },
     intraSpacing1PctDisplay: {
       get () { return Number(this.form.intra_spacing_1_pct || 0) * 100 },
@@ -666,20 +709,19 @@ export default {
         side: 'long',
         market_type: 'swap',
         execution_mode: 'signal',
-        leverage: 1,
-        initial_capital: 1000,
-        start_price: 98000,
-        end_price: 102000,
-        limit_price: 97000,
+        dynamic_anchor: true,
+        start_price: 0.98,
+        end_price: 1.02,
+        limit_price: 0.97,
         grid_count: 8,
         max_open_orders: 4,
         grid_mode: 'arithmetic',
-        total_amount_quote: 800,
-        initial_position_pct: 0.2,
+        total_amount_quote: 8,
+        initial_position_pct: 0.6,
         min_spread_between_orders: 0.0005,
-        entry_price: 100000,
-        base_order_size: 100,
-        safety_order_size: 120,
+        entry_price: 1,
+        base_order_size: 1,
+        safety_order_size: 1.2,
         max_layers: 5,
         layer_count: 5,
         orders_per_layer: 3,
@@ -703,6 +745,7 @@ export default {
         const res = await getExecutorTemplates()
         const data = res && (res.data || res)
         this.templates = ((data && data.items) || (data && data.data && data.data.items) || [])
+        this.compatibility = (data && data.compatibility) || (data && data.data && data.data.compatibility) || {}
       } finally {
         this.loadingTemplates = false
       }
@@ -766,23 +809,32 @@ export default {
     handleMarketTypeChange () {
       if (this.form.market_type === 'spot') {
         this.form.side = 'long'
-        this.form.leverage = 1
       }
     },
     handleSideChange () {
       if (this.form.side === 'neutral') {
         this.form.initial_position_pct = 0
       } else if (this.form.executor_type === 'grid' && Number(this.form.initial_position_pct || 0) === 0) {
-        this.form.initial_position_pct = 0.2
+        this.form.initial_position_pct = 0.6
       }
     },
     setRatio (field, value) {
-      this.form[field] = Number(value || 0) / 100
+      const ratio = Number(value || 0) / 100
+      if (field === 'lower_offset_pct') {
+        this.form.start_price = 1 - ratio
+      } else if (field === 'upper_offset_pct') {
+        this.form.end_price = 1 + ratio
+      } else {
+        this.form[field] = ratio
+      }
     },
     payload () {
       const credential = this.form.execution_mode === 'live' ? this.selectedCredential : null
+      const templateConfig = { ...this.form }
+      delete templateConfig.initial_capital
+      delete templateConfig.leverage
       return {
-        ...this.form,
+        ...templateConfig,
         exchange_config: credential
           ? { credential_id: credential.id, exchange_id: credential.exchange_id }
           : {}
@@ -863,9 +915,15 @@ export default {
       const number = Number(value || 0)
       return number.toLocaleString(undefined, { maximumFractionDigits: 2 })
     },
+    fmtWeight (value) {
+      const total = Number(this.summary.total_amount_quote || 0)
+      if (total <= 0) return '0.00%'
+      return `${((Number(value || 0) / total) * 100).toFixed(2)}%`
+    },
     fmtPrice (value) {
       const number = Number(value || 0)
-      return number.toLocaleString(undefined, { maximumFractionDigits: 8 })
+      const maximumFractionDigits = Math.abs(number) >= 1000 ? 2 : (Math.abs(number) >= 1 ? 4 : 8)
+      return number.toLocaleString(undefined, { maximumFractionDigits })
     },
     fmtPct (value) {
       return `${(Number(value || 0) * 100).toFixed(2)}%`
@@ -885,8 +943,30 @@ export default {
 
 .executor-page.is-embedded {
   min-height: 0;
+  height: 100%;
   padding: 0;
   background: transparent;
+}
+
+.panel-step {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d0d5dd;
+  border-radius: 50%;
+  color: #667085;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.panel-step {
+  border-color: #52c41a;
+  color: #fff;
+  background: #52c41a;
 }
 
 .executor-header {
@@ -923,9 +1003,15 @@ export default {
 
 .executor-workbench {
   display: grid;
-  grid-template-columns: minmax(360px, 430px) minmax(0, 1fr);
+  grid-template-columns: minmax(460px, 520px) minmax(0, 1fr);
   gap: 12px;
   align-items: start;
+}
+
+.is-embedded .executor-workbench {
+  height: calc(100% - 64px);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: stretch;
 }
 
 .executor-catalog {
@@ -950,6 +1036,17 @@ export default {
   border-radius: 8px;
   padding: 12px;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.is-embedded .executor-config-panel,
+.is-embedded .executor-preview-panel {
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.is-embedded .executor-preview-panel {
+  overflow-y: auto;
 }
 
 .panel-title {
@@ -1088,6 +1185,93 @@ export default {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.field-grid--four-compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.anchor-setting {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 9px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.anchor-setting label,
+.anchor-setting small {
+  display: block;
+}
+
+.anchor-setting label {
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.anchor-setting small {
+  margin-top: 2px;
+  color: #667085;
+  font-size: 11px;
+}
+
+.market-compact-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 0.82fr);
+  gap: 8px;
+}
+
+.compact-segmented {
+  width: 100%;
+  display: flex;
+  flex-wrap: nowrap;
+}
+
+.compact-segmented /deep/ .ant-radio-button-wrapper {
+  min-width: 0;
+  flex: 1 1 0;
+  padding-right: 7px;
+  padding-left: 7px;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-segmented--auto {
+  width: auto;
+  display: inline-flex;
+}
+
+.compact-segmented--auto /deep/ .ant-radio-button-wrapper {
+  min-width: 72px;
+  flex: 0 0 auto;
+}
+
+.is-embedded .executor-config-scroll {
+  padding-right: 2px;
+}
+
+.is-embedded .section-title {
+  margin: 6px 0 4px;
+}
+
+.is-embedded .field-block {
+  margin-bottom: 6px;
+}
+
+.is-embedded .field-block label {
+  margin-bottom: 3px;
+}
+
+.is-embedded .field-grid,
+.is-embedded .market-compact-grid {
+  gap: 6px;
+}
+
 .executor-live-account {
   margin: 4px 0 16px;
   padding: 14px;
@@ -1119,7 +1303,8 @@ export default {
 
 .config-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
   padding-top: 12px;
   z-index: 2;
@@ -1127,6 +1312,32 @@ export default {
   padding: 10px 12px;
   border-top: 1px solid #e5e7eb;
   background: #fff;
+}
+
+.config-actions__status {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  color: #389e0d;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.config-actions__status.has-error {
+  color: #d46b08;
+}
+
+.config-actions__status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-actions__buttons {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
 }
 
 .summary-grid {
@@ -1166,24 +1377,6 @@ export default {
 
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-.executor-notes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.executor-notes div {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  border: 1px solid #d9f7be;
-  border-radius: 8px;
-  padding: 12px;
-  color: #3f6212;
-  background: #f6ffed;
 }
 
 .theme-dark.executor-page {
@@ -1228,10 +1421,17 @@ export default {
   background: #0f1113;
 }
 
-.theme-dark .executor-notes div {
-  color: #b7eb8f;
-  background: #15230f;
-  border-color: #274916;
+.theme-dark .anchor-setting {
+  border-color: #2a2f35;
+  background: #111315;
+}
+
+.theme-dark .anchor-setting label {
+  color: #f3f4f6;
+}
+
+.theme-dark .anchor-setting small {
+  color: #9aa4b2;
 }
 
 .theme-dark .config-actions {
@@ -1247,7 +1447,7 @@ export default {
 
 @media (max-width: 1500px) {
   .executor-workbench {
-    grid-template-columns: minmax(340px, 410px) minmax(0, 1fr);
+    grid-template-columns: minmax(430px, 480px) minmax(0, 1fr);
   }
 }
 
@@ -1279,6 +1479,10 @@ export default {
     overflow: visible;
   }
 
+  .is-embedded .executor-workbench {
+    height: auto;
+  }
+
 }
 
 @media (max-width: 720px) {
@@ -1291,8 +1495,8 @@ export default {
   }
 
   .field-grid,
-  .summary-grid,
-  .executor-notes {
+  .market-compact-grid,
+  .summary-grid {
     grid-template-columns: 1fr;
   }
 }

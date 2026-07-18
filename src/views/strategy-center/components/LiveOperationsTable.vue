@@ -90,15 +90,29 @@
               :loading="controlLoadingId === selectedStrategy.id"
               @click="$emit('start', selectedStrategy)"
             >{{ $t('trading-assistant.startStrategy') }}</a-button>
-            <a-popconfirm
-              v-else
-              :title="$t('strategyCenter.console.stopConfirm')"
-              :ok-text="$t('trading-assistant.stopStrategy')"
-              :cancel-text="$t('common.cancel')"
-              @confirm="$emit('stop', selectedStrategy)"
-            >
-              <a-button icon="stop" :loading="controlLoadingId === selectedStrategy.id">{{ $t('trading-assistant.stopStrategy') }}</a-button>
-            </a-popconfirm>
+            <a-button-group v-else>
+              <a-popconfirm
+                :title="$t('strategyCenter.console.pauseConfirm')"
+                :ok-text="$t('strategyCenter.console.pauseOnly')"
+                :cancel-text="$t('common.cancel')"
+                @confirm="$emit('stop', selectedStrategy, { closePositions: false })"
+              >
+                <a-button icon="pause" :loading="controlLoadingId === selectedStrategy.id">
+                  {{ $t('strategyCenter.console.pauseOnly') }}
+                </a-button>
+              </a-popconfirm>
+              <a-popconfirm
+                :title="$t('strategyCenter.console.stopAndCloseConfirm')"
+                :ok-text="$t('strategyCenter.console.stopAndClose')"
+                :cancel-text="$t('common.cancel')"
+                ok-type="danger"
+                @confirm="$emit('stop', selectedStrategy, { closePositions: true })"
+              >
+                <a-button icon="stop" type="danger" ghost :loading="controlLoadingId === selectedStrategy.id">
+                  {{ $t('strategyCenter.console.stopAndClose') }}
+                </a-button>
+              </a-popconfirm>
+            </a-button-group>
             <a-button icon="edit" :disabled="isRunning(selectedStrategy)" @click="$emit('edit', selectedStrategy)">{{ $t('trading-assistant.editStrategy') }}</a-button>
             <a-popconfirm
               :title="$t('trading-assistant.messages.deleteConfirmWithName', { name: selectedStrategy.strategy_name || '-' })"

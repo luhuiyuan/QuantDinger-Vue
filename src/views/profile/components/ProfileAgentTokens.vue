@@ -195,7 +195,7 @@
     >
       <a-alert type="warning" show-icon :message="$t('agentTokens.revealAlert') || 'Full token shown once only.'" style="margin-bottom: 16px" />
       <div v-if="revealed" class="reveal-body">
-        <a-input :value="revealed.token" readOnly />
+        <a-input :value="revealed.token" :read-only="true" />
         <a-button type="primary" style="margin-top: 12px" @click="copyToken(revealed.token)">
           <a-icon type="copy" /> {{ $t('agentTokens.copy') || 'Copy' }}
         </a-button>

@@ -77,7 +77,7 @@
             >
               <a-select-option v-for="c in credentials" :key="c.id" :value="c.id">
                 {{ formatCredentialOptionLabel(c) }}
-                <a-tag v-if="c.enable_demo_trading" color="orange" size="small" style="margin-left: 6px;">{{ $t('quickTrade.testnetTag') }}</a-tag>
+                <a-tag v-if="c.enable_demo_trading" color="orange" size="small" style="margin-left: 6px;">{{ credentialEnvironmentLabel(c) }}</a-tag>
                 <a-tag v-if="c.market_type" size="small" style="margin-left: 6px;">{{ c.market_type }}</a-tag>
               </a-select-option>
             </a-select>
@@ -152,7 +152,7 @@
 
           <!-- Amount (USDT) -->
           <div class="qt-section qt-amount-block">
-            <div class="qt-label">{{ $t('quickTrade.amount') }} ({{ orderCurrency }})</div>
+            <div class="qt-label">{{ amountLabel }} ({{ orderCurrency }})</div>
             <a-input-number
               v-model="amount"
               :min="1"
@@ -171,6 +171,14 @@
               >
                 {{ pct }}%
               </a-button>
+            </div>
+            <div v-if="isSwapMode" class="qt-notional-summary">
+              {{ $t('quickTrade.marginNotionalFormula', {
+                margin: formatPrice(amount),
+                leverage: leverage,
+                notional: formatPrice(estimatedNotionalUsdt),
+                currency: orderCurrency
+              }) }}
             </div>
           </div>
 
@@ -327,6 +335,10 @@
                 <div class="qt-pos-row">
                   <span>{{ $t('quickTrade.posSize') }}</span>
                   <span>{{ pos.size }}</span>
+                </div>
+                <div class="qt-pos-row">
+                  <span>{{ $t('quickTrade.positionValue') }}</span>
+                  <span>{{ formatPrice(pos.notional_usdt) }} USDT</span>
                 </div>
                 <div class="qt-pos-row">
                   <span>{{ $t('quickTrade.entryPrice') }}</span>
@@ -510,6 +522,13 @@ export default {
     orderCurrency () {
       return this.isStockMarket ? 'USD' : 'USDT'
     },
+    amountLabel () {
+      return this.$t(this.isSwapMode ? 'quickTrade.marginAmount' : 'quickTrade.amount')
+    },
+    estimatedNotionalUsdt () {
+      const amount = Math.max(0, Number(this.amount) || 0)
+      return this.isSwapMode ? amount * Math.max(1, Number(this.leverage) || 1) : amount
+    },
     accountLabel () {
       return this.isStockMarket ? this.$t('quickTrade.brokerAccount') : this.$t('quickTrade.exchange')
     },
@@ -689,6 +708,12 @@ export default {
     }
   },
   methods: {
+    credentialEnvironmentLabel (credential) {
+      const environment = String((credential && credential.environment) || '').toLowerCase()
+      return this.$t(environment === 'testnet'
+        ? 'profile.exchange.environmentTestnet'
+        : 'profile.exchange.environmentDemo')
+    },
     formatCredentialOptionLabel (cred) {
       if (cred && cred.type === 'broker') {
         return cred.name || this.$t('quickTrade.alpacaAccount')
@@ -829,6 +854,10 @@ export default {
       const side = this.inferPositionSide(position, rawQty)
       const entryPrice = this.pickNumber(position, ['entry_price', 'avg_entry_price', 'avgEntryPrice', 'entryPrice', 'average_price', 'avgPrice'], 0)
       const markPrice = this.pickNumber(position, ['mark_price', 'markPrice', 'current_price', 'currentPrice', 'last_price', 'lastPrice'], this.currentPrice || 0)
+      const providedNotional = this.pickOptionalNumber(position, ['notional_usdt', 'notionalUsd', 'notional_usd', 'notional', 'positionValue', 'position_value', 'value'])
+      const notionalUsdt = providedNotional !== null && Math.abs(providedNotional) > 0
+        ? Math.abs(providedNotional)
+        : (size > 0 && markPrice > 0 ? size * markPrice : 0)
       const providedPnl = this.pickOptionalNumber(position, ['unrealized_pnl', 'unrealizedPnl', 'unrealized_pl', 'unrealizedPL', 'profit', 'pnl'])
       const computedPnl = this.calculatePositionPnl(side, size, entryPrice, markPrice)
       const shouldPreferComputed = options.preferComputedPnl || this.isStockMarket || this.effectiveMarketType === 'spot'
@@ -841,6 +870,7 @@ export default {
         size,
         entry_price: entryPrice,
         mark_price: markPrice,
+        notional_usdt: notionalUsdt,
         unrealized_pnl: unrealizedPnl,
         leverage: this.pickNumber(position, ['leverage'], position.leverage || 1)
       }
@@ -1892,6 +1922,16 @@ export default {
   margin-top: 8px;
   margin-bottom: 4px;
   button { flex: 1; font-size: 12px; }
+}
+
+.qt-notional-summary {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  color: #389e0d;
+  background: rgba(82, 196, 26, 0.08);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .qt-leverage-row {

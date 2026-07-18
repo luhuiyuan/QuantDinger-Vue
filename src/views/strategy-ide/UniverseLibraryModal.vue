@@ -13,7 +13,7 @@
         <strong>{{ $t('universeLibrary.subtitle') }}</strong>
         <span>{{ $t('universeLibrary.description') }}</span>
       </div>
-      <a-button type="primary" icon="plus" @click="openCreate">{{ $t('universeManager.create') }}</a-button>
+      <a-button class="universe-create-button" icon="plus" @click="openCreate">{{ $t('universeManager.create') }}</a-button>
     </div>
 
     <a-alert
@@ -27,6 +27,7 @@
       <a-input
         v-model="search"
         allow-clear
+        :aria-label="$t('universeManager.search')"
         :placeholder="$t('universeManager.search')"
       >
         <a-icon slot="prefix" type="search" />
@@ -44,7 +45,7 @@
         <a-select-option value="all">{{ $t('universeManager.allMarkets') }}</a-select-option>
         <a-select-option v-for="market in markets" :key="market" :value="market">{{ marketLabel(market) }}</a-select-option>
       </a-select>
-      <a-button icon="reload" :loading="loading" @click="loadUniverses">{{ $t('universeManager.reload') }}</a-button>
+      <a-button icon="reload" :loading="loading" @click="loadUniverses()">{{ $t('universeManager.reload') }}</a-button>
     </div>
 
     <a-spin :spinning="loading">
@@ -56,6 +57,7 @@
             type="button"
             class="universe-card"
             :class="{ 'universe-card--active': selected && Number(selected.id) === Number(item.id) }"
+            :aria-pressed="selected && Number(selected.id) === Number(item.id)"
             @click="selectUniverse(item)"
           >
             <span class="universe-card__head">
@@ -85,6 +87,7 @@
               <a-button
                 type="primary"
                 icon="check"
+                class="universe-apply-button"
                 :disabled="assetType !== 'portfolio_strategy'"
                 @click="useUniverse(selected)"
               >
@@ -142,20 +145,33 @@
       :visible="showCreate"
       :title="$t('universeManager.create')"
       :confirm-loading="creating"
+      :ok-button-props="{ props: { disabled: !canCreateUniverse } }"
       :ok-text="$t('universeManager.save')"
       :cancel-text="$t('universeManager.cancel')"
       :wrap-class-name="isDark ? 'universe-create-modal universe-create-modal--dark' : 'universe-create-modal'"
       @ok="createPersonalUniverse"
       @cancel="showCreate = false"
     >
-      <label class="universe-create-label">{{ $t('universeManager.name') }}</label>
-      <a-input v-model="createForm.name" />
-      <label class="universe-create-label">{{ $t('universeManager.market') }}</label>
-      <a-select v-model="createForm.market" class="universe-create-full">
+      <a-form-item
+        :label="$t('universeManager.name')"
+        :validate-status="createTouched && !canCreateUniverse ? 'error' : ''"
+        :help="createTouched && !canCreateUniverse ? $t('universeManager.nameRequired') : ''"
+        required
+      >
+        <a-input
+          id="universe-create-name"
+          ref="createNameInput"
+          v-model="createForm.name"
+          aria-required="true"
+          @input="createTouched = true"
+        />
+      </a-form-item>
+      <label class="universe-create-label" for="universe-create-market">{{ $t('universeManager.market') }}</label>
+      <a-select id="universe-create-market" v-model="createForm.market" class="universe-create-full">
         <a-select-option v-for="market in markets" :key="market" :value="market">{{ marketLabel(market) }}</a-select-option>
       </a-select>
-      <label class="universe-create-label">{{ $t('universeManager.members') }}</label>
-      <a-textarea v-model="createForm.members" :rows="8" :placeholder="createForm.market === 'Mixed' ? $t('universeManager.mixedPlaceholder') : $t('universeManager.placeholder')" />
+      <label class="universe-create-label" for="universe-create-members">{{ $t('universeManager.members') }}</label>
+      <a-textarea id="universe-create-members" v-model="createForm.members" :rows="8" :placeholder="createForm.market === 'Mixed' ? $t('universeManager.mixedPlaceholder') : $t('universeManager.placeholder')" />
       <small>{{ $t('universeManager.memberHint') }}</small>
     </a-modal>
   </a-modal>
@@ -180,12 +196,15 @@ export default {
       creating: false,
       universes: [],
       members: [],
+      memberCache: Object.create(null),
+      memberRequestId: 0,
       selected: null,
       search: '',
       scopeFilter: 'all',
       marketFilter: 'all',
       markets: ['USStock', 'CNStock', 'HKStock', 'Crypto', 'Mixed'],
       showCreate: false,
+      createTouched: false,
       createForm: { name: '', market: 'USStock', members: '' }
     }
   },
@@ -193,33 +212,48 @@ export default {
     filteredUniverses () {
       const query = String(this.search || '').trim().toLowerCase()
       return this.universes.filter(item => {
-        if (this.scopeFilter === 'system' && !item.is_system) return false
-        if (this.scopeFilter === 'personal' && item.is_system) return false
+        if (this.scopeFilter === 'system' && (!item.is_system || item.code === 'watchlist')) return false
+        if (this.scopeFilter === 'personal' && (item.is_system || item.code === 'watchlist')) return false
         if (this.scopeFilter === 'watchlist' && item.code !== 'watchlist') return false
         if (this.marketFilter !== 'all' && item.market !== this.marketFilter) return false
         return !query || `${this.universeLabel(item)} ${item.code} ${item.market}`.toLowerCase().includes(query)
       })
+    },
+    canCreateUniverse () {
+      return Boolean(String(this.createForm.name || '').trim())
     }
   },
   watch: {
     visible (value) {
-      if (value) this.loadUniverses()
+      if (!value) return
+      if (this.loaded) this.ensureSelection()
+      else this.loadUniverses()
     },
     selectedUniverseId () {
       if (this.visible) this.ensureSelection()
+    },
+    search () {
+      this.ensureFilteredSelection()
+    },
+    scopeFilter () {
+      this.ensureFilteredSelection()
+    },
+    marketFilter () {
+      this.ensureFilteredSelection()
     }
   },
   methods: {
     unwrap (res) {
       return res && Object.prototype.hasOwnProperty.call(res, 'data') ? res.data : res
     },
-    async loadUniverses () {
+    async loadUniverses (preferredId = undefined) {
       this.loading = true
       try {
         const payload = this.unwrap(await getUniverses())
         this.universes = Array.isArray(payload) ? payload : []
+        this.memberCache = Object.create(null)
         this.loaded = true
-        await this.ensureSelection()
+        await this.ensureSelection(true, preferredId)
       } catch (error) {
         this.universes = []
         this.$message.error(error.backendMessage || error.message || this.$t('universeManager.loadFailed'))
@@ -227,21 +261,44 @@ export default {
         this.loading = false
       }
     },
-    async ensureSelection () {
-      const preferred = this.universes.find(item => Number(item.id) === Number(this.selectedUniverseId)) || this.selected || this.filteredUniverses[0]
-      if (preferred) await this.selectUniverse(preferred)
+    ensureFilteredSelection () {
+      if (!this.visible || !this.loaded) return
+      this.$nextTick(() => this.ensureSelection())
     },
-    async selectUniverse (item) {
+    async ensureSelection (force = false, preferredId = this.selectedUniverseId) {
+      const selectedId = this.selected && this.selected.id
+      const preferred = this.filteredUniverses.find(item => Number(item.id) === Number(preferredId)) ||
+        this.filteredUniverses.find(item => Number(item.id) === Number(selectedId)) ||
+        this.filteredUniverses[0] || null
+      if (!preferred) {
+        this.selected = null
+        this.members = []
+        this.membersLoading = false
+        return
+      }
+      if (!force && Number(selectedId) === Number(preferred.id) && (this.memberCache[String(preferred.id)] || this.membersLoading)) return
+      await this.selectUniverse(preferred, force)
+    },
+    async selectUniverse (item, force = false) {
       this.selected = item
+      const cacheKey = String(item.id)
+      if (!force && this.memberCache[cacheKey]) {
+        this.members = this.memberCache[cacheKey]
+        this.membersLoading = false
+        return
+      }
       this.members = []
       this.membersLoading = true
+      const requestId = ++this.memberRequestId
       try {
         const payload = this.unwrap(await getUniverseMembers(item.id)) || {}
-        if (this.selected && Number(this.selected.id) === Number(item.id)) this.members = payload.members || []
+        const nextMembers = Array.isArray(payload.members) ? payload.members : []
+        this.$set(this.memberCache, cacheKey, nextMembers)
+        if (requestId === this.memberRequestId && this.selected && Number(this.selected.id) === Number(item.id)) this.members = nextMembers
       } catch (error) {
-        this.$message.error(error.backendMessage || error.message || this.$t('universeManager.loadMembersFailed'))
+        if (requestId === this.memberRequestId) this.$message.error(error.backendMessage || error.message || this.$t('universeManager.loadMembersFailed'))
       } finally {
-        this.membersLoading = false
+        if (requestId === this.memberRequestId) this.membersLoading = false
       }
     },
     universeLabel (item) {
@@ -278,7 +335,11 @@ export default {
     },
     openCreate () {
       this.createForm = { name: '', market: 'USStock', members: '' }
+      this.createTouched = false
       this.showCreate = true
+      this.$nextTick(() => {
+        if (this.$refs.createNameInput && this.$refs.createNameInput.focus) this.$refs.createNameInput.focus()
+      })
     },
     parseMembers () {
       return String(this.createForm.members || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean).map(value => {
@@ -289,6 +350,7 @@ export default {
       })
     },
     async createPersonalUniverse () {
+      this.createTouched = true
       if (!String(this.createForm.name || '').trim()) return
       this.creating = true
       try {
@@ -299,8 +361,10 @@ export default {
           members: this.parseMembers()
         }))
         this.showCreate = false
-        await this.loadUniverses()
-        if (created && created.id) await this.selectUniverse(created)
+        this.search = ''
+        this.scopeFilter = 'personal'
+        this.marketFilter = 'all'
+        await this.loadUniverses(created && created.id)
         this.$message.success(this.$t('universeManager.saved'))
       } catch (error) {
         this.$message.error(error.backendMessage || error.message || this.$t('universeManager.saveFailed'))
@@ -324,5 +388,173 @@ export default {
 .universe-library-modal--dark{.ant-modal-content,.ant-modal-header,.ant-modal-body{border-color:rgba(255,255,255,.08);background:#141414}.ant-modal-title,.ant-modal-close,.universe-library-intro strong,.universe-card__name,.universe-detail__heading h3,.universe-detail__section h4,.universe-detail__facts strong{color:rgba(255,255,255,.9)}.universe-library-intro,.universe-library-workspace,.universe-library-list,.universe-card,.universe-detail,.universe-detail__facts>div,.universe-member-table-wrap{border-color:rgba(255,255,255,.09)}.universe-library-intro,.universe-library-list,.universe-detail__facts>div{background:#181818}.universe-card,.universe-detail{background:#1d1d1d}.universe-card__stats strong,.universe-library-intro span,.universe-detail__heading p,.universe-detail__facts span{color:rgba(255,255,255,.52)}.ant-input,.ant-select-selection,.ant-btn:not(.ant-btn-primary){border-color:rgba(255,255,255,.12);color:rgba(255,255,255,.82);background:#202020}.ant-alert-info{border-color:rgba(24,144,255,.28);background:rgba(24,144,255,.1)}.ant-alert-message,.ant-empty-description{color:rgba(255,255,255,.72)}.universe-member-table th{color:rgba(255,255,255,.58);background:#242424}.universe-member-table th,.universe-member-table td{border-color:rgba(255,255,255,.08)}}
 .universe-library-dropdown--dark{color:rgba(255,255,255,.82);background:#202020}.universe-library-dropdown--dark .ant-select-dropdown-menu-item{color:rgba(255,255,255,.78)}.universe-library-dropdown--dark .ant-select-dropdown-menu-item:hover,.universe-library-dropdown--dark .ant-select-dropdown-menu-item-active,.universe-library-dropdown--dark .ant-select-dropdown-menu-item-selected{color:#fff;background:#303030}.universe-create-modal--dark .ant-modal-content,.universe-create-modal--dark .ant-modal-header,.universe-create-modal--dark .ant-modal-body,.universe-create-modal--dark .ant-modal-footer{border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.82);background:#181818}.universe-create-modal--dark .ant-modal-title,.universe-create-modal--dark .universe-create-label{color:rgba(255,255,255,.9)}.universe-create-modal--dark .ant-input,.universe-create-modal--dark .ant-select-selection{border-color:rgba(255,255,255,.12);color:rgba(255,255,255,.82);background:#202020}
 .universe-detail__section-head>div{min-width:0}.universe-detail__section-head h4{margin-bottom:4px}.universe-detail__section-head p{margin:0;color:#8a94a6;font-size:11px}.universe-detail__section-head+pre{margin-top:10px}.universe-library-modal--dark .universe-detail__section-head p{color:rgba(255,255,255,.52)}
-@media(max-width:900px){.universe-library-workspace{grid-template-columns:1fr;height:min(680px,calc(100vh - 250px))}.universe-library-list{max-height:280px;border-right:0;border-bottom:1px solid #e6e9ef}.universe-detail__facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.universe-library-modal {
+  .ant-modal {
+    top: 16px;
+    max-width: calc(100vw - 32px);
+    padding-bottom: 16px;
+  }
+
+  .ant-btn,
+  .ant-radio-button-wrapper {
+    font-weight: 600;
+  }
+
+  .ant-radio-button-wrapper {
+    height: 36px;
+    line-height: 34px;
+  }
+
+  .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+    z-index: 1;
+    border-color: #faad14;
+    color: #171717;
+    background: #faad14;
+    box-shadow: -1px 0 0 0 #faad14;
+  }
+
+  .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):hover {
+    border-color: #ffc53d;
+    color: #171717;
+    background: #ffc53d;
+  }
+
+  .universe-apply-button.ant-btn-primary {
+    min-height: 36px;
+    border-color: #faad14;
+    color: #171717;
+    background: #faad14;
+    box-shadow: 0 4px 12px rgba(250, 173, 20, .18);
+  }
+
+  .universe-apply-button.ant-btn-primary:hover,
+  .universe-apply-button.ant-btn-primary:focus {
+    border-color: #ffc53d;
+    color: #171717;
+    background: #ffc53d;
+  }
+
+  .universe-apply-button.ant-btn-primary[disabled] {
+    border-color: #d9d9d9;
+    color: rgba(0, 0, 0, .4);
+    background: #f5f5f5;
+    box-shadow: none;
+  }
+}
+
+.universe-create-button.ant-btn {
+  display: inline-flex;
+  min-height: 36px;
+  padding: 0 16px;
+  align-items: center;
+  justify-content: center;
+  border-color: #d48806;
+  color: #874d00;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  background: #fff7e6;
+  box-shadow: 0 2px 8px rgba(250, 173, 20, .12);
+}
+
+.universe-create-button.ant-btn:hover,
+.universe-create-button.ant-btn:focus {
+  border-color: #faad14;
+  color: #613400;
+  background: #fff1b8;
+}
+
+.universe-library-tools {
+  flex-wrap: wrap;
+}
+
+.universe-library-tools .ant-input-affix-wrapper {
+  width: clamp(220px, 28vw, 300px);
+}
+
+.universe-library-workspace {
+  height: clamp(280px, calc(100vh - 390px), 620px);
+  min-height: 280px;
+}
+
+.universe-card {
+  transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.universe-card:hover {
+  transform: translateY(-1px);
+}
+
+.universe-card--active {
+  border-color: #faad14;
+  background: #fffdf3;
+  box-shadow: inset 3px 0 0 #faad14, 0 0 0 1px rgba(250, 173, 20, .16);
+}
+
+.universe-member-table-wrap {
+  max-height: none;
+  overflow: visible;
+}
+
+.universe-library-modal--dark {
+  .universe-create-button.ant-btn {
+    border-color: rgba(250, 173, 20, .72);
+    color: #ffd666;
+    background: rgba(250, 173, 20, .11);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .2);
+  }
+
+  .universe-create-button.ant-btn:hover,
+  .universe-create-button.ant-btn:focus {
+    border-color: #faad14;
+    color: #ffe58f;
+    background: rgba(250, 173, 20, .19);
+  }
+
+  .universe-card--active {
+    border-color: #faad14;
+    background: rgba(250, 173, 20, .075);
+    box-shadow: inset 3px 0 0 #faad14, 0 0 0 1px rgba(250, 173, 20, .14);
+  }
+
+  .universe-card__selected {
+    color: #ffd666;
+  }
+
+  .universe-apply-button.ant-btn-primary[disabled] {
+    border-color: rgba(255, 255, 255, .12);
+    color: rgba(255, 255, 255, .34);
+    background: rgba(255, 255, 255, .06);
+  }
+}
+
+.universe-create-modal {
+  .ant-btn-primary {
+    border-color: #faad14;
+    color: #171717;
+    font-weight: 700;
+    background: #faad14;
+  }
+
+  .ant-btn-primary:hover,
+  .ant-btn-primary:focus {
+    border-color: #ffc53d;
+    color: #171717;
+    background: #ffc53d;
+  }
+
+  .ant-btn-primary[disabled] {
+    border-color: #d9d9d9 !important;
+    color: rgba(0, 0, 0, .32) !important;
+    background: #f5f5f5 !important;
+  }
+}
+
+.universe-create-modal--dark .ant-btn-primary[disabled] {
+  border-color: rgba(255, 255, 255, .12) !important;
+  color: rgba(255, 255, 255, .34) !important;
+  background: rgba(255, 255, 255, .06) !important;
+}
+
+@media(max-width:900px){.universe-library-tools .ant-input-affix-wrapper{width:100%}.universe-library-tools .ant-radio-group{overflow-x:auto;white-space:nowrap}.universe-library-workspace{grid-template-columns:1fr;height:clamp(260px,calc(100vh - 430px),560px);min-height:260px}.universe-library-list{max-height:240px;border-right:0;border-bottom:1px solid #e6e9ef}.universe-detail{padding:16px}.universe-detail__heading{flex-direction:column}.universe-detail__facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>

@@ -746,6 +746,15 @@ export default {
   methods: {
     async initPage () {
       await this.loadSources()
+      if (this.isIndicatorConvertRoute()) {
+        this.createNewDraft({
+          openTemplate: false,
+          updateRoute: false,
+          assetType: 'script'
+        })
+        await this.applyIndicatorConvertRouteOnce()
+        return
+      }
       if (this.isDraftRoute() || this.hasCopilotScriptDraft()) {
         this.createNewDraft({
           openTemplate: this.shouldOpenTemplateFromRoute(),
@@ -810,6 +819,13 @@ export default {
     isLegacyAiDraftRoute () {
       const query = this.$route.query || {}
       return String(query.aiDraft || '') === '1'
+    },
+    isIndicatorConvertRoute () {
+      const query = this.$route.query || {}
+      return String(query.convert || '').toLowerCase() === 'indicator' ||
+        !!query.convert_key ||
+        !!query.source_indicator_id ||
+        !!query.indicator_id
     },
     hasRouteSourceId () {
       return !!this.getInitialRouteSourceId()
@@ -1011,19 +1027,29 @@ export default {
     async applyGeneratedRobot (generated) {
       if (!generated || !generated.code) return
       const generatedCode = String(generated.code)
+      const generatedTradingConfig = { ...(generated.trading_config || {}) }
+      delete generatedTradingConfig.initial_capital
+      delete generatedTradingConfig.leverage
       this.currentSource = null
       this.currentSourceId = null
       this.selectedScriptId = undefined
       this.currentAssetType = 'script'
       this.scriptCodeHidden = false
-      this.scriptTemplateKey = ''
-      this.scriptTemplateParams = {}
+      this.scriptTemplateKey = generated.template_key || ''
+      this.scriptTemplateParams = {
+        ...((generated.trading_config && generated.trading_config.executor_config) || {})
+      }
       this.scriptParamSchema = {}
       this.editorInitialTemplateKey = ''
       this.scriptVerified = false
       this.runConfig = {
         ...this.runConfig,
-        ...(generated.trading_config || {}),
+        ...generatedTradingConfig,
+        script_template_key: generated.template_key || '',
+        script_template_params: {
+          ...((generated.trading_config && generated.trading_config.executor_config) || {})
+        },
+        robot_compatibility: generated.compatibility || {},
         universe_id: undefined,
         universe_code: '',
         universe_name: '',
@@ -1031,9 +1057,7 @@ export default {
         symbol: generated.symbol || this.runConfig.symbol,
         timeframe: generated.timeframe || this.runConfig.timeframe,
         market_type: generated.market_type || this.runConfig.market_type,
-        trade_direction: generated.trade_direction || this.runConfig.trade_direction,
-        leverage: Number(generated.leverage || this.runConfig.leverage || 1),
-        initial_capital: Number(generated.initial_capital || this.runConfig.initial_capital || 10000)
+        trade_direction: generated.trade_direction || this.runConfig.trade_direction
       }
       this.scriptCode = generatedCode
       this.editorKeySeed += 1
@@ -1626,13 +1650,19 @@ export default {
     },
     normalizeIndicator (raw) {
       if (!raw || typeof raw !== 'object') return null
-      const codeHidden = this.toBool(raw.code_hidden)
+      const codeHidden = this.toBool(raw.code_hidden ?? raw.codeHidden)
       return {
-        indicatorId: String(raw.id || '').trim(),
+        indicatorId: String(raw.indicatorId || raw.id || '').trim(),
         name: String(raw.name || this.defaultIndicatorNameFromCode(raw.code || '') || '').trim(),
         description: String(raw.description || '').trim(),
         code: codeHidden ? '' : String(raw.code || '').trim(),
         params: raw.params || {},
+        market: String(raw.market || '').trim(),
+        symbol: String(raw.symbol || '').trim(),
+        exchange_id: String(raw.exchange_id || '').trim(),
+        market_type: String(raw.market_type || '').trim(),
+        instrument_id: String(raw.instrument_id || '').trim(),
+        timeframe: String(raw.timeframe || '').trim(),
         codeHidden
       }
     },
@@ -1764,8 +1794,7 @@ export default {
     },
     async applyIndicatorConvertRouteOnce () {
       const query = this.$route.query || {}
-      const isConvert = String(query.convert || '').toLowerCase() === 'indicator' || !!query.convert_key || !!query.source_indicator_id
-      if (!isConvert) return
+      if (!this.isIndicatorConvertRoute()) return
       let context = null
       const key = String(query.convert_key || '').trim()
       if (key && typeof sessionStorage !== 'undefined') {
@@ -2085,18 +2114,26 @@ export default {
 
   .ant-drawer-body {
     height: calc(100vh - 55px);
-    overflow: auto;
+    display: flex;
+    overflow: hidden;
     padding: 14px 18px 18px;
     background: #f4f6f8;
+    flex-direction: column;
   }
 
   .robot-builder-intro {
+    flex: 0 0 auto;
     margin-bottom: 12px;
     padding: 10px 12px;
     border: 1px solid #d9e2ec;
     border-radius: 8px;
     background: #fff;
     color: #52606d;
+  }
+
+  .executor-page {
+    min-height: 0;
+    flex: 1;
   }
 }
 

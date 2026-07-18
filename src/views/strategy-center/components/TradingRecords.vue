@@ -21,6 +21,9 @@
           <div class="trade-type-desc">{{ getTradeActionDescription(record) }}</div>
         </div>
       </template>
+      <template slot="instrument" slot-scope="text, record">
+        <span class="trade-instrument">{{ formatTradeInstrument(record) }}</span>
+      </template>
       <template slot="price" slot-scope="text">
         ${{ parseFloat(text).toFixed(4) }}
       </template>
@@ -97,6 +100,13 @@ export default {
           scopedSlots: { customRender: 'type' }
         },
         {
+          title: this.$t('trading-assistant.table.instrument'),
+          dataIndex: 'symbol',
+          key: 'symbol',
+          width: 130,
+          scopedSlots: { customRender: 'instrument' }
+        },
+        {
           title: this.$t('trading-assistant.table.price'),
           dataIndex: 'price',
           key: 'price',
@@ -160,6 +170,15 @@ export default {
     }
   },
   methods: {
+    formatTradeInstrument (record) {
+      if (!record || typeof record !== 'object') return '--'
+      const raw = record.symbol || record.symbol_canonical || record.instrument || record.inst_id || record.ticker
+      if (raw === null || raw === undefined || String(raw).trim() === '') return '--'
+      return String(raw)
+        .trim()
+        .replace(/^(Crypto|USStock|CNStock|HKStock|Forex|Commodity|Future):/i, '')
+        .replace(/@(spot|swap|future|futures)$/i, '')
+    },
     async loadRecords () {
       if (!this.strategyId) return
 
@@ -288,13 +307,6 @@ export default {
       const type = record ? record.type : recordOrType
 
       if (record) {
-        const loc = String((this.$i18n && this.$i18n.locale) || 'zh-CN').toLowerCase()
-        const preferEn = loc.startsWith('en')
-        const note = preferEn
-          ? (record.action_note_en || record.action_note)
-          : (record.action_note || record.action_note_en)
-        if (note) return note
-
         const reasonKey = this.closeReasonI18nKey(record.close_reason)
         if (reasonKey) {
           const rt = this.$t(reasonKey)
@@ -313,6 +325,13 @@ export default {
           const tt = this.$t(typedKey)
           if (tt !== typedKey) return tt
         }
+
+        const loc = String((this.$i18n && this.$i18n.locale) || 'zh-CN').toLowerCase()
+        const preferEn = loc.startsWith('en')
+        const note = preferEn
+          ? (record.action_note_en || record.action_note)
+          : (record.action_note || record.action_note_en)
+        if (note) return note
       }
 
       const key = this.tradeDetailI18nKey(type)
@@ -475,6 +494,13 @@ export default {
     }
   }
 
+  .trade-instrument {
+    color: #0f172a;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
   .ta-pnl {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
@@ -494,6 +520,9 @@ export default {
 
   &.theme-dark .trade-type-cell .trade-type-desc {
     color: rgba(255, 255, 255, 0.45);
+  }
+  &.theme-dark .trade-instrument {
+    color: rgba(255, 255, 255, 0.88);
   }
   &.theme-dark .ta-pnl-zero {
     color: rgba(255, 255, 255, 0.45) !important;

@@ -2377,15 +2377,6 @@ registerOverlay({
           if (props.realtimeEnabled) {
             startRealtime()
           }
-
-          const visibleNeed = estimateVisibleBarCount()
-          if (formattedData.length < visibleNeed * 1.3 && hasMoreHistory.value) {
-            setTimeout(() => {
-              if (klineData.value.length > 0 && klineData.value.length < visibleNeed * 1.3 && hasMoreHistory.value) {
-                loadMoreHistoryDataForScroll(klineData.value[0].timestamp)
-              }
-            }, 600)
-          }
         })
       } catch (err) {
         if (generation !== loadGeneration) return
@@ -3127,9 +3118,8 @@ registerOverlay({
 
               if (reachedLeftEdge && !loadingHistory.value && !loadingHistoryPromise && hasMoreHistory.value && chartInitialized.value) {
                 const isScrollingLeft = lastVisibleFrom !== null && lastVisibleFrom > data.from
-                const isAlreadyAtEdge = data.from <= 0
                 const canLoadAgain = Date.now() - lastHistoryLoadAt >= HISTORY_LOAD_COOLDOWN_MS
-                if ((isScrollingLeft || isAlreadyAtEdge) && canLoadAgain) {
+                if (isScrollingLeft && canLoadAgain) {
                   if (klineData.value.length > 0) {
                     const earliestTimestamp = klineData.value[0].timestamp
                     await loadMoreHistoryDataForScroll(earliestTimestamp)

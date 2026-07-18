@@ -214,7 +214,7 @@
           <div class="composer-actions">
             <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" multiple @change="handleFiles">
             <a-button v-if="messages.length" @click="quickToolsVisible = true">
-              <a-icon type="appstore" /> {{ text.quickTools || 'Quick tools' }}
+              <a-icon type="appstore" /> {{ text.quickTools }}
             </a-button>
             <a-button @click="$refs.fileInput.click()">
               <a-icon type="picture" /> {{ uploadImageLabel }}
@@ -310,7 +310,7 @@
         <div class="event-title-row">
           <div>
             <strong>{{ eventTitle(selectedEvent) }}</strong>
-            <span>{{ formatEventTime(selectedEvent) }} · {{ selectedEvent.country || selectedEvent.region || '--' }}</span>
+            <span>{{ formatEventTime(selectedEvent) }} {{ text.eventMetaSeparator }} {{ selectedEvent.country || selectedEvent.region || '--' }}</span>
           </div>
           <em :class="['impact-pill', impactClass(selectedEvent)]">{{ impactLabel(selectedEvent) }}</em>
         </div>
@@ -427,7 +427,7 @@
 
     <a-modal
       v-model="quickToolsVisible"
-      :title="text.quickTools || 'Quick tools'"
+      :title="text.quickTools"
       :footer="null"
       wrap-class-name="copilot-modal quick-tools-modal"
       width="760px"
@@ -607,8 +607,14 @@ export default {
       composerMinHeight: 98,
       composerMaxHeight: 236,
       draftContextLock: null,
+      localizedDraft: null,
       printReportId: '',
       quickToolsVisible: false
+    }
+  },
+  watch: {
+    '$i18n.locale' () {
+      this.refreshLocalizedDraft()
     }
   },
   computed: {
@@ -663,6 +669,10 @@ export default {
         running: t('running', 'Running'),
         paused: t('paused', 'Paused'),
         eventDetail: t('eventDetail', 'Event detail'),
+        eventMetaSeparator: t('eventMetaSeparator', '·'),
+        impactHigh: t('impactHigh', 'High'),
+        impactMedium: t('impactMedium', 'Medium'),
+        impactLow: t('impactLow', 'Low'),
         actual: t('actual', 'Actual'),
         forecast: t('forecast', 'Forecast'),
         previous: t('previous', 'Previous'),
@@ -738,7 +748,7 @@ export default {
       }
     },
     uploadImageLabel () {
-      return this.text.uploadImage
+      return this.text.uploadChart
     },
     thinkingText () {
       return this.text.thinking
@@ -1271,6 +1281,7 @@ export default {
       } catch (_) {}
     },
     async loadHistory (sessionId) {
+      this.resetComposerDraft()
       this.sessionId = sessionId
       try {
         const res = await getChatHistory({ session_id: sessionId })
@@ -1338,8 +1349,20 @@ export default {
       }
     },
     newSession () {
+      this.resetComposerDraft()
       this.sessionId = null
       this.messages = []
+    },
+    resetComposerDraft () {
+      this.draft = ''
+      this.attachments = []
+      this.draftContextLock = null
+      this.localizedDraft = null
+      this.pendingAgentTask = null
+      this.monitorSetupDraft = null
+      this.quickToolsVisible = false
+      this.composerHeight = this.composerMinHeight
+      this.$nextTick(this.resizeComposer)
     },
     seedSymbolOptions () {
       this.symbolOptions = (this.watchlist || []).filter(item => !this.context.market || item.market === this.context.market)
@@ -1582,10 +1605,29 @@ export default {
       this.draft = prompt
       const lockTarget = options && options.contextLock ? this.normalizeSymbolOption(options.contextLock) : null
       this.draftContextLock = lockTarget ? { ...lockTarget, locked: true } : null
+      const localizedDraft = options && options.localizedDraft
+      this.localizedDraft = localizedDraft
+        ? { ...localizedDraft, lastValue: String(prompt || '') }
+        : null
       this.$nextTick(() => {
         this.resizeComposer()
         if (this.$refs.composerInput) this.$refs.composerInput.focus()
       })
+    },
+    refreshLocalizedDraft () {
+      const descriptor = this.localizedDraft
+      if (!descriptor || String(this.draft || '') !== String(descriptor.lastValue || '')) {
+        this.localizedDraft = null
+        return
+      }
+      let next = ''
+      if (descriptor.type === 'analysis') {
+        next = this.buildAnalysisPrompt(descriptor.target || null)
+      }
+      if (!next) return
+      this.draft = next
+      this.localizedDraft = { ...descriptor, lastValue: next }
+      this.$nextTick(this.resizeComposer)
     },
     async loadAgentPreflight () {
       try {
@@ -2437,7 +2479,11 @@ export default {
               workflow: 'QuantDinger Professional Analysis'
             }
           : null
-        this.usePrompt(this.buildAnalysisPrompt(target || null), target ? { contextLock: target } : {})
+        const analysisTarget = target ? { ...target } : null
+        this.usePrompt(this.buildAnalysisPrompt(analysisTarget), {
+          ...(target ? { contextLock: target } : {}),
+          localizedDraft: { type: 'analysis', target: analysisTarget }
+        })
         return
       }
       if (activeItem.action === 'strategy') {
@@ -3034,13 +3080,14 @@ export default {
           intent: 'generate_code',
           source: 'copilot_quick_tool'
         })
-        if (!res || !res.code) throw new Error((res && res.msg) || 'AI generation failed')
+        const code = this.extractStrategyCode(res)
+        if (!code) throw new Error((res && res.msg) || 'AI generation failed')
         const scriptDraftMeta = {
           symbol: target.symbol,
           market: target.market,
           name: `${target.symbol} ${this.text.scriptStrategy}`
         }
-        sessionStorage.setItem('qd_strategy_source', res.code)
+        sessionStorage.setItem('qd_strategy_source', code)
         sessionStorage.setItem('qd_copilot_script_strategy_meta', JSON.stringify(scriptDraftMeta))
         assistantMsg.content = [
           `## ${target.symbol} ${this.text.scriptStrategy}`,
@@ -3048,7 +3095,7 @@ export default {
           this.i18nText('aiAssetAnalysis.copilot.scriptStrategyReady', 'A trading script draft is ready. Keep refining it here, or open the Trading Script editor to edit, backtest, and publish it.'),
           '',
           '```python',
-          res.code,
+          code,
           '```'
         ].join('\n')
         assistantMsg.meta = this.text.strategyGenerated
@@ -3059,7 +3106,7 @@ export default {
           label: this.i18nText('aiAssetAnalysis.copilot.openStrategyV2Ide', 'Open Trading Script editor'),
           path: '/strategy-ide',
           storageKey: 'qd_strategy_source',
-          storageValue: res.code,
+          storageValue: code,
           extraStorage: {
             qd_copilot_script_strategy_meta: JSON.stringify(scriptDraftMeta)
           },
@@ -3076,6 +3123,13 @@ export default {
         this.generatingStrategy = false
         this.scrollToBottom()
       }
+    },
+    extractStrategyCode (res) {
+      if (!res || typeof res !== 'object') return ''
+      const data = res.data && typeof res.data === 'object' ? res.data : {}
+      const candidate = [data.code, data.source, data.strategy_code, res.code]
+        .find(value => typeof value === 'string' && value.trim())
+      return candidate ? candidate.trim() : ''
     },
     openTaskModal (item) {
       this.taskTarget = item ? this.normalizeSymbolOption(item) : this.normalizeSymbolOption(this.context)
@@ -3366,8 +3420,9 @@ export default {
     },
     impactLabel (event) {
       const cls = this.impactClass(event)
-      if (this.isZh) return cls === 'high' ? '高影响' : cls === 'low' ? '低影响' : '中影响'
-      return cls === 'high' ? 'High' : cls === 'low' ? 'Low' : 'Medium'
+      if (cls === 'high') return this.text.impactHigh
+      if (cls === 'low') return this.text.impactLow
+      return this.text.impactMedium
     },
     formatEventTime (event) {
       const date = String((event && (event.date || event.datetime)) || '').slice(5, 10)
@@ -3462,16 +3517,27 @@ export default {
       const reader = response.body.getReader()
       const decoder = new TextDecoder('utf-8')
       let buffer = ''
-      while (true) {
+      let streamComplete = false
+      while (!streamComplete) {
         const { value, done } = await reader.read()
         if (done) break
         buffer += decoder.decode(value, { stream: true })
         const parts = buffer.split(/\r?\n\r?\n/)
         buffer = parts.pop() || ''
-        parts.forEach(part => this.handleStreamEvent(part, assistantMsg))
+        for (const part of parts) {
+          if (this.handleStreamEvent(part, assistantMsg) === 'done') {
+            streamComplete = true
+            break
+          }
+        }
         this.scrollToBottom()
+        if (streamComplete) {
+          try {
+            await reader.cancel()
+          } catch (_) {}
+        }
       }
-      if (buffer.trim()) this.handleStreamEvent(buffer, assistantMsg)
+      if (!streamComplete && buffer.trim()) this.handleStreamEvent(buffer, assistantMsg)
       if (assistantMsg.isThinking) {
         assistantMsg.content = ''
         assistantMsg.isThinking = false
@@ -3486,7 +3552,7 @@ export default {
         .filter(line => line.startsWith('data:'))
         .map(line => line.replace(/^data:\s*/, ''))
         .join('\n')
-      if (!data) return
+      if (!data) return eventName
       const payload = JSON.parse(data)
       if (eventName === 'meta') {
         this.sessionId = payload.session_id || this.sessionId
@@ -3506,6 +3572,7 @@ export default {
       } else if (eventName === 'error') {
         throw new Error(payload.msg || this.text.chatUnavailable)
       }
+      return eventName
     },
     setAgentUsageActions (message, actions = [], usage = null) {
       if (!message) return
@@ -6072,7 +6139,9 @@ export default {
 
 @media (max-width: 1360px) {
   .copilot-workbench {
-    grid-template-columns: minmax(250px, 300px) minmax(580px, 1fr);
+    grid-template-columns: minmax(210px, 240px) minmax(460px, 1fr) minmax(230px, 260px);
+    gap: 8px;
+    padding: 8px;
   }
 
   .copilot-workbench::before {
@@ -6082,6 +6151,11 @@ export default {
   .chat-hero::after {
     right: 30px;
     opacity: 0.34;
+  }
+
+  .welcome-prompts,
+  .quick-task-shelf {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
   }
 }
 
@@ -6408,6 +6482,11 @@ body.realdark .copilot-workbench .empty-mini,
 @media (max-width: 1360px) {
   .strategy-type-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  .copilot-workbench .welcome-prompts,
+  .copilot-workbench .quick-task-shelf {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
   }
 }
 

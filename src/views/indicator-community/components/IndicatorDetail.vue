@@ -3,7 +3,7 @@
     :visible="visible"
     :title="null"
     :footer="null"
-    :width="720"
+    :width="modalWidth"
     :body-style="{ padding: 0 }"
     :wrap-class-name="modalWrapClass"
     @cancel="$emit('close')"
@@ -19,7 +19,12 @@
             <span class="cover-initials">{{ indicatorInitials }}</span>
           </div>
           <div class="header-info">
-            <h2 class="indicator-name">{{ detail.name }}</h2>
+            <div class="strategy-title-row">
+              <h2 class="indicator-name">{{ detail.name }}</h2>
+              <a-tag v-if="isStrategyAsset" class="strategy-api-badge">
+                {{ $t('community.strategyApiV2') }}
+              </a-tag>
+            </div>
             <div class="indicator-meta">
               <div class="author-info">
                 <a-avatar :src="detail.author.avatar" :size="32" />
@@ -37,7 +42,12 @@
               </a-statistic>
               <a-statistic :title="$t('community.rating')">
                 <template #formatter>
-                  <a-rate :value="detail.avg_rating" disabled allow-half :style="{ fontSize: '14px' }" />
+                  <span
+                    role="img"
+                    :aria-label="`${$t('community.rating')}: ${Number(detail.avg_rating || 0).toFixed(1)}`"
+                  >
+                    <a-rate aria-hidden="true" :value="detail.avg_rating" disabled allow-half :style="{ fontSize: '14px' }" />
+                  </span>
                   <span class="rating-text">({{ detail.rating_count || 0 }})</span>
                 </template>
               </a-statistic>
@@ -52,62 +62,159 @@
 
         <div class="detail-body">
           <div class="section">
-            <h3>{{ $t('community.description') }}</h3>
+            <h3>{{ isStrategyAsset ? $t('community.strategyOverview') : $t('community.description') }}</h3>
             <p class="description">{{ detail.description || $t('community.noDescription') }}</p>
           </div>
 
+          <div v-if="isStrategyAsset && strategyContract" class="section strategy-contract-section">
+            <div class="section-heading-row">
+              <div>
+                <h3>{{ $t('community.strategyContract') }}</h3>
+                <p>{{ $t('community.strategyContractHint') }}</p>
+              </div>
+              <span class="source-controlled-badge">
+                <a-icon type="safety-certificate" />
+                {{ $t('community.sourceControlled') }}
+              </span>
+            </div>
+
+            <div class="contract-grid">
+              <div v-for="item in strategyContractItems" :key="item.key" class="contract-card">
+                <div class="contract-card__icon"><a-icon :type="item.icon" /></div>
+                <div class="contract-card__body">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                  <small v-if="item.hint">{{ item.hint }}</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="contract-logic-grid">
+              <div class="contract-logic-card">
+                <span class="contract-logic-card__label">{{ $t('community.contractSignals') }}</span>
+                <div class="contract-tags">
+                  <a-tag v-for="name in strategyDependencies" :key="`dep-${name}`">{{ name }}</a-tag>
+                  <span v-if="!strategyDependencies.length" class="contract-empty">—</span>
+                </div>
+              </div>
+              <div class="contract-logic-card">
+                <span class="contract-logic-card__label">{{ $t('community.contractData') }}</span>
+                <div class="contract-tags">
+                  <a-tag v-for="name in (strategyContract.data_fields || [])" :key="`field-${name}`">{{ name.toUpperCase() }}</a-tag>
+                  <span v-if="!(strategyContract.data_fields || []).length" class="contract-empty">—</span>
+                </div>
+              </div>
+              <div class="contract-logic-card contract-logic-card--warmup">
+                <span class="contract-logic-card__label">{{ $t('community.contractWarmup') }}</span>
+                <strong>{{ $t('community.contractWarmupBars', { count: strategyContract.warmup_bars || 0 }) }}</strong>
+              </div>
+            </div>
+
+            <div v-if="strategyParameters.length" class="parameter-panel">
+              <div class="parameter-panel__head">
+                <div>
+                  <strong>{{ $t('community.contractParameters') }}</strong>
+                  <span>{{ $t('community.contractParametersHint') }}</span>
+                </div>
+                <span class="parameter-count">{{ strategyParameters.length }}</span>
+              </div>
+              <div class="parameter-grid">
+                <div v-for="param in visibleStrategyParameters" :key="param.name" class="parameter-item">
+                  <div class="parameter-item__name">
+                    <strong>{{ parameterName(param) }}</strong>
+                    <code>{{ param.name }}</code>
+                  </div>
+                  <div class="parameter-item__value">
+                    <span>{{ $t('community.parameterDefault') }}</span>
+                    <strong>{{ formatContractValue(param.default, param.type) }}</strong>
+                  </div>
+                  <div class="parameter-item__range">
+                    <span>{{ $t('community.parameterRange') }}</span>
+                    <strong>{{ formatParameterRange(param) }}</strong>
+                  </div>
+                </div>
+              </div>
+              <a-button
+                v-if="strategyParameters.length > parameterPreviewLimit"
+                type="link"
+                class="parameter-toggle"
+                @click="showAllParameters = !showAllParameters">
+                {{ showAllParameters ? $t('community.showFewerParameters') : $t('community.showAllParameters', { count: strategyParameters.length }) }}
+                <a-icon :type="showAllParameters ? 'up' : 'down'" />
+              </a-button>
+            </div>
+          </div>
+
           <div class="section strategy-performance-section" v-if="isStrategyAsset">
-            <h3>{{ $t('community.performance') }}</h3>
-            <div v-if="performance" class="performance-grid">
-              <div class="perf-item perf-item--score">
-                <div class="perf-label">
-                  {{ $t('community.compositeScore') }}
-                  <a-tooltip :title="$t('community.scoreTooltipBase')">
-                    <a-icon type="info-circle" />
-                  </a-tooltip>
-                </div>
-                <div class="perf-value">
-                  {{ formatScore(performance.score) }}
-                  <span class="perf-unit">/ 100</span>
-                </div>
+            <div class="section-heading-row evidence-heading">
+              <div>
+                <h3>{{ $t('community.backtestEvidence') }}</h3>
+                <p>{{ $t('community.backtestEvidenceHint') }}</p>
               </div>
-              <div class="perf-item">
-                <div class="perf-label">{{ $t('community.totalReturn') }}</div>
-                <div class="perf-value" :class="toneClass(performance.total_return)">
-                  {{ formatPercent(performance.total_return) }}
+            </div>
+            <div v-if="performance && Number(performance.sample_size || 0) > 0">
+              <div v-if="performance.best_run_meta" class="evidence-context">
+                <span class="evidence-context__label">{{ $t('community.representativeRun') }}</span>
+                <div class="evidence-context__tags">
+                  <a-tag v-if="performance.best_run_meta.symbol" class="tag-symbol">{{ performance.best_run_meta.symbol }}</a-tag>
+                  <a-tag v-if="performance.best_run_meta.timeframe" class="tag-tf">{{ performance.best_run_meta.timeframe }}</a-tag>
+                  <a-tag v-if="performance.best_run_meta.market_type" class="tag-market">
+                    {{ formatMarketType(performance.best_run_meta.market_type) }}
+                  </a-tag>
+                  <a-tag v-if="performance.best_run_meta.leverage" class="tag-leverage">{{ formatLeverage(performance.best_run_meta.leverage) }}</a-tag>
+                  <a-tag v-if="performance.best_run_meta.duration_days" class="tag-duration">{{ formatBacktestDuration(performance.best_run_meta.duration_days) }}</a-tag>
                 </div>
-              </div>
-              <div class="perf-item">
-                <div class="perf-label">{{ $t('community.sharpe') }}</div>
-                <div class="perf-value" :class="toneClass(performance.sharpe, 1)">
-                  {{ formatNumber(performance.sharpe, 2) }}
-                </div>
-              </div>
-              <div class="perf-item">
-                <div class="perf-label">{{ $t('community.maxDrawdown') }}</div>
-                <div class="perf-value negative">
-                  {{ formatPercent(performance.max_drawdown) }}
+                <div class="evidence-context__quality">
+                  <span>{{ $t('community.backtestSamplesCount', { count: performance.sample_size || 0 }) }}</span>
+                  <span :class="Number(performance.live_trade_count || 0) > 0 ? 'has-live' : 'no-live'">
+                    <a-icon :type="Number(performance.live_trade_count || 0) > 0 ? 'check-circle' : 'info-circle'" />
+                    {{ Number(performance.live_trade_count || 0) > 0 ? $t('community.liveEvidenceCount', { count: performance.live_trade_count }) : $t('community.noLiveEvidence') }}
+                  </span>
                 </div>
               </div>
-              <div class="perf-item">
-                <div class="perf-label">{{ $t('community.profitFactor') }}</div>
-                <div class="perf-value" :class="toneClass((performance.profit_factor || 0) - 1)">
-                  {{ formatNumber(performance.profit_factor, 2) }}
+              <div class="performance-grid">
+                <div class="perf-item perf-item--score">
+                  <div class="perf-label">
+                    {{ $t('community.compositeScore') }}
+                    <a-tooltip :title="$t('community.scoreTooltipBase')">
+                      <a-icon type="info-circle" />
+                    </a-tooltip>
+                  </div>
+                  <div class="perf-value">
+                    {{ formatScore(performance.score) }}
+                    <span class="perf-unit">/ 100</span>
+                  </div>
                 </div>
-              </div>
-              <div class="perf-item">
-                <div class="perf-label">{{ $t('community.winRate') }}</div>
-                <div class="perf-value" :class="Number(performance.win_rate || 0) >= 50 ? 'positive' : 'negative'">
-                  {{ formatNumber(performance.win_rate, 2) }}%
+                <div class="perf-item">
+                  <div class="perf-label">{{ $t('community.totalReturn') }}</div>
+                  <div class="perf-value" :class="toneClass(performance.total_return)">
+                    {{ formatPercent(performance.total_return) }}
+                  </div>
                 </div>
-              </div>
-              <div class="perf-item">
-                <div class="perf-label">{{ $t('community.admin.backtestSamples') }}</div>
-                <div class="perf-value">{{ performance.sample_size || 0 }}</div>
-              </div>
-              <div class="perf-item">
-                <div class="perf-label">{{ $t('community.liveTrades') }}</div>
-                <div class="perf-value">{{ performance.live_trade_count || 0 }}</div>
+                <div class="perf-item">
+                  <div class="perf-label">{{ $t('community.sharpe') }}</div>
+                  <div class="perf-value" :class="toneClass(performance.sharpe, 1)">
+                    {{ formatNumber(performance.sharpe, 2) }}
+                  </div>
+                </div>
+                <div class="perf-item">
+                  <div class="perf-label">{{ $t('community.maxDrawdown') }}</div>
+                  <div class="perf-value negative">
+                    {{ formatPercent(performance.max_drawdown) }}
+                  </div>
+                </div>
+                <div class="perf-item">
+                  <div class="perf-label">{{ $t('community.profitFactor') }}</div>
+                  <div class="perf-value" :class="toneClass((performance.profit_factor || 0) - 1)">
+                    {{ formatNumber(performance.profit_factor, 2) }}
+                  </div>
+                </div>
+                <div class="perf-item">
+                  <div class="perf-label">{{ $t('community.winRate') }}</div>
+                  <div class="perf-value" :class="Number(performance.win_rate || 0) >= 50 ? 'positive' : 'negative'">
+                    {{ formatNumber(performance.win_rate, 2) }}%
+                  </div>
+                </div>
               </div>
             </div>
             <a-alert
@@ -116,55 +223,14 @@
               show-icon
               :message="$t('community.admin.noBacktestData')"
             />
-            <div v-if="performance && hasApplicable" class="applicable-row">
-              <div class="applicable-row__label">{{ $t('community.applicableSymbols') }}</div>
-              <div class="applicable-row__tags">
-                <a-tag
-                  v-for="sym in performance.applicable_symbols"
-                  :key="`sym-${sym}`"
-                  class="tag-symbol"
-                >{{ sym }}</a-tag>
-                <span v-if="!(performance.applicable_symbols || []).length" class="applicable-row__empty">-</span>
-              </div>
-            </div>
-            <div v-if="performance && hasApplicable" class="applicable-row">
-              <div class="applicable-row__label">{{ $t('community.applicableTimeframes') }}</div>
-              <div class="applicable-row__tags">
-                <a-tag
-                  v-for="tf in performance.applicable_timeframes"
-                  :key="`tf-${tf}`"
-                  class="tag-tf"
-                >{{ tf }}</a-tag>
-                <span v-if="!(performance.applicable_timeframes || []).length" class="applicable-row__empty">-</span>
-              </div>
-            </div>
             <div v-if="hasEquityCurve" class="equity-card">
               <div class="equity-card__head">
                 <div class="equity-card__title">{{ $t('community.equityCurveTitle') }}</div>
                 <div v-if="performance.best_run_meta" class="equity-card__meta">
-                  <a-tag v-if="performance.best_run_meta.symbol" class="tag-symbol">
-                    {{ performance.best_run_meta.symbol }}
-                  </a-tag>
-                  <a-tag v-if="performance.best_run_meta.timeframe" class="tag-tf">
-                    {{ performance.best_run_meta.timeframe }}
-                  </a-tag>
-                  <a-tag
-                    v-if="performance.best_run_meta.market_type"
-                    :class="performance.best_run_meta.market_type === 'swap' ? 'tag-market tag-market--swap' : 'tag-market tag-market--spot'"
-                  >
-                    {{ formatMarketType(performance.best_run_meta.market_type) }}
-                  </a-tag>
-                  <a-tag v-if="performance.best_run_meta.leverage" class="tag-leverage">
-                    {{ formatLeverage(performance.best_run_meta.leverage) }}
-                  </a-tag>
-                  <a-tag v-if="performance.best_run_meta.duration_days" class="tag-duration">
-                    {{ formatBacktestDuration(performance.best_run_meta.duration_days) }}
-                  </a-tag>
-                  <span class="equity-card__meta-sep">/</span>
                   <span :class="toneClass(performance.best_run_meta.total_return)">
                     {{ formatPercent(performance.best_run_meta.total_return) }}
                   </span>
-                  <span class="equity-card__meta-sep">/</span>
+                  <span class="equity-card__meta-sep">·</span>
                   <span class="negative">
                     {{ $t('community.maxDrawdown') }}
                     {{ formatPercent(performance.best_run_meta.max_drawdown) }}
@@ -272,7 +338,7 @@
           </div>
           <div class="action-buttons">
             <a-button v-if="detail.is_own" disabled>
-              {{ $t('community.myIndicator') }}
+              {{ isStrategyAsset ? $t('community.myStrategy') : $t('community.myIndicator') }}
             </a-button>
             <template v-else-if="detail.is_purchased">
               <a-tooltip :title="syncActionTooltip" placement="top">
@@ -304,7 +370,7 @@
               @click="handlePurchase"
             >
               <a-icon type="shopping-cart" />
-              {{ detail.pricing_type === 'free' || detail.price <= 0 ? $t('community.getFree') : $t('community.buyNow') }}
+              {{ purchaseActionLabel }}
             </a-button>
           </div>
         </div>
@@ -353,7 +419,9 @@ export default {
       myComment: null,
       imageError: false,
       equityChartInst: null,
-      equityResizeHandler: null
+      equityResizeHandler: null,
+      showAllParameters: false,
+      parameterPreviewLimit: 4
     }
   },
   computed: {
@@ -389,6 +457,84 @@ export default {
     },
     isIndicatorAsset () {
       return !this.isStrategyAsset
+    },
+    modalWidth () {
+      return this.isStrategyAsset ? 860 : 720
+    },
+    strategyContract () {
+      const contract = this.performance && this.performance.strategy_contract
+      return contract && typeof contract === 'object' ? contract : null
+    },
+    strategyParameters () {
+      return this.strategyContract && Array.isArray(this.strategyContract.parameters)
+        ? this.strategyContract.parameters
+        : []
+    },
+    visibleStrategyParameters () {
+      return this.showAllParameters
+        ? this.strategyParameters
+        : this.strategyParameters.slice(0, this.parameterPreviewLimit)
+    },
+    strategyDependencies () {
+      if (!this.strategyContract) return []
+      return [...new Set([
+        ...(this.strategyContract.factor_dependencies || []),
+        ...(this.strategyContract.fundamental_dependencies || [])
+      ].filter(Boolean))]
+    },
+    strategyContractItems () {
+      if (!this.strategyContract) return []
+      const contract = this.strategyContract
+      const instruments = contract.instruments || []
+      const instrumentValue = instruments.length
+        ? instruments.map(item => item.symbol || item.instrument_id).filter(Boolean).join(' · ')
+        : (contract.universe_reference || this.$t('community.dynamicUniverse'))
+      const markets = [...new Set(instruments.map(item => item.market).filter(Boolean))]
+      const marketTypes = [...new Set(instruments.map(item => item.market_type).filter(Boolean))]
+      const strategyTypeKey = contract.strategy_type === 'portfolio' ? 'portfolio' : 'cta'
+      return [
+        {
+          key: 'instrument',
+          icon: 'global',
+          label: this.$t('community.contractInstrument'),
+          value: instrumentValue,
+          hint: markets.join(' · ') || this.$t(`community.strategyType.${strategyTypeKey}`)
+        },
+        {
+          key: 'marketType',
+          icon: 'bank',
+          label: this.$t('community.contractMarketType'),
+          value: marketTypes.length
+            ? marketTypes.map(value => this.formatMarketType(value)).join(' · ')
+            : this.$t('community.marketTypeUnspecified'),
+          hint: this.$t(`community.strategyType.${strategyTypeKey}`)
+        },
+        {
+          key: 'frequency',
+          icon: 'clock-circle',
+          label: this.$t('community.contractFrequency'),
+          value: contract.primary_frequency || '—',
+          hint: this.$t('community.sourceControlled')
+        },
+        {
+          key: 'leverage',
+          icon: 'dashboard',
+          label: this.$t('community.contractLeverage'),
+          value: contract.leverage_allowed
+            ? this.$t('community.contractMaxLeverage', { value: this.formatLeverage(contract.max_leverage) })
+            : this.$t('community.contractNoLeverage'),
+          hint: contract.leverage_allowed
+            ? this.$t('community.leverageDeclared')
+            : this.$t('community.spotRiskBoundary')
+        }
+      ]
+    },
+    purchaseActionLabel () {
+      const isFree = this.detail && (this.detail.pricing_type === 'free' || this.detail.price <= 0)
+      if (!this.isStrategyAsset) {
+        return isFree ? this.$t('community.getFree') : this.$t('community.buyNow')
+      }
+      return isFree ? this.$t('community.getStrategy') : this.$t('community.buyStrategy')
     },
     codeHidden () {
       const d = this.detail || {}
@@ -473,11 +619,6 @@ export default {
       }
       return this.$t('community.useNow')
     },
-    hasApplicable () {
-      if (!this.performance) return false
-      return (this.performance.applicable_symbols || []).length > 0 ||
-        (this.performance.applicable_timeframes || []).length > 0
-    },
     hasEquityCurve () {
       return this.performance && Array.isArray(this.performance.equity_curve) &&
         this.performance.equity_curve.length > 1
@@ -533,6 +674,7 @@ export default {
       this.performance = null
       this.comments = { items: [], total: 0, page: 1 }
       this.myComment = null
+      this.showAllParameters = false
       this.disposeEquityChart()
     },
 
@@ -928,6 +1070,32 @@ export default {
       if (!days || days <= 0) return ''
       return this.$t('community.backtestDurationDays', { days })
     },
+    parameterName (param) {
+      if (param.label_key && this.$te(param.label_key)) return this.$t(param.label_key)
+      return param.label || param.name
+    },
+    formatContractValue (value, type) {
+      if (value === null || value === undefined || value === '') return '—'
+      if (type === 'boolean') {
+        return value ? this.$t('community.parameterEnabled') : this.$t('community.parameterDisabled')
+      }
+      const number = Number(value)
+      if (type === 'percent' && Number.isFinite(number)) {
+        return `${(number * 100).toFixed(Number.isInteger(number * 100) ? 0 : 2)}%`
+      }
+      if (Number.isFinite(number)) {
+        return Number.isInteger(number) ? String(number) : String(Number(number.toFixed(6)))
+      }
+      return String(value)
+    },
+    formatParameterRange (param) {
+      const hasMin = param.min !== null && param.min !== undefined
+      const hasMax = param.max !== null && param.max !== undefined
+      if (!hasMin && !hasMax) return this.$t('community.parameterNoRange')
+      const min = hasMin ? this.formatContractValue(param.min, param.type) : '—'
+      const max = hasMax ? this.formatContractValue(param.max, param.type) : '—'
+      return `${min} – ${max}`
+    },
     // Generic tone class. ``positiveThreshold`` lets callers say "Sharpe
     // is only good if >= 1" without re-implementing the rule.
     toneClass (val, positiveThreshold = 0) {
@@ -988,6 +1156,25 @@ export default {
 
     .header-info {
       flex: 1;
+
+      .strategy-title-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+
+        .indicator-name {
+          margin-bottom: 0;
+        }
+
+        .strategy-api-badge {
+          margin: 0;
+          border-color: rgba(255, 255, 255, 0.32);
+          background: rgba(255, 255, 255, 0.14);
+          color: #fff;
+        }
+      }
 
       .indicator-name {
         font-size: 20px;
@@ -1226,9 +1413,292 @@ export default {
       }
     }
 
+    .section-heading-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+
+      h3 {
+        margin-bottom: 4px;
+        padding-bottom: 0;
+        border-bottom: 0;
+      }
+
+      p {
+        margin: 0;
+        color: rgba(0, 0, 0, 0.52);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+    }
+
+    .strategy-contract-section {
+      padding: 16px;
+      border: 1px solid rgba(24, 144, 255, 0.16);
+      border-radius: 10px;
+      background: linear-gradient(145deg, rgba(24, 144, 255, 0.055), rgba(82, 196, 26, 0.025));
+    }
+
+    .source-controlled-badge {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(82, 196, 26, 0.1);
+      color: #389e0d;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .contract-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .contract-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.78);
+
+      &__icon {
+        flex: 0 0 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+        background: rgba(24, 144, 255, 0.1);
+        color: var(--primary-color, #1890ff);
+      }
+
+      &__body {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        span,
+        small {
+          color: rgba(0, 0, 0, 0.45);
+          font-size: 11px;
+          line-height: 1.4;
+        }
+
+        strong {
+          overflow: hidden;
+          color: rgba(0, 0, 0, 0.85);
+          font-size: 14px;
+          line-height: 1.45;
+          text-overflow: ellipsis;
+        }
+      }
+    }
+
+    .contract-logic-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 160px;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .contract-logic-card {
+      min-width: 0;
+      padding: 11px 12px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.025);
+
+      &__label {
+        display: block;
+        margin-bottom: 7px;
+        color: rgba(0, 0, 0, 0.48);
+        font-size: 11px;
+      }
+
+      &--warmup strong {
+        color: rgba(0, 0, 0, 0.82);
+        font-size: 14px;
+      }
+    }
+
+    .contract-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+
+      .ant-tag {
+        margin: 0;
+        border: 0;
+        background: rgba(24, 144, 255, 0.09);
+        color: #096dd9;
+        font-size: 11px;
+      }
+    }
+
+    .contract-empty {
+      color: rgba(0, 0, 0, 0.3);
+    }
+
+    .parameter-panel {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(24, 144, 255, 0.12);
+
+      &__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+
+        > div {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        strong {
+          color: rgba(0, 0, 0, 0.85);
+          font-size: 13px;
+        }
+
+        span {
+          color: rgba(0, 0, 0, 0.46);
+          font-size: 11px;
+        }
+
+        .parameter-count {
+          min-width: 26px;
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: rgba(24, 144, 255, 0.1);
+          color: var(--primary-color, #1890ff);
+          text-align: center;
+          font-weight: 600;
+        }
+      }
+    }
+
+    .parameter-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .parameter-item {
+      display: grid;
+      grid-template-columns: minmax(120px, 1.35fr) minmax(70px, 0.65fr) minmax(100px, 1fr);
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 10px 11px;
+      border: 1px solid rgba(0, 0, 0, 0.055);
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.58);
+
+      &__name,
+      &__value,
+      &__range {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      &__name strong,
+      &__value strong,
+      &__range strong {
+        overflow: hidden;
+        color: rgba(0, 0, 0, 0.8);
+        font-size: 12px;
+        line-height: 1.4;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      &__name code,
+      &__value span,
+      &__range span {
+        overflow: hidden;
+        color: rgba(0, 0, 0, 0.4);
+        font-size: 10px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    .parameter-toggle {
+      display: block;
+      height: auto;
+      margin: 8px auto 0;
+      padding: 2px 8px;
+      font-size: 12px;
+    }
+
+    .evidence-heading {
+      margin-bottom: 10px;
+    }
+
+    .evidence-context {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.025);
+
+      &__label {
+        color: rgba(0, 0, 0, 0.62);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      &__tags,
+      &__quality {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      &__tags .ant-tag {
+        margin: 0;
+        border: 0;
+        font-size: 11px;
+      }
+
+      &__quality {
+        justify-content: flex-end;
+        color: rgba(0, 0, 0, 0.48);
+        font-size: 11px;
+
+        .has-live { color: #389e0d; }
+        .no-live { color: #d48806; }
+      }
+
+      .tag-symbol { background: rgba(24, 144, 255, 0.08); color: #096dd9; }
+      .tag-tf { background: rgba(82, 196, 26, 0.09); color: #389e0d; }
+      .tag-market { background: rgba(19, 194, 194, 0.1); color: #08979c; }
+      .tag-leverage { background: rgba(250, 140, 22, 0.11); color: #d46b08; }
+      .tag-duration { background: rgba(47, 84, 235, 0.09); color: #2f54eb; }
+    }
+
     .performance-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 12px;
 
       .perf-item {
@@ -1477,6 +1947,85 @@ export default {
       color: rgba(255, 255, 255, 0.72);
     }
 
+    .section-heading-row p {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .strategy-contract-section {
+      border-color: #373d37;
+      background: linear-gradient(145deg, #202320, #202020);
+    }
+
+    .source-controlled-badge {
+      background: rgba(82, 196, 26, 0.16);
+      color: #95de64;
+    }
+
+    .contract-card,
+    .parameter-item {
+      border-color: #383838;
+      background: #292929;
+    }
+
+    .contract-card__body {
+      span,
+      small { color: rgba(255, 255, 255, 0.45); }
+      strong { color: rgba(255, 255, 255, 0.88); }
+    }
+
+    .contract-card__icon {
+      background: rgba(82, 196, 26, 0.12);
+      color: #8fd96a;
+    }
+
+    .contract-logic-card,
+    .evidence-context {
+      border-color: #363636;
+      background: #262626;
+    }
+
+    .contract-logic-card {
+      &__label { color: rgba(255, 255, 255, 0.48); }
+      &--warmup strong { color: rgba(255, 255, 255, 0.86); }
+    }
+
+    .contract-tags .ant-tag {
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .parameter-panel {
+      border-color: rgba(255, 255, 255, 0.09);
+
+      &__head {
+        strong { color: rgba(255, 255, 255, 0.88); }
+        span { color: rgba(255, 255, 255, 0.46); }
+        .parameter-count { background: rgba(82, 196, 26, 0.14); color: #95de64; }
+      }
+    }
+
+    .parameter-item {
+      &__name strong,
+      &__value strong,
+      &__range strong { color: rgba(255, 255, 255, 0.82); }
+
+      &__name code,
+      &__value span,
+      &__range span { color: rgba(255, 255, 255, 0.4); }
+    }
+
+    .evidence-context {
+      &__label { color: rgba(255, 255, 255, 0.7); }
+      &__quality { color: rgba(255, 255, 255, 0.46); }
+      .tag-symbol { background: rgba(24, 144, 255, 0.16); color: #69c0ff; }
+      .tag-tf { background: rgba(82, 196, 26, 0.16); color: #95de64; }
+      .tag-market { background: rgba(19, 194, 194, 0.18); color: #5cdbd3; }
+      .tag-leverage { background: rgba(250, 140, 22, 0.18); color: #ffc069; }
+      .tag-duration { background: rgba(47, 84, 235, 0.2); color: #85a5ff; }
+      .has-live { color: #95de64; }
+      .no-live { color: #ffd666; }
+    }
+
     .indicator-profile-grid .profile-item {
       background: rgba(255, 255, 255, 0.04);
       border-color: #303030;
@@ -1634,6 +2183,42 @@ export default {
 
       .price-line--secondary .price-current-aside {
         color: rgba(255, 255, 255, 0.35);
+      }
+    }
+  }
+}
+
+@media (max-width: 760px) {
+  .indicator-detail-modal {
+    .detail-header {
+      .header-cover {
+        width: 112px;
+        height: 96px;
+      }
+
+      .indicator-meta,
+      .indicator-stats {
+        flex-wrap: wrap;
+      }
+    }
+
+    .detail-body {
+      .contract-grid,
+      .performance-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .contract-logic-grid,
+      .parameter-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .evidence-context {
+        grid-template-columns: 1fr;
+
+        &__quality {
+          justify-content: flex-start;
+        }
       }
     }
   }

@@ -123,6 +123,7 @@
           v-else
           ref="cryptoCard"
           :is-dark-theme="isDarkTheme"
+          :exchange-id="selectedCryptoExchangeId"
           @summary-change="handleCryptoSummary"
         />
       </main>
@@ -183,6 +184,12 @@ export default {
     },
     selectedBroker () {
       return BROKER_META[this.activeProvider] || null
+    },
+    selectedCryptoExchangeId () {
+      const prefix = 'crypto:'
+      return this.activeProvider.startsWith(prefix)
+        ? this.activeProvider.slice(prefix.length).trim().toLowerCase()
+        : ''
     },
     connectedCount () {
       return BROKER_IDS.filter(id => this.isBrokerConnected(id)).length + this.cryptoCredentialItems.length

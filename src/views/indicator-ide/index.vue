@@ -475,12 +475,22 @@
         ></a-tab-pane>
       </a-tabs>
       <div v-if="addMarketTab === 'Crypto'" class="ide-add-source-row">
-        <a-select v-model="cryptoExchangeId" style="width: 50%;" @change="onAddSourceChange">
+        <a-select
+          v-model="cryptoExchangeId"
+          style="width: 50%;"
+          :dropdown-class-name="isDarkTheme ? 'ide-add-source-dropdown ide-add-source-dropdown--dark' : 'ide-add-source-dropdown'"
+          @change="onAddSourceChange"
+        >
           <a-select-option v-for="exchangeId in cryptoExchangeIds" :key="exchangeId" :value="exchangeId">
             {{ exchangeId.toUpperCase() }}
           </a-select-option>
         </a-select>
-        <a-select v-model="cryptoMarketType" style="width: 50%;" @change="onAddSourceChange">
+        <a-select
+          v-model="cryptoMarketType"
+          style="width: 50%;"
+          :dropdown-class-name="isDarkTheme ? 'ide-add-source-dropdown ide-add-source-dropdown--dark' : 'ide-add-source-dropdown'"
+          @change="onAddSourceChange"
+        >
           <a-select-option value="spot">{{ $t('marketContext.spot') }}</a-select-option>
           <a-select-option value="swap">{{ $t('marketContext.swap') }}</a-select-option>
         </a-select>
@@ -1649,6 +1659,13 @@ export default {
         })
       }
       return out
+    },
+    parseIndicatorParamRaw (code) {
+      const params = {}
+      for (const spec of this.parseIndicatorParamSpecs(code || '')) {
+        params[spec.name] = spec.defaultValue
+      }
+      return params
     },
     normalizeIndicatorParamMap (params, specs = this.currentIndicatorParamSpecs) {
       const out = {}
@@ -6482,6 +6499,22 @@ body.dark .ide-param-modal-wrap {
   }
 }
 
+.ide-add-source-dropdown--dark {
+  background: #1f1f1f;
+  border: 1px solid #363636;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  .ant-select-dropdown-menu-item {
+    color: rgba(255, 255, 255, 0.85);
+  }
+  .ant-select-dropdown-menu-item-selected {
+    color: rgba(255, 255, 255, 0.92);
+    background: var(--primary-color-soft, rgba(24, 144, 255, 0.2));
+  }
+  .ant-select-dropdown-menu-item-active:not(.ant-select-dropdown-menu-item-selected) {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
 .ide-modal-wrap--dark {
   .ant-modal-content { background: #1f1f1f; box-shadow: 0 8px 32px rgba(0,0,0,0.55); }
   .ant-modal-header { background: #1f1f1f; border-bottom-color: #303030; }
@@ -6496,6 +6529,11 @@ body.dark .ide-param-modal-wrap {
   .ant-input-search-icon { color: rgba(255,255,255,0.45); }
   .ant-list-item { color: rgba(255,255,255,0.85); border-bottom-color: #303030; }
   .ant-list-item:hover { background: rgba(255,255,255,0.04); }
+  .ant-list-item.add-item-active,
+  .ant-list-item.add-item-active:hover {
+    color: rgba(255,255,255,0.92);
+    background: var(--primary-color-soft, rgba(24, 144, 255, 0.2)) !important;
+  }
   .ant-input, .ant-input-number { background: #1f1f1f; border-color: #434343; color: rgba(255,255,255,0.85); &:focus, &:hover { border-color: var(--primary-color-active, #177ddc); } }
   .ant-input-number-handler-wrap { background: #1f1f1f; border-left-color: #434343; }
   .ant-input-number-handler { color: rgba(255,255,255,0.45); &:hover { color: var(--primary-color-active, #177ddc); } }

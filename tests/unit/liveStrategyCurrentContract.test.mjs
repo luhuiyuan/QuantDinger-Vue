@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+
+const editorPath = fileURLToPath(
+  new URL('../../src/views/strategy-center/components/LiveStrategyEditor.vue', import.meta.url)
+)
+const source = fs.readFileSync(editorPath, 'utf8')
+
+test('live strategy creation validates with the current compiler', () => {
+  assert.match(source, /compileScriptSource/)
+  assert.match(source, /compiledManifest/)
+  assert.match(source, /hasCurrentContract/)
+  assert.doesNotMatch(source, /strategyManifest\.apiVersion/)
+  assert.doesNotMatch(source, /Number\(config\.api_version/)
+})

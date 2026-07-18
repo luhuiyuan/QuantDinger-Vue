@@ -134,6 +134,16 @@
       </div>
     </pro-layout>
 
+    <button
+      v-if="isMobile && isDrawerOpen"
+      type="button"
+      class="mobile-menu-close"
+      :aria-label="$t('common.close')"
+      @click="closeMobileMenu"
+    >
+      <a-icon type="close" />
+    </button>
+
     <div v-if="false" class="custom-menu-footer" :class="{ 'collapsed': collapsed, 'drawer-open': isMobile && isDrawerOpen, 'drawer-animating': isMobile && isDrawerAnimating }">
       <div v-if="!collapsed" class="menu-footer-content">
         <div class="footer-section">
@@ -835,6 +845,9 @@ export default {
       this.$nextTick(() => {
         this.updateMenuFooterPosition()
       })
+    },
+    closeMobileMenu () {
+      this.handleCollapse(true)
     },
     handleMobileMenuToggle () {
       this.$nextTick(() => {

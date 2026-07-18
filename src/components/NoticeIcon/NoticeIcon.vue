@@ -280,31 +280,31 @@ export default {
     },
     getNoticeIcon (signalType) {
       const iconMap = {
-        'ai_monitor': 'robot',
-        'price_alert': 'bell',
-        'signal': 'thunderbolt',
-        'indicator_signal': 'line-chart',
-        'buy': 'rise',
-        'sell': 'fall',
-        'hold': 'pause-circle',
-        'trade': 'swap',
-        'security_login': 'safety-certificate',
-        'profile_test': 'experiment'
+        ai_monitor: 'robot',
+        price_alert: 'bell',
+        signal: 'thunderbolt',
+        indicator_signal: 'line-chart',
+        buy: 'rise',
+        sell: 'fall',
+        hold: 'pause-circle',
+        trade: 'swap',
+        security_login: 'safety-certificate',
+        profile_test: 'experiment'
       }
       return iconMap[signalType] || 'notification'
     },
     getNoticeColor (signalType) {
       const colorMap = {
-        'ai_monitor': '#722ed1',
-        'price_alert': '#faad14',
-        'signal': 'var(--primary-color, #1890ff)',
-        'indicator_signal': '#ff4d4f',
-        'buy': '#52c41a',
-        'sell': '#f5222d',
-        'hold': '#faad14',
-        'trade': '#13c2c2',
-        'security_login': '#fa541c',
-        'profile_test': '#2f54eb'
+        ai_monitor: '#722ed1',
+        price_alert: '#faad14',
+        signal: 'var(--primary-color, #1890ff)',
+        indicator_signal: '#ff4d4f',
+        buy: '#52c41a',
+        sell: '#f5222d',
+        hold: '#faad14',
+        trade: '#13c2c2',
+        security_login: '#fa541c',
+        profile_test: '#2f54eb'
       }
       return colorMap[signalType] || 'var(--primary-color, #1890ff)'
     },
@@ -322,9 +322,9 @@ export default {
     },
     getDecisionColor (decision) {
       const colorMap = {
-        'BUY': 'green',
-        'SELL': 'red',
-        'HOLD': 'orange'
+        BUY: 'green',
+        SELL: 'red',
+        HOLD: 'orange'
       }
       return colorMap[decision] || 'blue'
     },
@@ -395,7 +395,7 @@ export default {
     },
     goToPortfolio () {
       this.detailVisible = false
-      this.$router.push({ path: '/portfolio' }).catch(() => {})
+      this.$router.push({ path: '/strategy-center' }).catch(() => {})
     },
     async markAsRead (id) {
       const item = this.notifications.find(n => n.id === id)

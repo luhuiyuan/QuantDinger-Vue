@@ -5,7 +5,7 @@
         <a-icon type="reload" /> {{ $t('brokerAccounts.refresh') }}
       </a-button>
       <span class="bp-table-count">
-        {{ $t('brokerAccounts.ordersCount', { count: rows.length }) }}
+        {{ $t('brokerAccounts.orderHistoryCount', { count: rows.length }) }}
       </span>
     </div>
     <a-table

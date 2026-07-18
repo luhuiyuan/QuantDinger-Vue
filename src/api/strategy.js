@@ -24,6 +24,9 @@ const api = {
   executorCreate: '/api/strategies/executors/create',
   strategyAssets: '/api/strategy-assets',
   strategyBacktestRun: '/api/backtest/run',
+  strategyFactorResearch: '/api/backtest/factor-research',
+  strategyFactorResearchHistory: '/api/backtest/factor-research/history',
+  strategyFactorResearchGet: '/api/backtest/factor-research/get',
   strategyBacktestTune: '/api/backtest/tune',
   strategyBacktestHistory: '/api/backtest/history',
   strategyBacktestGet: '/api/backtest/get',
@@ -70,10 +73,11 @@ export function updateStrategy (id, data) {
   })
 }
 
-export function stopStrategy (id) {
+export function stopStrategy (id, closePositions = false) {
   return request({
     url: `${api.strategies}/${id}/stop`,
-    method: 'post'
+    method: 'post',
+    data: { close_positions: Boolean(closePositions) }
   })
 }
 
@@ -273,6 +277,31 @@ export function runStrategyBacktest (data) {
     method: 'post',
     data: payload,
     timeout
+  })
+}
+
+export function runStrategyFactorResearch (data) {
+  return request({
+    url: api.strategyFactorResearch,
+    method: 'post',
+    data,
+    timeout: data && data.timeout
+  })
+}
+
+export function getStrategyFactorResearchHistory (params = {}) {
+  return request({
+    url: api.strategyFactorResearchHistory,
+    method: 'get',
+    params
+  })
+}
+
+export function getStrategyFactorResearchRun (runId) {
+  return request({
+    url: api.strategyFactorResearchGet,
+    method: 'get',
+    params: { runId }
   })
 }
 

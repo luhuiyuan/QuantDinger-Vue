@@ -1,12 +1,14 @@
 <template>
   <div class="setting-drawer" :class="{ 'setting-drawer--dark': isDarkDrawer }">
     <a-drawer
+      v-if="visible"
       width="300"
       placement="right"
       @close="onClose"
       :closable="true"
       :visible="visible"
       :get-container="false"
+      :destroy-on-close="true"
     >
       <div class="setting-drawer-index-content">
 
