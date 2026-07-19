@@ -2747,7 +2747,10 @@ export default {
       const target = this.normalizeSymbolOption({
         market: entities.market || (fallbackTarget && fallbackTarget.market),
         symbol: entities.symbol || (fallbackTarget && fallbackTarget.symbol),
-        name: entities.name || (fallbackTarget && fallbackTarget.name)
+        name: entities.name || (fallbackTarget && fallbackTarget.name),
+        exchange_id: entities.exchange_id || (fallbackTarget && fallbackTarget.exchange_id),
+        market_type: entities.market_type || (fallbackTarget && fallbackTarget.market_type),
+        instrument_id: entities.instrument_id || (fallbackTarget && fallbackTarget.instrument_id)
       })
       return target || this.normalizeSymbolOption(fallbackTarget)
     },
@@ -2758,12 +2761,30 @@ export default {
       if (targetType === 'script' || workflow === 'script_strategy') return 'script'
       return 'script'
     },
+    strategyPromptTarget (target = {}, entities = {}) {
+      const market = String(entities.market || target.market || '').trim()
+      const rawSymbol = String(entities.symbol || target.symbol || '').trim()
+      if (!rawSymbol) return market
+      if (market.toLowerCase() !== 'crypto') {
+        return /^(?:CNStock|Forex|Future|Futures|USStock):/i.test(rawSymbol)
+          ? rawSymbol
+          : `${market}:${rawSymbol}`
+      }
+      const symbol = rawSymbol.replace(/^Crypto:/i, '')
+      if (symbol.includes('@')) return `Crypto:${symbol}`
+      const marketType = String(entities.market_type || target.market_type || 'spot').trim().toLowerCase() === 'swap'
+        ? 'swap'
+        : 'spot'
+      const exchangeId = String(entities.exchange_id || target.exchange_id || '').trim().toLowerCase()
+      return `Crypto:${symbol}@${exchangeId ? `${exchangeId}:` : ''}${marketType}`
+    },
     buildExecutableStrategyPrompt (plan, message, target) {
       const entities = plan && plan.entities ? plan.entities : {}
       const timeframe = entities.timeframe || ''
       const template = entities.strategy_template || ''
       const workflow = plan && plan.workflow ? plan.workflow : 'script_strategy'
       const isIndicatorWorkflow = String(workflow || '').toLowerCase() === 'indicator_ide'
+      const targetLabel = this.strategyPromptTarget(target, entities)
       const promptText = (key, fallback, values = {}) => this.i18nText(`aiAssetAnalysis.copilot.executableStrategyPrompt.${key}`, fallback, values)
       const artifactRules = isIndicatorWorkflow
         ? [
@@ -2773,7 +2794,9 @@ export default {
             promptText('ruleSparseAnnotations', '- Keep chart annotations sparse, transparent, and clear of dense candles.')
           ]
         : [
-            promptText('ruleScriptDraft', '- Generate one executable Python Strategy API V2 draft using explicit position intents and runtime-safe sizing.')
+            promptText('ruleScriptDraft', '- Generate one executable Python Strategy API V2 draft using explicit position intents and runtime-safe sizing.'),
+            promptText('ruleScriptOwnership', '- The strategy source owns its canonical instrument, market type, subscription frequency, direction, sizing, entries, exits, risk rules, and schedules. The run panel owns only initial capital, date range, and permitted Crypto @swap leverage.'),
+            promptText('ruleScriptApis', '- Use only Strategy API V2 runtime APIs. Read current prices with data.current(...), positions through amount/avg_cost, and global order/schedule helpers; never use get_current_data, quantity/cost_basis, or context.run_daily.')
           ]
       const memoryLines = (this.userMemories || [])
         .slice(0, 8)
@@ -2785,10 +2808,14 @@ export default {
           ? promptText('generateIndicatorArtifact', 'Generate the runnable QuantDinger chart indicator artifact now.')
           : promptText('generateArtifact', 'Generate the runnable QuantDinger strategy artifact now.'),
         promptText('workflow', 'Workflow: {workflow}', { workflow }),
-        promptText('target', 'Target: {target}', { target: `${target.market}:${target.symbol}` }),
-        timeframe
-          ? promptText('timeframe', 'Chart/run context timeframe: {timeframe}. Do not emit a code-owned timeframe header unless the user explicitly requested it.', { timeframe })
-          : promptText('timeframeDefault', 'Timeframe remains owned by the run panel unless the user explicitly requests a code-owned default.'),
+        promptText('target', 'Target: {target}', { target: targetLabel }),
+        isIndicatorWorkflow
+          ? (timeframe
+              ? promptText('indicatorTimeframe', 'Chart context timeframe: {timeframe}. Use it only to interpret the request; indicator code must not hardcode a timeframe.', { timeframe })
+              : promptText('indicatorTimeframeDefault', 'No chart timeframe was supplied. Indicator code must remain timeframe-agnostic.'))
+          : (timeframe
+              ? promptText('strategyTimeframe', 'Source timeframe: {timeframe}. Preserve it in context.subscribe(frequency=...).', { timeframe })
+              : promptText('strategyTimeframeDefault', 'No timeframe was supplied. Choose a conservative source-owned default and encode it in context.subscribe(frequency=...).')),
         template ? promptText('referenceTemplate', 'Reference strategy/template: {template}', { template }) : '',
         '',
         promptText('executionRules', 'Execution rules:'),
@@ -2932,9 +2959,10 @@ export default {
         ? promptText('workflowIndicator', 'QuantDinger Chart Indicator')
         : promptText('workflowScript', 'QuantDinger Trading Script')
       const isIndicatorWorkflow = targetType === 'indicator'
+      const targetLabel = this.strategyPromptTarget(target)
       const hardRules = [
         promptText('workflow', 'Workflow: {workflow}', { workflow }),
-        promptText('target', 'Target: {target}', { target: `${target && target.market ? target.market : ''}:${target && target.symbol ? target.symbol : ''}` }),
+        promptText('target', 'Target: {target}', { target: targetLabel }),
         '',
         promptText('hardRules', 'Hard rules:'),
         promptText('ruleExecutionTask', '- This is an execution task, not a consulting answer. Produce the runnable artifact now.'),
@@ -2944,7 +2972,7 @@ export default {
         promptText('ruleEnglishComments', '- Code comments must be English.'),
         isIndicatorWorkflow
           ? promptText('ruleIndicatorVerification', '- Encode visual parameters and marker meanings as # @param declarations, plot/signal names, labels, and concise code comments.')
-          : promptText('ruleRiskVerification', '- Encode risk parameters, invalidation, and safety behavior as context.params defaults, explicit exits, state guards, and concise code comments.'),
+          : promptText('ruleRiskVerification', '- Declare tunable risk knobs with # @param and read matching context.params defaults only inside executable handlers or callbacks. Encode explicit exits and state guards in code.'),
         promptText('ruleConservativeDefaults', '- If a required assumption is missing, choose conservative defaults and encode them in code params or comments, not prose outside the code.'),
         '',
         memoryLines ? `[${promptText('userMemory', 'User memory')}]\n${memoryLines}\n` : '',
@@ -2964,7 +2992,14 @@ export default {
           promptText('ruleLightChartLayers', '- When layers are truly needed, they must look like lightweight analysis annotations, not blocking panels: short text, transparent fills, dashed borders when useful, and labels near the right edge or outside dense candles.')
         )
       } else if (targetType === 'script') {
-        hardRules.splice(6, 0, promptText('ruleScriptDraft', '- Trading Script output must be a Python Strategy API V2 draft for the QuantDinger Trading Script editor.'))
+        hardRules.splice(
+          6,
+          0,
+          promptText('ruleScriptDraft', '- Trading Script output must be a Python Strategy API V2 draft for the QuantDinger Trading Script editor.'),
+          promptText('ruleScriptOwnership', '- Source code owns the canonical instrument, market type, subscription frequency, direction, sizing, entries, exits, risk, and schedules. The run panel owns only initial capital, date range, and permitted Crypto @swap leverage.'),
+          promptText('ruleScriptApis', '- Use data.current(...) for current prices, position.amount/avg_cost for positions, and global order/schedule helpers. Never use get_current_data, position.quantity/cost_basis, or context.run_daily.'),
+          promptText('ruleInitializeParams', '- Never read context.params in initialize(context); read declared # @param values only inside executable handlers or callbacks.')
+        )
       } else {
         hardRules.splice(6, 0, promptText('ruleScriptDraft', '- Trading Script output must be a Python Strategy API V2 draft for the QuantDinger Trading Script editor.'))
       }
@@ -3359,7 +3394,7 @@ export default {
     },
     normalizeSymbolOption (item) {
       if (!item) return null
-      const market = item.market || item.market_type || item.category || this.context.market || 'Crypto'
+      const market = item.market || item.category || this.context.market || 'Crypto'
       const symbol = String(item.symbol || item.code || item.ticker || '').trim()
       if (!symbol) return null
       return {

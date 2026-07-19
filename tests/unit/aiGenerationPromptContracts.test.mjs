@@ -23,7 +23,15 @@ test('indicator conversion prompt protects direction, edge, execution, and risk 
 test('copilot builds workflow-specific artifact rules instead of mixing indicator and strategy rules', () => {
   assert.match(copilot, /const artifactRules = isIndicatorWorkflow/)
   assert.match(copilot, /\.\.\.artifactRules/)
-  assert.match(copilot, /Timeframe remains owned by the run panel/)
+  assert.match(copilot, /Choose a conservative source-owned default and encode it in context\.subscribe/)
+  assert.doesNotMatch(copilot, /Timeframe remains owned by the run panel/)
+  assert.match(copilot, /The strategy source owns its canonical instrument/)
+  assert.match(copilot, /never use get_current_data, quantity\/cost_basis, or context\.run_daily/)
+  assert.match(copilot, /Never read context\.params in initialize\(context\)/)
+  assert.match(copilot, /Crypto:\$\{symbol\}@\$\{exchangeId/)
+  assert.match(copilot, /exchange_id: entities\.exchange_id \|\| \(fallbackTarget && fallbackTarget\.exchange_id\)/)
+  assert.match(copilot, /market_type: entities\.market_type \|\| \(fallbackTarget && fallbackTarget\.market_type\)/)
+  assert.doesNotMatch(copilot, /item\.market \|\| item\.market_type \|\| item\.category/)
 })
 
 test('English prompt overrides identify the indicator workflow as chart-only', () => {

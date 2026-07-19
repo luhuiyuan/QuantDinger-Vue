@@ -22,6 +22,19 @@ export const normalizeTimestampMilliseconds = value => {
 
 export const strategyTradingConfig = strategy => asObject(strategy && strategy.trading_config)
 
+export const strategyExchangeId = strategy => {
+  const exchange = asObject(strategy && strategy.exchange_config)
+  const trading = strategyTradingConfig(strategy)
+  return String(
+    exchange.exchange_id ||
+    exchange.exchangeId ||
+    trading.exchange_id ||
+    trading.exchangeId ||
+    (strategy && (strategy.exchange_id || strategy.exchangeId)) ||
+    ''
+  ).trim().toLowerCase()
+}
+
 export const strategyExecutionMode = strategy => {
   const config = strategyTradingConfig(strategy)
   const mode = String((strategy && strategy.execution_mode) || config.execution_mode || '').trim().toLowerCase()
@@ -76,13 +89,12 @@ export const filterAndSortStrategies = (strategies, filters = {}) => {
       if (executionMode !== 'all' && rowExecutionMode !== executionMode) return false
       if (!keyword) return true
       const config = strategyTradingConfig(strategy)
-      const exchange = asObject(strategy && strategy.exchange_config)
       const haystack = [
         strategy && strategy.id,
         strategy && strategy.strategy_name,
         strategySymbol(strategy),
         config.timeframe,
-        exchange.exchange_id
+        strategyExchangeId(strategy)
       ].map(item => String(item || '').toLowerCase()).join(' ')
       return haystack.includes(keyword)
     })

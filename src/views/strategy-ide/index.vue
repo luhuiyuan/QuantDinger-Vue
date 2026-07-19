@@ -415,6 +415,7 @@ import StrategyEditor from './components/StrategyEditor.vue'
 import FactorLibraryModal from './FactorLibraryModal.vue'
 import UniverseLibraryModal from './UniverseLibraryModal.vue'
 import ExecutorStrategies from '@/views/executor-strategies'
+import { resolveIndicatorStrategyContext } from '@/utils/indicatorStrategyContext'
 import {
   aiGenerateStrategy,
   createScriptSource,
@@ -1679,8 +1680,13 @@ export default {
       this.indicatorConvertContext = target || null
       this.indicatorConvertError = ''
     },
+    resolveIndicatorConversionContext (ctx = {}) {
+      const query = (this.$route && this.$route.query) || {}
+      return resolveIndicatorStrategyContext(ctx, query, this.runConfig || {})
+    },
     buildIndicatorConversionPrompt () {
       const ctx = this.indicatorConvertContext || {}
+      const source = this.resolveIndicatorConversionContext(ctx)
       const params = ctx.params && Object.keys(ctx.params).length ? JSON.stringify(ctx.params, null, 2) : '{}'
       const instruction = String(this.indicatorConvertInstruction || '').trim() ||
         'Convert the visible indicator signals into a conservative, event-based strategy. Confirm signals on closed bars and execute on the next bar to avoid look-ahead bias.'
@@ -1691,6 +1697,7 @@ export default {
         '- Return Strategy API V2 code only, using the current manifest and handler contract.',
         '- Start with a metadata docstring, then define initialize(context) and handle_data(context, data), scheduled callbacks, or on_rebalance(context, data).',
         '- The strategy source owns its universe, markets, subscriptions, frequency, factors, schedules, direction, sizing, entries, exits, and risk rules.',
+        '- Preserve the source instrument and timeframe below in context.set_universe(...) and context.subscribe(...). Never replace them with USStock:SPY or another fallback instrument.',
         '- In initialize(context), call context.set_universe(...) and context.subscribe(frequency=...). Use context.set_warmup(...) when indicators need history.',
         '- Backtest and deployment panels only provide initial capital, date range, and optional leverage for a Crypto @swap strategy that explicitly calls context.allow_leverage(max_leverage=N).',
         '- Preserve the indicator signal logic first. Map visual buy/entry markers to long entries, sell/exit markers to long exits, and warning markers to wait/risk states.',
@@ -1700,14 +1707,18 @@ export default {
         '- If the user explicitly requests symmetric shorts from a long-only indicator, derive and label them as new behavior; otherwise do not invent short entries.',
         '- Confirm indicator conditions on completed bars. Orders from handle_data are filled by the engine on the next available bar open.',
         '- Use get_history, indicator, factor, get_factors, and get_fundamentals without future data. TA-Lib functions are available through indicator/factor.',
+        '- Use data.current(symbol, field) for current scalar values. There is no get_current_data API. get_position(symbol) returns a Position with amount, avg_cost, and last_price; it has no quantity or cost_basis.',
         '- Fundamental factors are point-in-time and portfolio-oriented; never invent fundamental values or backfill future observations.',
         '- Use order, order_value, order_target, order_target_value, and order_target_percent. Prevent duplicate intents on the same bar.',
+        '- Declare tunable strategy knobs with # @param and read matching context.params defaults only inside handlers or callbacks, never inside initialize(context).',
         '- For risk-managed entries, attach explicit protection rules to entries with stop_loss_pct, take_profit_pct, trailing_stop_pct, or time_limit_seconds.',
         '- Remove display-only parameters such as colors, visibility toggles, marker offsets, line extension, and plot layout.',
         '- Do not generate grid, DCA, or martingale logic unless the user explicitly requests a Strategy API V2 robot.',
         '',
         `Indicator name: ${ctx.name || this.text.defaultIndicatorName}`,
         ctx.description ? `Indicator description: ${ctx.description}` : '',
+        source.instrument ? `Source instrument: ${source.instrument}` : '',
+        source.timeframe ? `Source timeframe: ${source.timeframe}` : '',
         `Indicator params JSON:\n${params}`,
         '',
         `User conversion request:\n${instruction}`,
@@ -1759,16 +1770,26 @@ export default {
       return code ? String(code).trim() : ''
     },
     buildGeneratedMetadata (ctx = {}) {
+      const source = this.resolveIndicatorConversionContext(ctx)
+      const lastRunConfig = {
+        ...this.buildTradingConfig(),
+        market_category: source.market || this.runConfig.market_category,
+        symbol: source.symbol || this.runConfig.symbol,
+        timeframe: source.timeframe || this.runConfig.timeframe,
+        exchange_id: source.market.toLowerCase() === 'crypto' ? source.exchangeId : '',
+        market_type: source.marketType
+      }
       return {
         generated_by: 'ai_indicator_to_strategy',
         source_indicator_id: ctx.indicatorId || '',
         source_indicator_name: ctx.name || '',
-        source_indicator_market: ctx.market || '',
-        source_indicator_symbol: ctx.symbol || '',
-        source_indicator_timeframe: ctx.timeframe || '',
+        source_indicator_market: source.market,
+        source_indicator_symbol: source.symbol,
+        source_indicator_instrument: source.instrument,
+        source_indicator_timeframe: source.timeframe,
         lifecycle_verified: false,
         script_verified: false,
-        last_run_config: this.buildTradingConfig(),
+        last_run_config: lastRunConfig,
         script_template_params: {}
       }
     },

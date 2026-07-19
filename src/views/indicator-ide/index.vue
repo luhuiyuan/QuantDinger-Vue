@@ -3038,37 +3038,6 @@ export default {
       this.publishCodeHidden = !!indicator.is_encrypted
       this.showPublishModal = true
     },
-    buildIndicatorToStrategyPrompt () {
-      const indicator = this.selectedIndicatorObj || {}
-      const codeHidden = this.selectedIndicatorCodeHidden
-      const code = codeHidden ? '' : String(this.currentCode || indicator.code || '').trim()
-      const target = [this.market, this.symbol].filter(Boolean).join(':') || this.symbol || ''
-      const description = String(indicator.description || '').trim()
-      const params = this.parseIndicatorParamRaw(code || '')
-      const paramText = Object.keys(params || {}).length
-        ? JSON.stringify(params, null, 2)
-        : ''
-      const lines = [
-        `请把当前 QuantDinger 指标转写成可回测、可实盘的 Python Strategy API V2 策略。`,
-        target ? `目标标的：${target}` : '',
-        `指标名称：${indicator.name || '未命名指标'}`,
-        description ? `指标说明：${description}` : '',
-        '',
-        '边界规则：',
-        '- 生成策略代码，不要生成图表指标代码。',
-        '- 标的、投入金额、交易类型、杠杆倍数、交易方向由策略页/回测页/实盘页表单配置，代码里不要硬编码。',
-        '- 手续费、滑点、资金费率等属于回测系统配置，代码里不要硬编码。',
-        '- K线周期、入场、出场、止盈、止损、移动止盈、加仓/减仓、仓位管理由策略代码自己清晰实现。',
-        '- 使用 QuantDinger Strategy API V2 风格，明确 open_long/open_short、add/reduce、close、风控和日志。',
-        '- 如果原指标只提供视觉信号，请把视觉信号转成明确的交易条件，并解释保守默认值。',
-        '',
-        paramText ? `指标参数：\n${paramText}` : '',
-        code
-          ? `指标源码：\n\`\`\`python\n${code}\n\`\`\``
-          : '指标源码不可见：请只根据指标名称、说明和可见图表行为做保守转写，不要尝试还原隐藏源码。'
-      ]
-      return lines.filter(Boolean).join('\n')
-    },
     buildIndicatorToStrategyContext () {
       const indicator = this.selectedIndicatorObj || {}
       const code = String(this.cmInstance ? this.cmInstance.getValue() : (this.currentCode || indicator.code || '')).trim()

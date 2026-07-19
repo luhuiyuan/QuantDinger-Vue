@@ -536,9 +536,9 @@ export default {
 .result-trustbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid; border-radius: 8px; }
 .result-trustbar > div { display: flex; align-items: center; gap: 8px; }
 .result-trustbar span { color: #64748b; font-size: 12px; }
-.result-trustbar.is-success { border-color: #315d22; background: #13200f; color: #73d13d; }
-.result-trustbar.is-warning { border-color: #664d03; background: #211b08; color: #ffc53d; }
-.result-trustbar.is-error { border-color: #6b2525; background: #251111; color: #ff7875; }
+.result-trustbar.is-success { border-color: #b7eb8f; background: #f6ffed; color: #3f8600; }
+.result-trustbar.is-warning { border-color: #ffe58f; background: #fffbe6; color: #ad6800; }
+.result-trustbar.is-error { border-color: #ffccc7; background: #fff2f0; color: #cf1322; }
 .metrics-grid { display: grid; grid-template-columns: repeat(8, minmax(105px, 1fr)); gap: 8px; }
 .metric-card, .overview-card, .status-card { min-width: 0; padding: 12px; border: 1px solid #edf0f4; border-radius: 8px; background: #f8fafc; }
 .metric-card { display: flex; flex-direction: column; gap: 3px; }
@@ -582,8 +582,13 @@ export default {
 .portfolio-result.theme-dark .metric-card, .portfolio-result.theme-dark .overview-card, .portfolio-result.theme-dark .status-card, .portfolio-result.theme-dark .assumption-strip div { border-color: rgba(255,255,255,.1); background: #0d0d0d; }
 .portfolio-result.theme-dark .metric-card strong, .portfolio-result.theme-dark .overview-card strong, .portfolio-result.theme-dark .status-card strong, .portfolio-result.theme-dark .chart-heading h3, .portfolio-result.theme-dark .assumption-strip strong { color: #e5e7eb; }
 .portfolio-result.theme-dark .chart-card { border-color: rgba(255,255,255,.1); }
+.portfolio-result.theme-dark .result-trustbar.is-success { border-color: #315d22; background: #13200f; color: #73d13d; }
+.portfolio-result.theme-dark .result-trustbar.is-warning { border-color: #664d03; background: #211b08; color: #ffc53d; }
+.portfolio-result.theme-dark .result-trustbar.is-error { border-color: #6b2525; background: #251111; color: #ff7875; }
+.portfolio-result.theme-dark .result-trustbar span { color: rgba(255, 255, 255, .56); }
 @media (max-width: 1500px) { .metrics-grid { grid-template-columns: repeat(4, 1fr); } }
 @media (max-width: 900px) { .metrics-grid, .overview-grid, .status-grid, .assumption-strip { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 720px) { .result-trustbar { align-items: flex-start; flex-direction: column; }.result-trustbar > div { flex-wrap: wrap; } }
 </style>
 
 <style lang="less">

@@ -49,7 +49,7 @@
           >
             <span class="row-main">
               <strong>{{ strategy.strategy_name || '-' }}</strong>
-              <small>{{ symbol(strategy) || '-' }}<template v-if="timeframe(strategy)"> · {{ timeframe(strategy) }}</template></small>
+              <small>{{ symbol(strategy) || '-' }}<template v-if="timeframe(strategy)"> · {{ timeframe(strategy) }}</template><template v-if="liveExchangeName(strategy)"> · {{ liveExchangeName(strategy) }}</template></small>
             </span>
             <span class="row-status">
               <i :class="statusClass(strategy)"></i>{{ statusLabel(strategy) }}
@@ -76,6 +76,9 @@
               <span class="detail-symbol">{{ symbol(selectedStrategy) }}</span>
               <span class="status-pill" :class="statusClass(selectedStrategy)">{{ statusLabel(selectedStrategy) }}</span>
               <span class="execution-pill" :class="executionMode(selectedStrategy)">{{ executionLabel(selectedStrategy) }}</span>
+              <span v-if="liveExchangeName(selectedStrategy)" class="exchange-pill">
+                <a-icon type="bank" />{{ liveExchangeName(selectedStrategy) }}
+              </span>
             </div>
             <p>
               {{ $t('strategyCenter.console.startedAt') }} · {{ formatTime(health(selectedStrategy).started_at || selectedStrategy.started_at || selectedStrategy.created_at) }}
@@ -90,7 +93,7 @@
               :loading="controlLoadingId === selectedStrategy.id"
               @click="$emit('start', selectedStrategy)"
             >{{ $t('trading-assistant.startStrategy') }}</a-button>
-            <a-button-group v-else>
+            <div v-else class="pause-actions">
               <a-popconfirm
                 :title="$t('strategyCenter.console.pauseConfirm')"
                 :ok-text="$t('strategyCenter.console.pauseOnly')"
@@ -112,7 +115,7 @@
                   {{ $t('strategyCenter.console.stopAndClose') }}
                 </a-button>
               </a-popconfirm>
-            </a-button-group>
+            </div>
             <a-button icon="edit" :disabled="isRunning(selectedStrategy)" @click="$emit('edit', selectedStrategy)">{{ $t('trading-assistant.editStrategy') }}</a-button>
             <a-popconfirm
               :title="$t('trading-assistant.messages.deleteConfirmWithName', { name: selectedStrategy.strategy_name || '-' })"
@@ -222,8 +225,10 @@ import PositionRecords from './PositionRecords.vue'
 import TradingRecords from './TradingRecords.vue'
 import StrategyReviewReport from './StrategyReviewReport.vue'
 import StrategyLogs from './StrategyLogs.vue'
+import { getExchangeDisplayName } from '@/utils/exchangeCredential'
 import {
   normalizeTimestampMilliseconds,
+  strategyExchangeId,
   strategyExecutionMode,
   strategyLastActivity,
   strategySymbol,
@@ -395,6 +400,11 @@ export default {
     resizeChart () { if (this.chart) this.chart.resize() },
     isRunning (strategy) { return String(strategy && strategy.status || '').toLowerCase() === 'running' },
     executionMode (strategy) { return strategyExecutionMode(strategy) },
+    liveExchangeName (strategy) {
+      if (this.executionMode(strategy) !== 'live') return ''
+      const exchangeId = strategyExchangeId(strategy)
+      return exchangeId ? getExchangeDisplayName(exchangeId) : ''
+    },
     tradingConfig (strategy) { return strategyTradingConfig(strategy) },
     executionLabel (strategy) { return this.executionMode(strategy) === 'live' ? this.$t('systemOverview.live') : this.$t('systemOverview.signal') },
     symbol (strategy) { return strategySymbol(strategy) },
@@ -475,8 +485,9 @@ export default {
 .detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid #e6e9ee; }
 .detail-title-line { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }.detail-title-line h2 { margin: 0; color: #151d29; font-size: 21px; font-weight: 700; letter-spacing: -.01em; }.detail-symbol { color: #667085; font-size: 13px; font-weight: 500; }
 .detail-header p { margin: 7px 0 0; color: #778290; font-size: 12px; font-variant-numeric: tabular-nums; }.detail-header p span { margin: 0 6px; }
-.status-pill, .execution-pill { padding: 2px 7px; border-radius: 3px; font-size: 12px; font-weight: 500; }.status-pill.running { color: #269d58; background: rgba(38, 157, 88, .09); }.status-pill.warning { color: #cb5f3f; background: rgba(203, 95, 63, .1); }.status-pill.stopped { color: #66717f; background: #eef0f3; }.execution-pill { border: 1px solid #e1e4e8; color: #66717f; }.execution-pill.live { border-color: rgba(225, 164, 22, .38); color: #a86f00; }
+.status-pill, .execution-pill, .exchange-pill { padding: 2px 7px; border-radius: 3px; font-size: 12px; font-weight: 500; }.status-pill.running { color: #269d58; background: rgba(38, 157, 88, .09); }.status-pill.warning { color: #cb5f3f; background: rgba(203, 95, 63, .1); }.status-pill.stopped { color: #66717f; background: #eef0f3; }.execution-pill { border: 1px solid #e1e4e8; color: #66717f; }.execution-pill.live { border-color: rgba(225, 164, 22, .38); color: #a86f00; }.exchange-pill { display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(24, 144, 255, .24); color: #1677b8; background: rgba(24, 144, 255, .06); }
 .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pause-actions { display: inline-flex; gap: 8px; }
 .delete-strategy-button:not([disabled]) { border-color: rgba(217, 86, 86, .4); color: #d95656; }
 .delete-strategy-button:not([disabled]):hover { border-color: #d95656; color: #d95656; }
 .health-strip { display: grid; grid-template-columns: repeat(5, 1fr); margin: 16px 0; border: 1px solid #e4e8ed; background: #fafbfc; }
@@ -494,6 +505,7 @@ export default {
 .overview-positions-panel ::v-deep .strategy-tab-empty { min-height: 132px; border: 0; background: transparent; }
 .workspace-empty { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 620px; padding: 30px; text-align: center; }.workspace-empty > .anticon { margin-bottom: 18px; color: #d19a18; font-size: 42px; }.workspace-empty h2 { margin: 0 0 8px; }.workspace-empty p { max-width: 430px; margin-bottom: 20px; color: #7b8490; }.detail-empty { display: flex; align-items: center; justify-content: center; }
 .theme-dark { border-color: #262a30; background: #111315; color: #e5e7eb; .strategy-master { border-color: #292d33; background: #121416; }.master-tabs,.strategy-master footer { border-color: #292d33; }.master-tabs b { background: #25282d; color: #a5abb4; }.strategy-row { border-color: #272b31; }.strategy-row:hover { background: #191c20; }.strategy-row.selected { background: #211d13; }.row-main strong { color: #e7e9ed; }.row-main small,.row-status { color: #818995; }.row-status em { border-color: #383c43; color: #959ca6; }.strategy-detail { background: #101214; }.detail-header,.section-head { border-color: #292d33; }.detail-title-line h2 { color: #f0f1f3; }.status-pill.stopped { background: #262a2f; color: #9ba2ab; }.execution-pill { border-color: #3a3e45; }.health-strip { border-color: #292d33; background: #15181b; }.health-strip > div { border-color: #292d33; }.health-strip strong { color: #e1e4e8; }.panel-section { border-color: #292d33; background: #131517; }.section-head h3 { color: #e0e3e7; }.master-search ::v-deep .ant-input { border-color: #30343a; background: #181b1e; color: #e4e7eb; }.workspace-empty h2 { color: #eceef1; }}
+.theme-dark .exchange-pill { border-color: rgba(64, 169, 255, .3); color: #69c0ff; background: rgba(24, 144, 255, .1); }
 
 /* Operational console layout */
 .operations-workspace {
@@ -692,5 +704,5 @@ export default {
   background: transparent;
 }
 @media (max-width: 1080px) { .operations-workspace { grid-template-columns: 290px minmax(0, 1fr); }.health-strip { grid-template-columns: repeat(3, 1fr); }.health-strip > div { border-bottom: 1px solid #e7eaf0; }.performance-strip { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 760px) { .operations-workspace { display: block; height: auto; }.strategy-master { max-height: 430px; border-right: 0; border-bottom: 1px solid #e4e8ee; }.strategy-detail { overflow: visible; padding: 14px; }.detail-header { flex-direction: column; }.detail-actions { width: 100%; }.detail-actions .ant-btn { flex: 1; }.health-strip,.performance-strip { grid-template-columns: repeat(2, 1fr); }.equity-chart { height: 240px; } }
+@media (max-width: 760px) { .operations-workspace { display: block; height: auto; }.strategy-master { max-height: 430px; border-right: 0; border-bottom: 1px solid #e4e8ee; }.strategy-detail { overflow: visible; padding: 14px; }.detail-header { flex-direction: column; }.detail-actions { width: 100%; }.detail-actions .ant-btn { flex: 1; }.pause-actions { width: 100%; }.health-strip,.performance-strip { grid-template-columns: repeat(2, 1fr); }.equity-chart { height: 240px; } }
 </style>

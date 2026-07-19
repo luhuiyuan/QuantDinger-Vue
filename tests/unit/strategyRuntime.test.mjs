@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   filterAndSortStrategies,
   normalizeTimestampMilliseconds,
+  strategyExchangeId,
   strategyExecutionMode,
   strategyLastActivityTimestamp,
   strategyRuntimeSummary,
@@ -48,6 +49,14 @@ test('normalizes strategy runtime fields', () => {
   assert.equal(strategyExecutionMode(rows[1]), 'live')
   assert.equal(strategySymbol(rows[2]), 'SOL/USDT')
   assert.equal(strategyLastActivityTimestamp(rows[1]), 1783677600000)
+})
+
+test('resolves the live exchange from supported strategy payload shapes', () => {
+  assert.equal(strategyExchangeId({ exchange_config: { exchange_id: 'OKX' } }), 'okx')
+  assert.equal(strategyExchangeId({ exchange_config: '{"exchangeId":"Bybit"}' }), 'bybit')
+  assert.equal(strategyExchangeId({ trading_config: { exchange_id: 'binance' } }), 'binance')
+  assert.equal(strategyExchangeId({ exchange_id: 'alpaca' }), 'alpaca')
+  assert.equal(strategyExchangeId({}), '')
 })
 
 test('normalizes Unix seconds and milliseconds for runtime charts', () => {
