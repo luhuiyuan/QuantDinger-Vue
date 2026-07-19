@@ -6442,6 +6442,8 @@ const locale = {
   "strategyCenter.backtest.adviceDrawdown": "回撤偏大，建议优先检查止损、仓位和波动过滤条件。",
   "strategyCenter.backtest.adviceLoss": "本轮收益为负，建议先排查入场条件、交易方向和成本敏感性。",
   "aiAssetAnalysis.copilot.copyCode": "复制代码",
+  "aiAssetAnalysis.copilot.openStrategyV2Ide": "打开交易脚本编辑器",
+  "aiAssetAnalysis.copilot.scriptStrategyReady": "交易脚本草稿已生成。你可以在这里继续完善，或打开交易脚本编辑器进行编辑、回测和发布。",
   "aiAssetAnalysis.copilot.strategyFlowDescribe": "描述",
   "aiAssetAnalysis.copilot.strategyFlowDraft": "草稿",
   "aiAssetAnalysis.copilot.strategyFlowBacktest": "回测",

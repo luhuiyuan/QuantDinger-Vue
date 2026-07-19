@@ -3044,6 +3044,8 @@ registerOverlay({
         if (chartRef.value && typeof chartRef.value.subscribeAction === 'function') {
           chartRef.value.subscribeAction('onDataReady', () => {
             scheduleSyncVolumePaneLayout()
+            const rows = typeof chartRef.value.getDataList === 'function' ? chartRef.value.getDataList() : []
+            emit('load', { barCount: Array.isArray(rows) ? rows.length : 0 })
           })
         }
 

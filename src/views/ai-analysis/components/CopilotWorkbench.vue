@@ -3092,7 +3092,7 @@ export default {
         assistantMsg.content = [
           `## ${target.symbol} ${this.text.scriptStrategy}`,
           '',
-          this.i18nText('aiAssetAnalysis.copilot.scriptStrategyReady', 'A trading script draft is ready. Keep refining it here, or open the Trading Script editor to edit, backtest, and publish it.'),
+          this.i18nText('aiAssetAnalysis.copilot.scriptStrategyReady'),
           '',
           '```python',
           code,
@@ -3103,7 +3103,7 @@ export default {
           key: 'open-script-strategy',
           group: 'strategy_workflow',
           icon: 'code',
-          label: this.i18nText('aiAssetAnalysis.copilot.openStrategyV2Ide', 'Open Trading Script editor'),
+          label: this.i18nText('aiAssetAnalysis.copilot.openStrategyV2Ide'),
           path: '/strategy-ide',
           storageKey: 'qd_strategy_source',
           storageValue: code,

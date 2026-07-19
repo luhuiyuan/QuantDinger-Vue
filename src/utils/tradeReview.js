@@ -22,6 +22,8 @@ const TIMEFRAME_MILLISECONDS = {
   '1W': 7 * 24 * 60 * 60 * 1000
 }
 
+const REVIEW_TIMEFRAMES = ['1m', '3m', '5m', '15m', '30m', '1H', '4H', '1D', '1W']
+
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value))
 
 const timestampMilliseconds = (value) => {
@@ -46,6 +48,26 @@ export const calculateTradeValueUsd = (trade = {}) => {
   const entryPrice = Number(trade.entry_price)
   if (!Number.isFinite(quantity) || !Number.isFinite(entryPrice)) return null
   return Math.abs(quantity * entryPrice)
+}
+
+export const resolveTradeReviewTimeframe = (trade = {}, timeframeValue = '1D', maxBars = 1000) => {
+  const requested = normalizeReviewTimeframe(timeframeValue)
+  const startIndex = REVIEW_TIMEFRAMES.indexOf(requested)
+  const normalized = startIndex >= 0 ? requested : '1D'
+  const entryTime = timestampMilliseconds(trade.entry_time)
+  const exitTime = timestampMilliseconds(trade.exit_time)
+  if (entryTime === null || exitTime === null) return normalized
+
+  const duration = Math.abs(exitTime - entryTime)
+  const limit = Math.max(180, Number(maxBars) || 1000)
+  const candidates = REVIEW_TIMEFRAMES.slice(Math.max(0, REVIEW_TIMEFRAMES.indexOf(normalized)))
+  for (const timeframe of candidates) {
+    const interval = TIMEFRAME_MILLISECONDS[timeframe]
+    const tradeBars = Math.max(1, Math.ceil(duration / interval) + 1)
+    const paddingBars = clamp(Math.ceil(tradeBars * 0.75), 60, 180)
+    if (tradeBars + paddingBars * 2 <= limit) return timeframe
+  }
+  return REVIEW_TIMEFRAMES[REVIEW_TIMEFRAMES.length - 1]
 }
 
 export const buildTradeReviewWindow = (trade = {}, timeframeValue = '1D') => {

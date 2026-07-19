@@ -40,6 +40,13 @@ test('backtest workbench keeps execution controls visible and moves history into
   assert.doesNotMatch(source, /class="panel history-panel"/)
 })
 
+test('saved backtest details expose an in-drawer loading state', () => {
+  assert.match(source, /v-if="historyDetailLoading" class="drawer-detail-loading"/)
+  assert.match(source, /this\.historyDetailLoading = true/)
+  assert.match(source, /this\.historyVisible = false[\s\S]*?finally/)
+  assert.match(source, /strategyV2\.backtest\.historyLoading/)
+})
+
 test('CTA source summary exposes the concrete instrument instead of only its count', () => {
   assert.match(source, /this\.manifest\.strategyType === 'cta' && instruments\.length/)
   assert.match(source, /instruments\.map\(this\.formatInstrument\)\.join\(', '\)/)
@@ -51,4 +58,10 @@ test('portfolio drawdown chart uses initial capital and backend drawdown points'
   assert.match(portfolioResultSource, /const savedDrawdown = Number\(item\.drawdown\)/)
   assert.match(portfolioResultSource, /item\.drawdown !== undefined/)
   assert.match(portfolioResultSource, /strategyV2\.backtest\.maxDrawdownHint/)
+})
+
+test('trade review centers the full entry-to-exit range and draws after data is ready', () => {
+  assert.match(portfolioResultSource, /@load="renderReviewMarkers"/)
+  assert.match(portfolioResultSource, /Math\.ceil\(tradeBars \* 1\.2\)/)
+  assert.match(portfolioResultSource, /chart\.scrollByDistance\(-Math\.max/)
 })

@@ -525,6 +525,8 @@ const locale = {
   "aiAssetAnalysis.copilot.composerGuide.script.title": "How should the strategy trade?",
   "aiAssetAnalysis.copilot.contextAutoInfer": "Not fixed; AI will infer from your message",
   "aiAssetAnalysis.copilot.copyCode": "Copy code",
+  "aiAssetAnalysis.copilot.openStrategyV2Ide": "Trading-Skript-Editor öffnen",
+  "aiAssetAnalysis.copilot.scriptStrategyReady": "Der Entwurf des Trading-Skripts ist fertig. Verfeinern Sie ihn hier weiter oder öffnen Sie den Trading-Skript-Editor, um ihn zu bearbeiten, zu testen und zu veröffentlichen.",
   "aiAssetAnalysis.copilot.createMonitor": "Create scheduled analysis",
   "aiAssetAnalysis.copilot.currentSymbol": "this symbol",
   "aiAssetAnalysis.copilot.deleteSessionConfirm": "Delete this conversation?",

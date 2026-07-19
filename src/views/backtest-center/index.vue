@@ -249,6 +249,12 @@
           {{ $t('backtest-center.refreshHistory') }}
         </a-button>
       </div>
+      <div v-if="historyDetailLoading" class="drawer-detail-loading" role="status" aria-live="polite">
+        <a-icon type="loading" />
+        <span>{{ mode === 'factor'
+          ? $t('strategyV2.factorResearch.historyLoading', { id: historyDetailRunId })
+          : $t('strategyV2.backtest.historyLoading', { id: historyDetailRunId }) }}</span>
+      </div>
       <a-empty v-if="!historyLoading && !history.length" :description="mode === 'factor' ? $t('strategyV2.factorResearch.noHistory') : $t('strategyV2.backtest.noHistory')" />
       <div v-else class="drawer-run-list">
         <button
@@ -256,10 +262,17 @@
           :key="item.id"
           type="button"
           class="run-card"
-          :class="{ active: selectedRun && Number(selectedRun.id || selectedRun.runId) === Number(item.id) }"
+          :class="{
+            active: selectedRun && Number(selectedRun.id || selectedRun.runId) === Number(item.id),
+            loading: historyDetailLoading && Number(historyDetailRunId) === Number(item.id)
+          }"
+          :disabled="historyDetailLoading"
           @click="openRun(item)"
         >
-          <span class="run-card__top"><strong>{{ mode === 'factor' ? (item.source_name || item.factor_id) : (item.strategy_name || item.symbol) }}</strong><em>{{ mode === 'factor' ? 'FR-' : '#' }}{{ item.id }}</em></span>
+          <span class="run-card__top">
+            <strong><a-icon v-if="historyDetailLoading && Number(historyDetailRunId) === Number(item.id)" type="loading" />{{ mode === 'factor' ? (item.source_name || item.factor_id) : (item.strategy_name || item.symbol) }}</strong>
+            <em>{{ mode === 'factor' ? 'FR-' : '#' }}{{ item.id }}</em>
+          </span>
           <span class="run-card__meta">{{ item.market }} · {{ item.timeframe }} · {{ formatDate(item.created_at) }}</span>
           <template v-if="mode === 'factor'">
             <span class="run-card__status status-complete">{{ factorLabel(item.factor_id) }} · {{ item.groups_count }}Q · {{ item.holding_period }}{{ $t('strategyV2.factorResearch.bars') }}</span>
@@ -321,6 +334,8 @@ export default {
       runTimer: null,
       historyLoading: false,
       historyVisible: false,
+      historyDetailLoading: false,
+      historyDetailRunId: null,
       equityChart: null,
       chartResizeObserver: null,
       form: {
@@ -835,44 +850,65 @@ export default {
       return this.mode === 'portfolio' ? this.run() : this.runFactorResearch()
     },
     async openRun (item) {
-      this.historyVisible = false
+      if (this.historyDetailLoading) return
       if (this.mode === 'factor') return this.openFactorRun(item)
-      const response = await getStrategyBacktestRun(item.id)
-      const run = response.data || {}
-      this.selectedRun = run
-      this.result = run.result || null
-      if (run.source_id && Number(this.form.sourceId) !== Number(run.source_id)) {
-        this.form.sourceId = Number(run.source_id)
-        const detail = await getScriptSourceDetail(run.source_id)
-        this.source = detail.data
-        const compiled = await compileScriptSource({ sourceId: run.source_id })
-        this.manifest = compiled.data && compiled.data.manifest
-        this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
-        this.params = run.params || {}
+      this.historyDetailLoading = true
+      this.historyDetailRunId = item.id
+      try {
+        const response = await getStrategyBacktestRun(item.id)
+        const run = response.data || {}
+        this.selectedRun = run
+        this.result = run.result || null
+        if (run.source_id && Number(this.form.sourceId) !== Number(run.source_id)) {
+          this.form.sourceId = Number(run.source_id)
+          const detail = await getScriptSourceDetail(run.source_id)
+          this.source = detail.data
+          const compiled = await compileScriptSource({ sourceId: run.source_id })
+          this.manifest = compiled.data && compiled.data.manifest
+          this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
+          this.params = run.params || {}
+        }
+        this.historyVisible = false
+      } catch (error) {
+        this.$message.error((error && error.backendMessage) || this.$t('strategyV2.backtest.historyLoadFailed'))
+      } finally {
+        this.historyDetailLoading = false
+        this.historyDetailRunId = null
       }
     },
     async openFactorRun (item) {
-      const response = await getStrategyFactorResearchRun(item.id)
-      const run = response.data || {}
-      this.selectedRun = run
-      this.factorResult = run.result || null
-      this.factorForm = {
-        factorId: run.factor_id || 'momentum_20',
-        groups: Number(run.groups_count || 5),
-        holdingPeriod: Number(run.holding_period || 5),
-        neutralizeIndustry: Boolean(run.neutralize_industry)
-      }
-      this.form.commission = Number(run.commission || 0)
-      this.form.slippage = Number(run.slippage || 0)
-      if (run.start_date) this.form.startDate = moment(run.start_date)
-      if (run.end_date) this.form.endDate = moment(run.end_date)
-      if (run.source_id && Number(this.form.sourceId) !== Number(run.source_id)) {
-        this.form.sourceId = Number(run.source_id)
-        const detail = await getScriptSourceDetail(run.source_id)
-        this.source = detail.data
-        const compiled = await compileScriptSource({ sourceId: run.source_id })
-        this.manifest = compiled.data && compiled.data.manifest
-        this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
+      if (this.historyDetailLoading) return
+      this.historyDetailLoading = true
+      this.historyDetailRunId = item.id
+      try {
+        const response = await getStrategyFactorResearchRun(item.id)
+        const run = response.data || {}
+        this.selectedRun = run
+        this.factorResult = run.result || null
+        this.factorForm = {
+          factorId: run.factor_id || 'momentum_20',
+          groups: Number(run.groups_count || 5),
+          holdingPeriod: Number(run.holding_period || 5),
+          neutralizeIndustry: Boolean(run.neutralize_industry)
+        }
+        this.form.commission = Number(run.commission || 0)
+        this.form.slippage = Number(run.slippage || 0)
+        if (run.start_date) this.form.startDate = moment(run.start_date)
+        if (run.end_date) this.form.endDate = moment(run.end_date)
+        if (run.source_id && Number(this.form.sourceId) !== Number(run.source_id)) {
+          this.form.sourceId = Number(run.source_id)
+          const detail = await getScriptSourceDetail(run.source_id)
+          this.source = detail.data
+          const compiled = await compileScriptSource({ sourceId: run.source_id })
+          this.manifest = compiled.data && compiled.data.manifest
+          this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
+        }
+        this.historyVisible = false
+      } catch (error) {
+        this.$message.error((error && error.backendMessage) || this.$t('strategyV2.factorResearch.historyLoadFailed'))
+      } finally {
+        this.historyDetailLoading = false
+        this.historyDetailRunId = null
       }
     },
     factorLabel (factorId) {
@@ -1053,6 +1089,10 @@ export default {
 <style lang="less">
 .backtest-history-drawer .ant-drawer-header { border-bottom: 1px solid #e8edf2; }
 .backtest-history-drawer .ant-drawer-body { padding: 16px; }
+.drawer-detail-loading { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid #b7eb8f; border-radius: 8px; color: #3f7f1f; background: #f6ffed; font-size: 12px; }
+.run-card:disabled { cursor: wait; opacity: .68; }
+.run-card.loading { border-color: #52c41a; opacity: 1; }
+.run-card__top strong .anticon { margin-right: 6px; color: #52c41a; }
 .backtest-history-drawer.theme-dark .ant-drawer-content,
 .backtest-history-drawer.theme-dark .ant-drawer-header { background: #111; }
 .backtest-history-drawer.theme-dark .ant-drawer-header { border-color: rgba(255, 255, 255, 0.1); }
@@ -1062,5 +1102,6 @@ export default {
 .backtest-history-drawer.theme-dark .run-card { border-color: rgba(255, 255, 255, 0.1); background: #0d0d0d; color: rgba(255, 255, 255, 0.72); }
 .backtest-history-drawer.theme-dark .run-card:hover,
 .backtest-history-drawer.theme-dark .run-card.active { border-color: #52c41a; background: #15230f; }
+.backtest-history-drawer.theme-dark .drawer-detail-loading { border-color: rgba(82, 196, 26, .38); color: #73d13d; background: #10190c; }
 .backtest-history-drawer.theme-dark .run-card__top strong { color: #e5e7eb; }
 </style>

@@ -6650,6 +6650,8 @@ const locale = {
   "strategyCenter.backtest.adviceDrawdown": "Drawdown is high. Check stop loss, sizing, and volatility filters first.",
   "strategyCenter.backtest.adviceLoss": "This run is negative. Review entry rules, trade direction, and cost sensitivity first.",
   "aiAssetAnalysis.copilot.copyCode": "Copy code",
+  "aiAssetAnalysis.copilot.openStrategyV2Ide": "Open Trading Script editor",
+  "aiAssetAnalysis.copilot.scriptStrategyReady": "A trading script draft is ready. Keep refining it here, or open the Trading Script editor to edit, backtest, and publish it.",
   "aiAssetAnalysis.copilot.strategyFlowDescribe": "Describe",
   "aiAssetAnalysis.copilot.strategyFlowDraft": "Draft",
   "aiAssetAnalysis.copilot.strategyFlowBacktest": "Backtest",

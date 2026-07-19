@@ -525,6 +525,8 @@ const locale = {
   "aiAssetAnalysis.copilot.composerGuide.script.title": "你希望策略怎么交易？",
   "aiAssetAnalysis.copilot.contextAutoInfer": "未固定，AI 将从您的消息中推断。",
   "aiAssetAnalysis.copilot.copyCode": "复制代码",
+  "aiAssetAnalysis.copilot.openStrategyV2Ide": "開啟交易腳本編輯器",
+  "aiAssetAnalysis.copilot.scriptStrategyReady": "交易腳本草稿已建立。你可以在此繼續完善，或開啟交易腳本編輯器進行編輯、回測與發佈。",
   "aiAssetAnalysis.copilot.createMonitor": "创建定时分析",
   "aiAssetAnalysis.copilot.currentSymbol": "这个符号",
   "aiAssetAnalysis.copilot.deleteSessionConfirm": "删除此对话？",

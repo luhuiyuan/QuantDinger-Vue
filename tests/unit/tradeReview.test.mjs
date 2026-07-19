@@ -5,7 +5,8 @@ import {
   buildTradeReviewWindow,
   calculateTradeValueUsd,
   findNearestBarIndex,
-  normalizeReviewTimeframe
+  normalizeReviewTimeframe,
+  resolveTradeReviewTimeframe
 } from '../../src/utils/tradeReview.js'
 
 test('normalizes minute periods without turning them into month periods', () => {
@@ -34,6 +35,18 @@ test('builds a bounded historical window around the selected trade', () => {
   assert.ok(result.beforeTime > result.exitTime / 1000)
   assert.ok(result.limit >= 180)
   assert.ok(result.limit <= 1000)
+})
+
+test('uses the finest timeframe that can include both trade markers', () => {
+  const trade = {
+    entry_time: '2026-07-03T21:15:00Z',
+    exit_time: '2026-07-05T22:32:00Z'
+  }
+
+  assert.equal(resolveTradeReviewTimeframe(trade, '1m'), '5m')
+  const result = buildTradeReviewWindow(trade, resolveTradeReviewTimeframe(trade, '1m'))
+  assert.ok(result.limit <= 1000)
+  assert.ok(result.beforeTime > result.exitTime / 1000)
 })
 
 test('finds the closest loaded candle for an execution timestamp', () => {

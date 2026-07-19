@@ -525,6 +525,8 @@ const locale = {
   "aiAssetAnalysis.copilot.composerGuide.script.title": "How should the strategy trade?",
   "aiAssetAnalysis.copilot.contextAutoInfer": "Not fixed; AI will infer from your message",
   "aiAssetAnalysis.copilot.copyCode": "Copy code",
+  "aiAssetAnalysis.copilot.openStrategyV2Ide": "트레이딩 스크립트 편집기 열기",
+  "aiAssetAnalysis.copilot.scriptStrategyReady": "트레이딩 스크립트 초안이 준비되었습니다. 여기에서 계속 다듬거나 트레이딩 스크립트 편집기를 열어 편집, 백테스트 및 게시할 수 있습니다.",
   "aiAssetAnalysis.copilot.createMonitor": "Create scheduled analysis",
   "aiAssetAnalysis.copilot.currentSymbol": "this symbol",
   "aiAssetAnalysis.copilot.deleteSessionConfirm": "Delete this conversation?",

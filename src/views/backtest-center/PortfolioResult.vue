@@ -183,6 +183,7 @@
           :active-indicators="[]"
           :realtime-enabled="false"
           :full-width="true"
+          @load="renderReviewMarkers"
           @indicators-updated="renderReviewMarkers"
         />
       </div>
@@ -198,7 +199,7 @@ import {
   buildTradeReviewWindow,
   calculateTradeValueUsd,
   findNearestBarIndex,
-  normalizeReviewTimeframe
+  resolveTradeReviewTimeframe
 } from '@/utils/tradeReview'
 
 export default {
@@ -295,7 +296,12 @@ export default {
       const parts = suffix.split(':')
       return { market, symbol, exchangeId: parts.length > 1 ? parts[0] : '', marketType: parts.length > 1 ? parts[1] : (parts[0] || 'spot') }
     },
-    reviewTimeframe () { return normalizeReviewTimeframe((this.result.manifest && this.result.manifest.primaryFrequency) || '1d') },
+    reviewTimeframe () {
+      return resolveTradeReviewTimeframe(
+        this.selectedTrade,
+        (this.result.manifest && this.result.manifest.primaryFrequency) || '1d'
+      )
+    },
     reviewWindow () { return buildTradeReviewWindow(this.selectedTrade, this.reviewTimeframe) },
     rebalanceColumns () {
       return [
@@ -496,12 +502,19 @@ export default {
       const firstIndex = Math.min(entryIndex, exitIndex)
       const lastIndex = Math.max(entryIndex, exitIndex)
       const tradeBars = Math.max(1, lastIndex - firstIndex + 1)
-      const visibleBars = Math.max(48, Math.min(180, tradeBars + 32))
+      const visibleBars = Math.min(rows.length, Math.max(48, Math.ceil(tradeBars * 1.2)))
       const size = typeof chart.getSize === 'function' ? chart.getSize() : null
       const chartWidth = size && Number(size.width) > 0 ? Number(size.width) : 1100
-      if (typeof chart.setBarSpace === 'function') chart.setBarSpace(Math.max(4, Math.min(18, (chartWidth - 80) / visibleBars)))
-      if (typeof chart.scrollToTimestamp === 'function') chart.scrollToTimestamp(Math.round((entryTime + exitTime) / 2), 0)
-      else if (typeof chart.scrollToDataIndex === 'function') chart.scrollToDataIndex(Math.round((firstIndex + lastIndex) / 2), 0)
+      if (typeof chart.setBarSpace === 'function') chart.setBarSpace(Math.max(1, Math.min(18, (chartWidth - 80) / visibleBars)))
+      const centerIndex = Math.round((firstIndex + lastIndex) / 2)
+      if (typeof chart.scrollToDataIndex === 'function') {
+        chart.scrollToDataIndex(centerIndex, 0)
+        if (typeof chart.scrollByDistance === 'function') {
+          chart.scrollByDistance(-Math.max(0, (chartWidth - 80) / 2), 0)
+        }
+      } else if (typeof chart.scrollToTimestamp === 'function') {
+        chart.scrollToTimestamp(Math.round((entryTime + exitTime) / 2), 0)
+      }
     },
     formatDate (value) { return value ? moment(value).format('YYYY-MM-DD HH:mm') : '-' },
     formatPercent (value, signed = true) { const number = Number(value || 0); return `${signed && number > 0 ? '+' : ''}${number.toFixed(2)}%` },

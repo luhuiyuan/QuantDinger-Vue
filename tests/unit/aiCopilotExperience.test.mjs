@@ -57,6 +57,31 @@ test('copilot action and event labels exist in both primary locales', () => {
   }
 })
 
+test('trading script editor actions are localized for every supported language', () => {
+  const localeNames = [
+    'en-US.js',
+    'zh-CN.js',
+    'zh-TW.js',
+    'ja-JP.js',
+    'ko-KR.js',
+    'de-DE.js',
+    'fr-FR.js',
+    'ru-RU.js',
+    'vi-VN.js',
+    'th-TH.js',
+    'ar-SA.js'
+  ]
+  const keys = ['openStrategyV2Ide', 'scriptStrategyReady']
+
+  for (const localeName of localeNames) {
+    const locale = read(`../../src/locales/lang/${localeName}`)
+    for (const key of keys) {
+      assert.ok(locale.includes(`"aiAssetAnalysis.copilot.${key}"`), `missing ${localeName} key: ${key}`)
+    }
+  }
+  assert.doesNotMatch(copilot, /i18nText\('aiAssetAnalysis\.copilot\.openStrategyV2Ide',\s*'Open Trading Script editor'/)
+})
+
 test('desktop breakpoint keeps history, chat, and watchlist in one row', () => {
   assert.match(
     copilot,
