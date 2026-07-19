@@ -78,7 +78,7 @@ docker compose -f docker-compose.ghcr.yml up -d
 The frontend image used by the stack is:
 
 ```text
-ghcr.io/brokermr810/quantdinger-frontend
+ghcr.io/openbyteinc/quantdinger-frontend
 ```
 
 Common tags are `latest`, semantic versions such as `4.0.4`, and major/minor tags such as `4.0`. Pin a release in the main repo `.env` with `IMAGE_TAG`, or override only this service with `FRONTEND_TAG`.
@@ -91,7 +91,7 @@ Use this when the backend is already running somewhere else:
 docker run -d --name quantdinger-frontend \
   -p 8888:80 \
   -e BACKEND_URL=http://host.docker.internal:5000 \
-  ghcr.io/brokermr810/quantdinger-frontend:latest
+  ghcr.io/openbyteinc/quantdinger-frontend:latest
 ```
 
 `BACKEND_URL` controls the Nginx `/api/` proxy inside the container. In the main Compose stack it normally stays as `http://backend:5000`.

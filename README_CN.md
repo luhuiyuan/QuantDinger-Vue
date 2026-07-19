@@ -78,7 +78,7 @@ docker compose -f docker-compose.ghcr.yml up -d
 前端镜像地址：
 
 ```text
-ghcr.io/brokermr810/quantdinger-frontend
+ghcr.io/openbyteinc/quantdinger-frontend
 ```
 
 常用标签包括 `latest`、`4.0.4` 这样的语义化版本，以及 `4.0` 这样的主次版本标签。需要固定版本时，在主仓库 `.env` 中设置 `IMAGE_TAG`；只想单独固定桌面端前端时，设置 `FRONTEND_TAG`。
@@ -91,7 +91,7 @@ ghcr.io/brokermr810/quantdinger-frontend
 docker run -d --name quantdinger-frontend \
   -p 8888:80 \
   -e BACKEND_URL=http://host.docker.internal:5000 \
-  ghcr.io/brokermr810/quantdinger-frontend:latest
+  ghcr.io/openbyteinc/quantdinger-frontend:latest
 ```
 
 `BACKEND_URL` 用来控制容器内 Nginx 的 `/api/` 反向代理目标。主仓库 Compose 中通常保持为 `http://backend:5000`。
