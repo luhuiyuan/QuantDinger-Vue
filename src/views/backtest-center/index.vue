@@ -285,6 +285,7 @@
 import * as echarts from 'echarts'
 import moment from 'moment'
 import { mapState } from 'vuex'
+import { calculateTradeValueUsd } from '@/utils/tradeReview'
 import {
   compileScriptSource,
   getScriptSourceDetail,
@@ -475,6 +476,7 @@ export default {
         { title: this.$t('backtest-center.tradeColumns.entryTime'), dataIndex: 'entry_time', key: 'entry_time', width: 170, customRender: value => this.formatDate(value) },
         { title: this.$t('backtest-center.tradeColumns.exitTime'), dataIndex: 'exit_time', key: 'exit_time', width: 170, customRender: value => this.formatDate(value) },
         { title: this.$t('backtest-center.tradeColumns.quantity'), dataIndex: 'quantity', key: 'quantity', width: 110, customRender: value => this.formatNumber(value, 4) },
+        { title: this.$t('backtest-center.tradeColumns.valueUsd'), key: 'value_usd', width: 130, customRender: (value, row) => { const total = calculateTradeValueUsd(row); return total === null ? '-' : this.formatNumber(total) } },
         { title: this.$t('backtest-center.tradeColumns.entryPrice'), dataIndex: 'entry_price', key: 'entry_price', width: 120, customRender: value => this.formatNumber(value, 4) },
         { title: this.$t('backtest-center.tradeColumns.exitPrice'), dataIndex: 'exit_price', key: 'exit_price', width: 120, customRender: value => this.formatNumber(value, 4) },
         {

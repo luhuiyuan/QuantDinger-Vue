@@ -43,6 +43,8 @@ const locale = {
   'strategyV2.backtest.attempt': 'Attempt',
   'strategyV2.backtest.auditScope': 'Fees, fill prices, timing, positions, cash, final equity, and non-filled orders are traceable.',
   'strategyV2.backtest.tradeReviewTitle': '{symbol} trade review',
+  'strategyV2.backtest.entryMarker': 'Entry',
+  'strategyV2.backtest.exitMarker': 'Exit',
   'strategyV2.backtest.orderStatus.filled': 'Filled',
   'strategyV2.backtest.orderStatus.partial': 'Partial',
   'strategyV2.backtest.orderStatus.deferred': 'Deferred',
@@ -310,6 +312,8 @@ const locale = {
 const enUSFallback = locale
 
 const zhCN = {
+  'strategyV2.backtest.entryMarker': '\u5f00\u4ed3',
+  'strategyV2.backtest.exitMarker': '\u5e73\u4ed3',
   ...enUSFallback,
   'strategyV2.backtest.rangeLimitTitle': '{timeframe} 回测单次最多覆盖 {maxDays} 天',
   'strategyV2.backtest.rangeLimitEstimate': '当前每个标的预计约 {bars} 根 K 线。日期选择器和服务端会在加载行情前共同执行限制。',

@@ -109,7 +109,7 @@
           :row-key="(row, index) => row.id || index"
           :custom-row="tradeRowProps"
           size="small"
-          :scroll="{ x: 1480 }"
+          :scroll="{ x: 1610 }"
           :pagination="{ pageSize: 8 }"
           class="clickable-table"
         />
@@ -156,7 +156,8 @@
       v-model="reviewVisible"
       :title="$t('strategyV2.backtest.tradeReviewTitle', { symbol: selectedTrade.symbol || '-' })"
       :footer="null"
-      width="1120px"
+      width="min(1440px, 94vw)"
+      wrap-class-name="trade-review-modal"
       :destroy-on-close="true"
     >
       <div v-if="selectedTrade.symbol" class="review-summary">
@@ -170,14 +171,19 @@
       <div class="review-chart-shell">
         <kline-chart
           v-if="reviewVisible"
+          ref="reviewChart"
           :symbol="reviewInstrument.symbol"
           :market="reviewInstrument.market"
           :exchange-id="reviewInstrument.exchangeId"
           :market-type="reviewInstrument.marketType"
           :timeframe="reviewTimeframe"
+          :initial-before-time="reviewWindow.beforeTime"
+          :initial-limit="reviewWindow.limit"
           :theme="isDark ? 'dark' : 'light'"
           :active-indicators="[]"
           :realtime-enabled="false"
+          :full-width="true"
+          @indicators-updated="renderReviewMarkers"
         />
       </div>
     </a-modal>
@@ -188,6 +194,12 @@
 import * as echarts from 'echarts'
 import moment from 'moment'
 import KlineChart from '@/views/indicator-analysis/components/KlineChart.vue'
+import {
+  buildTradeReviewWindow,
+  calculateTradeValueUsd,
+  findNearestBarIndex,
+  normalizeReviewTimeframe
+} from '@/utils/tradeReview'
 
 export default {
   name: 'PortfolioResult',
@@ -202,6 +214,7 @@ export default {
       resizeObserver: null,
       reviewVisible: false,
       selectedTrade: {},
+      reviewMarkerTimer: null,
       orderStatuses: ['filled', 'partial', 'deferred', 'rejected']
     }
   },
@@ -282,7 +295,8 @@ export default {
       const parts = suffix.split(':')
       return { market, symbol, exchangeId: parts.length > 1 ? parts[0] : '', marketType: parts.length > 1 ? parts[1] : (parts[0] || 'spot') }
     },
-    reviewTimeframe () { return String((this.result.manifest && this.result.manifest.primaryFrequency) || '1d').toUpperCase() },
+    reviewTimeframe () { return normalizeReviewTimeframe((this.result.manifest && this.result.manifest.primaryFrequency) || '1d') },
+    reviewWindow () { return buildTradeReviewWindow(this.selectedTrade, this.reviewTimeframe) },
     rebalanceColumns () {
       return [
         { title: this.$t('strategyV2.backtest.time'), dataIndex: 'time', width: 170, customRender: this.formatDate },
@@ -311,6 +325,7 @@ export default {
         { title: this.$t('backtest-center.tradeColumns.entryTime'), dataIndex: 'entry_time', width: 165, customRender: this.formatDate },
         { title: this.$t('backtest-center.tradeColumns.exitTime'), dataIndex: 'exit_time', width: 165, customRender: this.formatDate },
         { title: this.$t('backtest-center.tradeColumns.quantity'), dataIndex: 'quantity', customRender: value => this.formatNumber(value, 4) },
+        { title: this.$t('backtest-center.tradeColumns.valueUsd'), key: 'value_usd', customRender: (value, row) => this.formatNullableNumber(calculateTradeValueUsd(row)) },
         { title: this.$t('backtest-center.tradeColumns.entryPrice'), dataIndex: 'entry_price', customRender: value => this.formatNumber(value, 4) },
         { title: this.$t('backtest-center.tradeColumns.exitPrice'), dataIndex: 'exit_price', customRender: value => this.formatNumber(value, 4) },
         { title: this.$t('backtest-center.tradeColumns.profit'), dataIndex: 'profit', customRender: value => this.$createElement('span', { class: ['trade-profit', this.profitTone(value)] }, this.formatSignedNumber(value)) },
@@ -361,6 +376,7 @@ export default {
   mounted () { this.renderChart(); window.addEventListener('resize', this.resizeChart) },
   beforeDestroy () {
     window.removeEventListener('resize', this.resizeChart)
+    if (this.reviewMarkerTimer) clearTimeout(this.reviewMarkerTimer)
     if (this.resizeObserver) this.resizeObserver.disconnect()
     if (this.chart) this.chart.dispose()
   },
@@ -429,10 +445,69 @@ export default {
     },
     resizeChart () { if (this.chart) this.chart.resize() },
     tradeRowProps (record) { return { on: { click: () => { this.selectedTrade = record; this.reviewVisible = true } } } },
+    renderReviewMarkers () {
+      if (this.reviewMarkerTimer) clearTimeout(this.reviewMarkerTimer)
+      this.reviewMarkerTimer = setTimeout(() => {
+        const component = this.$refs.reviewChart
+        const chart = component && component.getChartInstance ? component.getChartInstance() : null
+        const trade = this.selectedTrade || {}
+        const entryTime = this.reviewWindow.entryTime
+        const exitTime = this.reviewWindow.exitTime
+        const entryPrice = Number(trade.entry_price)
+        const exitPrice = Number(trade.exit_price)
+        if (!component || !chart || !Number.isFinite(entryTime) || !Number.isFinite(exitTime)) return
+
+        component.clearBacktestOverlays()
+        const isShort = String(trade.side || '').toLowerCase() === 'short'
+        if (Number.isFinite(entryPrice)) {
+          component.addBacktestOverlay(this.reviewMarkerConfig({
+            timestamp: entryTime,
+            price: entryPrice,
+            text: this.$t('strategyV2.backtest.entryMarker'),
+            side: isShort ? 'sell' : 'buy',
+            color: isShort ? '#f6465d' : '#0ecb81'
+          }))
+        }
+        if (Number.isFinite(exitPrice)) {
+          component.addBacktestOverlay(this.reviewMarkerConfig({
+            timestamp: exitTime,
+            price: exitPrice,
+            text: this.$t('strategyV2.backtest.exitMarker'),
+            side: isShort ? 'buy' : 'sell',
+            color: isShort ? '#0ecb81' : '#f6465d'
+          }))
+        }
+        this.focusReviewRange(chart, entryTime, exitTime)
+      }, 80)
+    },
+    reviewMarkerConfig ({ timestamp, price, text, side, color }) {
+      return {
+        name: 'signalTag',
+        points: [{ timestamp, value: price }, { timestamp, value: price }],
+        extendData: { text, side, color, source: 'backtest', labelMode: 'full' },
+        lock: true
+      }
+    },
+    focusReviewRange (chart, entryTime, exitTime) {
+      const rows = typeof chart.getDataList === 'function' ? chart.getDataList() : []
+      const entryIndex = findNearestBarIndex(rows, entryTime)
+      const exitIndex = findNearestBarIndex(rows, exitTime)
+      if (entryIndex < 0 || exitIndex < 0) return
+      const firstIndex = Math.min(entryIndex, exitIndex)
+      const lastIndex = Math.max(entryIndex, exitIndex)
+      const tradeBars = Math.max(1, lastIndex - firstIndex + 1)
+      const visibleBars = Math.max(48, Math.min(180, tradeBars + 32))
+      const size = typeof chart.getSize === 'function' ? chart.getSize() : null
+      const chartWidth = size && Number(size.width) > 0 ? Number(size.width) : 1100
+      if (typeof chart.setBarSpace === 'function') chart.setBarSpace(Math.max(4, Math.min(18, (chartWidth - 80) / visibleBars)))
+      if (typeof chart.scrollToTimestamp === 'function') chart.scrollToTimestamp(Math.round((entryTime + exitTime) / 2), 0)
+      else if (typeof chart.scrollToDataIndex === 'function') chart.scrollToDataIndex(Math.round((firstIndex + lastIndex) / 2), 0)
+    },
     formatDate (value) { return value ? moment(value).format('YYYY-MM-DD HH:mm') : '-' },
     formatPercent (value, signed = true) { const number = Number(value || 0); return `${signed && number > 0 ? '+' : ''}${number.toFixed(2)}%` },
     formatRate (value) { return `${(Number(value || 0) * 100).toFixed(2)}%` },
     formatNumber (value, digits = 2) { const number = Number(value || 0); return Number.isFinite(number) ? number.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits }) : '-' },
+    formatNullableNumber (value, digits = 2) { return value === null || value === undefined ? '-' : this.formatNumber(value, digits) },
     formatSignedNumber (value, digits = 2) { const number = Number(value || 0); return `${number > 0 ? '+' : ''}${this.formatNumber(number, digits)}` },
     formatWeights (value) { return Object.entries(value || {}).map(([symbol, weight]) => `${symbol.split(':').pop().split('@')[0]} ${this.formatRate(weight)}`).join(' · ') || '-' },
     profitTone (value) { const number = Number(value || 0); return number > 0 ? 'positive' : number < 0 ? 'negative' : 'neutral' },
@@ -488,8 +563,9 @@ export default {
 .clickable-table /deep/ tbody tr:hover td { background: rgba(82, 196, 26, .08) !important; }
 .review-summary { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px; border-radius: 8px; background: #f8fafc; }
 .review-summary b { margin-left: auto; }
-.review-chart-shell { height: 560px; overflow: hidden; }
-.review-chart-shell /deep/ .kline-chart-container { height: 560px !important; }
+.review-chart-shell { width: 100%; height: 68vh; min-height: 520px; max-height: 680px; overflow: hidden; }
+.review-chart-shell /deep/ .chart-left { width: 100% !important; height: 100% !important; }
+.review-chart-shell /deep/ .kline-chart-container { height: auto !important; min-height: 0; }
 .portfolio-result.theme-dark .metric-card, .portfolio-result.theme-dark .overview-card, .portfolio-result.theme-dark .status-card, .portfolio-result.theme-dark .assumption-strip div { border-color: rgba(255,255,255,.1); background: #0d0d0d; }
 .portfolio-result.theme-dark .metric-card strong, .portfolio-result.theme-dark .overview-card strong, .portfolio-result.theme-dark .status-card strong, .portfolio-result.theme-dark .chart-heading h3, .portfolio-result.theme-dark .assumption-strip strong { color: #e5e7eb; }
 .portfolio-result.theme-dark .chart-card { border-color: rgba(255,255,255,.1); }
@@ -499,4 +575,6 @@ export default {
 
 <style lang="less">
 body.dark .review-summary { color: rgba(255,255,255,.88); background: #111; }
+.trade-review-modal .ant-modal { max-width: calc(100vw - 32px); padding-bottom: 24px; }
+.trade-review-modal .ant-modal-body { padding: 16px; }
 </style>

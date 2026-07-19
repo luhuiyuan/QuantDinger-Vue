@@ -6675,6 +6675,7 @@ const locale = {
   "backtest-center.tradeColumns.time": "Time",
   "backtest-center.tradeColumns.price": "Price",
   "backtest-center.tradeColumns.quantity": "Quantity",
+  "backtest-center.tradeColumns.valueUsd": "Value (USD)",
   "backtest-center.historyColumns.time": "Time",
   "backtest-center.historyColumns.range": "Range",
   "backtest-center.historyColumns.source": "Data source",

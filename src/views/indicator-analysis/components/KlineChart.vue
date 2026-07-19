@@ -1,5 +1,5 @@
 <template>
-  <div ref="chartRootEl" class="chart-left" :class="{ 'theme-dark': chartTheme === 'dark' }">
+  <div ref="chartRootEl" class="chart-left" :class="{ 'theme-dark': chartTheme === 'dark', 'chart-left--full': fullWidth }">
     <div class="chart-wrapper">
       <div class="drawing-toolbar">
         <a-tooltip
@@ -226,6 +226,18 @@ export default {
       type: Boolean,
       default: false
     },
+    fullWidth: {
+      type: Boolean,
+      default: false
+    },
+    initialBeforeTime: {
+      type: [Number, String],
+      default: null
+    },
+    initialLimit: {
+      type: Number,
+      default: null
+    },
     userId: {
       type: Number,
       default: null
@@ -321,7 +333,17 @@ export default {
     }
 
     const getInitialKlineLimit = () => {
+      const requestedLimit = Number(props.initialLimit)
+      if (Number.isFinite(requestedLimit) && requestedLimit > 0) {
+        return clampNumber(Math.round(requestedLimit), 120, 1000)
+      }
       return clampNumber(estimateVisibleBarCount() * 3, MIN_INITIAL_KLINE_LIMIT, MAX_INITIAL_KLINE_LIMIT)
+    }
+
+    const getInitialBeforeTime = () => {
+      const requestedTime = Number(props.initialBeforeTime)
+      if (!Number.isFinite(requestedTime) || requestedTime <= 0) return undefined
+      return Math.floor(requestedTime > 100000000000 ? requestedTime / 1000 : requestedTime)
     }
 
     const calcPricePrecision = (data) => {
@@ -2292,7 +2314,9 @@ registerOverlay({
         props.timeframe,
         props.exchangeId,
         props.marketType,
-        props.instrumentId
+        props.instrumentId,
+        props.initialBeforeTime,
+        props.initialLimit
       ])
       if (loading.value && contextKey === activeLoadContextKey) return
       const generation = ++loadGeneration
@@ -2316,7 +2340,7 @@ registerOverlay({
           const response = await request({
             url: '/api/indicator/kline',
             method: 'get',
-            params: marketRequestParams({ limit: initialLimit }),
+            params: marketRequestParams({ limit: initialLimit, before_time: getInitialBeforeTime() }),
             timeout: 45000
           })
 
@@ -4955,7 +4979,7 @@ registerOverlay({
     }
 
     watch(
-      () => [props.market, props.symbol, props.timeframe, props.exchangeId, props.marketType, props.instrumentId],
+      () => [props.market, props.symbol, props.timeframe, props.exchangeId, props.marketType, props.instrumentId, props.initialBeforeTime, props.initialLimit],
       () => {
         if (props.symbol) loadKlineData()
       },
@@ -5220,6 +5244,13 @@ registerOverlay({
     background: #141414;
     border-right-color: #2a2a2a;
   }
+}
+
+.chart-left.chart-left--full {
+  width: 100% !important;
+  min-width: 100% !important;
+  flex: 1 1 100% !important;
+  border-right: none;
 }
 
 .chart-wrapper {
