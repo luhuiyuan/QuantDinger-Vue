@@ -69,10 +69,10 @@
           <a-form layout="vertical">
             <div class="form-grid">
               <a-form-item :label="$t('backtest-center.startDate')">
-                <a-date-picker v-model="form.startDate" class="full-width" />
+                <a-date-picker v-model="form.startDate" :disabled-date="disabledStartDate" class="full-width" />
               </a-form-item>
               <a-form-item :label="$t('backtest-center.endDate')">
-                <a-date-picker v-model="form.endDate" class="full-width" />
+                <a-date-picker v-model="form.endDate" :disabled-date="disabledEndDate" class="full-width" />
               </a-form-item>
               <a-form-item v-if="mode === 'portfolio'" :label="$t('backtest-center.initialCapital')">
                 <a-input-number v-model="form.initialCapital" :min="10" class="full-width" />
@@ -93,6 +93,15 @@
                 <a-input-number v-model="form.leverage" :min="1" :max="maxLeverage" :step="0.5" class="full-width" />
               </a-form-item>
             </div>
+
+            <a-alert
+              v-if="backtestRangePolicy"
+              class="range-limit-alert"
+              :type="backtestRangeExceeded ? 'error' : 'info'"
+              show-icon
+              :message="backtestRangeAlertTitle"
+              :description="backtestRangeAlertDescription"
+            />
 
             <div v-if="mode === 'portfolio' && paramDefinitions.length" class="params-section">
               <div class="subheading">
@@ -162,7 +171,7 @@
             size="large"
             icon="thunderbolt"
             data-testid="run-backtest"
-            :disabled="!manifest || (mode === 'factor' && !factorCompatible)"
+            :disabled="runDisabled"
             :loading="running"
             @click="runActive"
           >
@@ -301,6 +310,7 @@ export default {
       factorHistory: [],
       source: null,
       manifest: null,
+      backtestRangePolicy: null,
       params: {},
       result: null,
       factorResult: null,
@@ -375,6 +385,49 @@ export default {
     manifestFrequency () {
       const subscriptions = (this.manifest && this.manifest.subscriptions) || []
       return (this.manifest && this.manifest.primaryFrequency) || (subscriptions[0] && subscriptions[0].frequency) || '-'
+    },
+    backtestRangeLimitDays () {
+      if (!this.backtestRangePolicy) return null
+      const value = Number(this.mode === 'factor'
+        ? this.backtestRangePolicy.factorMaxSelectedDays
+        : this.backtestRangePolicy.maxSelectedDays)
+      return Number.isFinite(value) ? Math.max(0, value) : null
+    },
+    selectedRangeDays () {
+      if (!this.form.startDate || !this.form.endDate) return null
+      return this.form.endDate.clone().startOf('day').diff(this.form.startDate.clone().startOf('day'), 'days')
+    },
+    estimatedBacktestBars () {
+      if (!this.backtestRangePolicy || this.selectedRangeDays === null || this.selectedRangeDays < 0) return 0
+      const seconds = Number(this.backtestRangePolicy.timeframeSeconds || 86400)
+      const warmupBars = Number(this.mode === 'factor'
+        ? this.backtestRangePolicy.factorWarmupBars
+        : this.backtestRangePolicy.warmupBars) || 0
+      return Math.ceil((this.selectedRangeDays * 86400) / Math.max(1, seconds)) + warmupBars
+    },
+    backtestRangeExceeded () {
+      if (this.selectedRangeDays === null || this.selectedRangeDays < 0) return true
+      return this.backtestRangeLimitDays !== null && this.selectedRangeDays > this.backtestRangeLimitDays
+    },
+    backtestRangeAlertTitle () {
+      return this.$t('strategyV2.backtest.rangeLimitTitle', {
+        timeframe: this.manifestFrequency,
+        maxDays: this.backtestRangeLimitDays
+      })
+    },
+    backtestRangeAlertDescription () {
+      const key = this.backtestRangeExceeded
+        ? 'strategyV2.backtest.rangeLimitExceeded'
+        : 'strategyV2.backtest.rangeLimitEstimate'
+      return this.$t(key, {
+        timeframe: this.manifestFrequency,
+        maxDays: this.backtestRangeLimitDays,
+        bars: this.estimatedBacktestBars.toLocaleString(),
+        maxBars: Number(this.backtestRangePolicy && this.backtestRangePolicy.maxBars || 0).toLocaleString()
+      })
+    },
+    runDisabled () {
+      return !this.manifest || this.backtestRangeExceeded || (this.mode === 'factor' && !this.factorCompatible)
     },
     strategyTypeLabel () {
       const type = String((this.manifest && this.manifest.strategyType) || 'cta')
@@ -631,8 +684,10 @@ export default {
         else {
           this.source = null
           this.manifest = null
+          this.backtestRangePolicy = null
         }
       }
+      this.applyBacktestRangePolicy()
       this.$nextTick(() => this.resizeEquityChart())
     },
     async selectSource (sourceId) {
@@ -645,6 +700,8 @@ export default {
       this.source = response.data
       const compiled = await compileScriptSource({ sourceId })
       this.manifest = compiled.data && compiled.data.manifest
+      this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
+      this.applyBacktestRangePolicy()
       this.params = this.paramDefinitions.reduce((output, item) => {
         output[item.name] = item.default
         return output
@@ -668,6 +725,34 @@ export default {
     setParam (name, value) {
       this.params = { ...this.params, [name]: value }
     },
+    disabledStartDate (current) {
+      if (!current || !this.form.endDate) return false
+      const endDate = this.form.endDate.clone().startOf('day')
+      if (current.isAfter(endDate, 'day')) return true
+      if (this.backtestRangeLimitDays === null) return false
+      return current.isBefore(endDate.clone().subtract(this.backtestRangeLimitDays, 'days'), 'day')
+    },
+    disabledEndDate (current) {
+      if (!current || !this.form.startDate) return false
+      const startDate = this.form.startDate.clone().startOf('day')
+      if (current.isBefore(startDate, 'day')) return true
+      if (this.backtestRangeLimitDays === null) return false
+      return current.isAfter(startDate.clone().add(this.backtestRangeLimitDays, 'days'), 'day')
+    },
+    applyBacktestRangePolicy () {
+      if (this.backtestRangeLimitDays === null || !this.form.startDate || !this.form.endDate) return
+      if (this.selectedRangeDays <= this.backtestRangeLimitDays && this.selectedRangeDays >= 0) return
+      this.form.startDate = this.form.endDate.clone().startOf('day').subtract(this.backtestRangeLimitDays, 'days')
+      this.$message.info(this.$t('strategyV2.backtest.rangeLimitAdjusted', {
+        timeframe: this.manifestFrequency,
+        maxDays: this.backtestRangeLimitDays
+      }))
+    },
+    ensureBacktestRangeAllowed () {
+      if (!this.backtestRangeExceeded) return true
+      this.$message.error(this.backtestRangeAlertDescription)
+      return false
+    },
     startRunTimer () {
       this.stopRunTimer()
       this.runElapsedSeconds = 0
@@ -685,6 +770,7 @@ export default {
         this.$message.warning(this.$t('strategyV2.sourceContractRequired'))
         return
       }
+      if (!this.ensureBacktestRangeAllowed()) return
       this.running = true
       this.result = null
       this.selectedRun = null
@@ -716,6 +802,7 @@ export default {
         this.$message.warning(this.$t('strategyV2.sourceContractRequired'))
         return
       }
+      if (!this.ensureBacktestRangeAllowed()) return
       this.running = true
       this.factorResult = null
       this.startRunTimer()
@@ -758,6 +845,7 @@ export default {
         this.source = detail.data
         const compiled = await compileScriptSource({ sourceId: run.source_id })
         this.manifest = compiled.data && compiled.data.manifest
+        this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
         this.params = run.params || {}
       }
     },
@@ -782,6 +870,7 @@ export default {
         this.source = detail.data
         const compiled = await compileScriptSource({ sourceId: run.source_id })
         this.manifest = compiled.data && compiled.data.manifest
+        this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
       }
     },
     factorLabel (factorId) {
@@ -865,6 +954,7 @@ export default {
 .manifest-grid strong { color: #23344d; overflow-wrap: anywhere; }
 .section-hint { margin: 7px 0 10px; font-size: 12px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+.range-limit-alert { margin: 0 0 14px; }
 .switch-row { display: flex; align-items: center; gap: 8px; min-height: 32px; color: #7c8ca1; font-size: 11px; }
 .params-section { margin: 2px 0 14px; padding-top: 12px; border-top: 1px solid #eef2f6; }
 .factor-contract-alert { margin: 10px 0 14px; }

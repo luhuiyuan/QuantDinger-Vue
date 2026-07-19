@@ -159,6 +159,10 @@ const locale = {
   'strategyV2.backtest.serverExecution': 'Market data and strategy execution',
   'strategyV2.backtest.auditBeforeReturn': 'Ledger audit before response',
   'strategyV2.backtest.runFailed': 'The backtest did not complete. Review the visible error and try again.',
+  'strategyV2.backtest.rangeLimitTitle': '{timeframe} backtests can cover up to {maxDays} days per run',
+  'strategyV2.backtest.rangeLimitEstimate': 'This selection is about {bars} bars per instrument. The date picker and server both enforce the limit before market data is loaded.',
+  'strategyV2.backtest.rangeLimitExceeded': 'The selected range exceeds the {timeframe} limit. Shorten it to {maxDays} days or use a higher timeframe.',
+  'strategyV2.backtest.rangeLimitAdjusted': 'The date range was adjusted to the {timeframe} limit of {maxDays} days.',
   'strategyV2.backtest.equityCurve': 'Equity curve',
   'strategyV2.backtest.engine': 'Engine',
   'strategyV2.backtest.fillRule': 'Fill rule',
@@ -306,6 +310,10 @@ const enUSFallback = locale
 
 const zhCN = {
   ...enUSFallback,
+  'strategyV2.backtest.rangeLimitTitle': '{timeframe} 回测单次最多覆盖 {maxDays} 天',
+  'strategyV2.backtest.rangeLimitEstimate': '当前每个标的预计约 {bars} 根 K 线。日期选择器和服务端会在加载行情前共同执行限制。',
+  'strategyV2.backtest.rangeLimitExceeded': '所选区间超过 {timeframe} 上限，请缩短到 {maxDays} 天以内，或改用更高 K 线周期。',
+  'strategyV2.backtest.rangeLimitAdjusted': '日期区间已自动调整为 {timeframe} 的 {maxDays} 天上限。',
   'strategyV2.backtest.mode.portfolio': '组合回测',
   'strategyV2.backtest.mode.factor': '因子研究',
   'strategyV2.backtest.portfolioDashboard': '组合表现与风险',
@@ -610,6 +618,10 @@ const zhCN = {
 
 const zhTW = {
   ...zhCN,
+  'strategyV2.backtest.rangeLimitTitle': '{timeframe} 回測單次最多涵蓋 {maxDays} 天',
+  'strategyV2.backtest.rangeLimitEstimate': '目前每個標的預計約 {bars} 根 K 線。日期選擇器和服務端會在載入行情前共同執行限制。',
+  'strategyV2.backtest.rangeLimitExceeded': '所選區間超過 {timeframe} 上限，請縮短到 {maxDays} 天以內，或改用更高 K 線週期。',
+  'strategyV2.backtest.rangeLimitAdjusted': '日期區間已自動調整為 {timeframe} 的 {maxDays} 天上限。',
   'strategyV2.robot': '機器人',
   'strategyV2.backtest.sources': '個策略原始碼',
   'strategyV2.backtest.runs': '筆最近回測',
