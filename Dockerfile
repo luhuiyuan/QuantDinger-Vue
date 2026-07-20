@@ -17,6 +17,10 @@ ARG NGINX_IMAGE=nginx:1.25-alpine
 FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS builder
 ARG APP_VERSION=""
 ARG GIT_TAG=""
+ARG NODE_OPTIONS="--max-old-space-size=1536"
+ARG NPM_CONFIG_JOBS="1"
+ENV NODE_OPTIONS=${NODE_OPTIONS} \
+    npm_config_jobs=${NPM_CONFIG_JOBS}
 WORKDIR /app
 
 # git is needed at build time so vite.config.js can stamp the short hash.
