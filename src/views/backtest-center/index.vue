@@ -201,6 +201,8 @@
           </div>
         </div>
 
+        <cn-history-coverage-failure v-else-if="mode === 'portfolio' && coverageFailure" :failure="coverageFailure" />
+
         <div v-else-if="!activeResult" class="result-empty" data-testid="backtest-empty">
           <div class="empty-hero-card">
             <div class="empty-orbit"><a-icon type="line-chart" /></div>
@@ -314,10 +316,12 @@ import {
 } from '@/api/strategy'
 import PortfolioResult from './PortfolioResult.vue'
 import FactorResearchResult from './FactorResearchResult.vue'
+import CNHistoryCoverageFailure from './CNHistoryCoverageFailure.vue'
+import { extractCoverageFailure } from '@/utils/marketHistory'
 
 export default {
   name: 'BacktestCenter',
-  components: { PortfolioResult, FactorResearchResult },
+  components: { PortfolioResult, FactorResearchResult, CNHistoryCoverageFailure },
   data () {
     return {
       mode: 'portfolio',
@@ -329,6 +333,7 @@ export default {
       backtestRangePolicy: null,
       params: {},
       result: null,
+      coverageFailure: null,
       factorResult: null,
       selectedRun: null,
       running: false,
@@ -711,6 +716,7 @@ export default {
     },
     async selectSource (sourceId) {
       this.result = null
+      this.coverageFailure = null
       this.factorResult = null
       this.selectedRun = null
       this.form.leverageEnabled = false
@@ -792,6 +798,7 @@ export default {
       if (!this.ensureBacktestRangeAllowed()) return
       this.running = true
       this.result = null
+      this.coverageFailure = null
       this.selectedRun = null
       this.startRunTimer()
       try {
@@ -807,10 +814,12 @@ export default {
           params: this.params
         })
         this.result = response.data
+        this.coverageFailure = null
         this.selectedRun = { id: response.data && response.data.runId }
         await this.loadHistory()
       } catch (error) {
-        this.$message.error((error && error.backendMessage) || this.$t('strategyV2.backtest.runFailed'))
+        this.coverageFailure = extractCoverageFailure(error)
+        if (!this.coverageFailure) this.$message.error((error && error.backendMessage) || this.$t('strategyV2.backtest.runFailed'))
       } finally {
         this.stopRunTimer()
         this.running = false

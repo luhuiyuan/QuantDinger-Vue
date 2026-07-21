@@ -46,7 +46,26 @@
       <div><span>{{ $t('strategyV2.backtest.fillRule') }}</span><strong>{{ $t('strategyV2.backtest.fillRuleNextOpen') }}</strong></div>
       <div><span>{{ $t('backtest-center.commission') }}</span><strong>{{ formatRate(result.executionAssumptions.commission) }}</strong></div>
       <div><span>{{ $t('backtest-center.slippage') }}</span><strong>{{ formatRate(result.executionAssumptions.slippage) }}</strong></div>
+      <div v-if="isCNResult"><span>{{ text('strategyV2.cnHistory.ruleVersion', 'Market rules') }}</span><strong>{{ result.executionAssumptions.marketRuleVersion || '-' }}</strong></div>
+      <div v-if="isCNResult"><span>{{ text('strategyV2.cnHistory.settlement', 'Settlement') }}</span><strong>{{ result.executionAssumptions.settlement || '-' }}</strong></div>
+      <div v-if="isCNResult"><span>{{ text('strategyV2.cnHistory.lotSize', 'Buy lot') }}</span><strong>{{ result.executionAssumptions.buyLotSize || '-' }}</strong></div>
+      <div v-if="isCNResult"><span>{{ text('strategyV2.cnHistory.minimumCommission', 'Minimum commission') }}</span><strong>{{ formatNumber(result.executionAssumptions.minimumCommission, 2) }}</strong></div>
     </div>
+
+    <section v-if="provenanceRows.length" class="provenance-card">
+      <div class="provenance-heading">
+        <h3>{{ text('strategyV2.cnHistory.provenanceTitle', 'Data provenance') }}</h3>
+        <span>{{ text('strategyV2.cnHistory.provenanceHint', 'Provider, content, adjustment, factor, coverage, and cutoff are stored with this run.') }}</span>
+      </div>
+      <div v-for="item in provenanceRows" :key="item.instrument" class="provenance-row">
+        <strong>{{ item.instrument }}</strong>
+        <a-tag color="blue">{{ item.provider || result.dataProvenance.source || '-' }}</a-tag>
+        <span>{{ text('strategyV2.cnHistory.dataVersion', 'Data version') }}: {{ shortVersion(item.dataVersion || item.contentHash) }}</span>
+        <span>{{ text('strategyV2.cnHistory.factorVersion', 'Factor version') }}: {{ shortVersion(item.factorVersion) }}</span>
+        <span>{{ text('strategyV2.cnHistory.adjustmentMode', 'Adjustment') }}: {{ item.adjustmentMode || result.executionAssumptions.adjustmentMode || 'raw' }}</span>
+        <span>{{ text('strategyV2.cnHistory.availableThrough', 'Available through') }}: {{ item.availableThrough || item.lastBar || '-' }}</span>
+      </div>
+    </section>
 
     <a-tabs class="result-tabs" default-active-key="overview">
       <a-tab-pane key="overview" :tab="$t('strategyV2.backtest.tabs.overview')">
@@ -222,6 +241,8 @@ export default {
   computed: {
     auditPassed () { return Boolean(this.result.audit && this.result.audit.passed) },
     legacyBackfilled () { return Boolean(this.result.compatibility && this.result.compatibility.legacyBackfill) },
+    provenanceRows () { return (this.result.dataProvenance && this.result.dataProvenance.symbols) || [] },
+    isCNResult () { return this.provenanceRows.some(item => item.provider === 'easy_tdx') || Boolean(this.result.executionAssumptions && this.result.executionAssumptions.marketRuleVersion) },
     initialCapital () {
       return Number(
         this.result.initialCapital ||
@@ -387,6 +408,8 @@ export default {
     if (this.chart) this.chart.dispose()
   },
   methods: {
+    text (key, fallback) { const value = this.$t(key); return value && value !== key ? value : fallback },
+    shortVersion (value) { return value ? String(value).slice(0, 16) : '-' },
     renderChart () {
       const curve = this.result.equityCurve || []
       if (!this.$refs.chart || !curve.length) return
@@ -559,6 +582,13 @@ export default {
 .assumption-strip div { padding: 9px 10px; border-radius: 8px; background: #f8fafc; }
 .assumption-strip span { display: block; color: #7c8ca1; font-size: 11px; }
 .assumption-strip strong { display: block; color: #334155; font-size: 11px; }
+.provenance-card { margin-top: 12px; padding: 12px; border: 1px solid #edf0f4; border-radius: 8px; }
+.provenance-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.provenance-heading h3 { margin: 0; color: #26364c; font-size: 14px; }
+.provenance-heading span { color: #7c8ca1; font-size: 11px; }
+.provenance-row { display: grid; grid-template-columns: minmax(150px, 1.2fr) auto repeat(4, minmax(120px, 1fr)); align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid #edf0f4; color: #64748b; font-size: 11px; }
+.provenance-row:first-of-type { border-top: 0; }
+.provenance-row strong { overflow: hidden; color: #334155; text-overflow: ellipsis; white-space: nowrap; }
 .overview-grid { grid-template-columns: repeat(4, 1fr); }
 .overview-card, .status-card { display: flex; justify-content: space-between; align-items: center; }
 .overview-card strong, .status-card strong { font-size: 18px; }
@@ -580,6 +610,8 @@ export default {
 .review-chart-shell /deep/ .chart-left { width: 100% !important; height: 100% !important; }
 .review-chart-shell /deep/ .kline-chart-container { height: auto !important; min-height: 0; }
 .portfolio-result.theme-dark .metric-card, .portfolio-result.theme-dark .overview-card, .portfolio-result.theme-dark .status-card, .portfolio-result.theme-dark .assumption-strip div { border-color: rgba(255,255,255,.1); background: #0d0d0d; }
+.portfolio-result.theme-dark .provenance-card, .portfolio-result.theme-dark .provenance-row { border-color: rgba(255,255,255,.1); }
+.portfolio-result.theme-dark .provenance-heading h3, .portfolio-result.theme-dark .provenance-row strong { color: #e5e7eb; }
 .portfolio-result.theme-dark .metric-card strong, .portfolio-result.theme-dark .overview-card strong, .portfolio-result.theme-dark .status-card strong, .portfolio-result.theme-dark .chart-heading h3, .portfolio-result.theme-dark .assumption-strip strong { color: #e5e7eb; }
 .portfolio-result.theme-dark .chart-card { border-color: rgba(255,255,255,.1); }
 .portfolio-result.theme-dark .result-trustbar.is-success { border-color: #315d22; background: #13200f; color: #73d13d; }
@@ -587,7 +619,9 @@ export default {
 .portfolio-result.theme-dark .result-trustbar.is-error { border-color: #6b2525; background: #251111; color: #ff7875; }
 .portfolio-result.theme-dark .result-trustbar span { color: rgba(255, 255, 255, .56); }
 @media (max-width: 1500px) { .metrics-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (max-width: 900px) { .metrics-grid, .overview-grid, .status-grid, .assumption-strip { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 1100px) { .provenance-row { grid-template-columns: minmax(150px, 1fr) auto repeat(2, minmax(120px, 1fr)); } }
+@media (max-width: 900px) { .metrics-grid, .overview-grid, .status-grid, .assumption-strip { grid-template-columns: repeat(2, 1fr); } .provenance-heading { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 720px) { .provenance-row { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .result-trustbar { align-items: flex-start; flex-direction: column; }.result-trustbar > div { flex-wrap: wrap; } }
 </style>
 

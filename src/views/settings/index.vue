@@ -293,6 +293,7 @@
                     </div>
                   </a-checkbox-group>
                 </a-spin>
+                <market-history-operations />
               </a-spin>
             </div>
 
@@ -721,9 +722,11 @@ import { getSettingsSchema, getSettingsValues, saveSettings, getOpenRouterBalanc
 import { getMarketModules } from '@/api/marketModules'
 import { getSystemUniverseOverview, syncSystemUniverses } from '@/api/universe'
 import { baseMixin } from '@/store/app-mixin'
+import MarketHistoryOperations from './MarketHistoryOperations.vue'
 
 export default {
   name: 'Settings',
+  components: { MarketHistoryOperations },
   mixins: [baseMixin],
   data () {
     return {
