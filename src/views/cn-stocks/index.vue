@@ -10,6 +10,9 @@
         <a-tag :color="freshnessColor(snapshot.freshness)">{{ $t(freshnessKey(snapshot.freshness)) }}</a-tag>
         <span>{{ snapshot.source || '-' }} · {{ formatTime(snapshot.asOf) }}</span>
         <a-button icon="reload" :loading="loading" @click="refreshAll">{{ $t('cnStocks.refresh') }}</a-button>
+        <span v-if="catalogCoverage.coveredCount !== undefined">
+          {{ $t('cnStocks.quoteCoverage', { covered: catalogCoverage.coveredCount, total: catalogCoverage.catalogCount || pagination.total }) }}
+        </span>
       </div>
     </section>
 
@@ -20,6 +23,14 @@
       show-icon
       :message="$t('cnStocks.staleTitle')"
       :description="snapshot.warning"
+    />
+    <a-alert
+      v-if="refreshRun.status === 'partial' || refreshRun.status === 'failed'"
+      class="stale-alert"
+      type="warning"
+      show-icon
+      :message="$t('cnStocks.refreshRunWarning')"
+      :description="$t('cnStocks.refreshRunSummary', { status: refreshRun.status, succeeded: refreshRun.succeeded_symbols || 0, planned: refreshRun.planned_symbols || 0 })"
     />
 
     <section class="index-grid">
@@ -61,6 +72,18 @@
           <a-select-option value="down">{{ $t('cnStocks.declining') }}</a-select-option>
           <a-select-option value="flat">{{ $t('cnStocks.flat') }}</a-select-option>
         </a-select>
+        <a-select v-model="filters.sortBy" @change="applySort">
+          <a-select-option value="symbol">{{ $t('cnStocks.sort.symbol') }}</a-select-option>
+          <a-select-option value="name">{{ $t('cnStocks.sort.name') }}</a-select-option>
+          <a-select-option value="change_percent">{{ $t('cnStocks.sort.changePercent') }}</a-select-option>
+          <a-select-option value="volume">{{ $t('cnStocks.sort.volume') }}</a-select-option>
+          <a-select-option value="amount">{{ $t('cnStocks.sort.amount') }}</a-select-option>
+          <a-select-option value="quote_time">{{ $t('cnStocks.sort.quoteTime') }}</a-select-option>
+        </a-select>
+        <a-select v-model="filters.sortOrder" @change="applySort">
+          <a-select-option value="asc">{{ $t('cnStocks.sort.asc') }}</a-select-option>
+          <a-select-option value="desc">{{ $t('cnStocks.sort.desc') }}</a-select-option>
+        </a-select>
       </div>
 
       <a-table
@@ -78,7 +101,10 @@
         <template slot="change" slot-scope="value, row"><span :class="cnChangeTone(row.changePercent)">{{ formatCNSigned(row.changePercent, 2, '%') }}</span></template>
         <template slot="amount" slot-scope="value, row">{{ formatAmount(row.amount) }}</template>
         <template slot="status" slot-scope="value, row">
-          <a-tag :color="row.quoteStatus === 'available' ? 'green' : 'default'">{{ $t(row.quoteStatus === 'available' ? 'cnStocks.quoteAvailable' : 'cnStocks.unavailable') }}</a-tag>
+          <a-tag :color="row.quoteStatus === 'available' ? freshnessColor(row.freshness || 'fresh') : 'default'">
+            {{ $t(row.quoteStatus === 'available' ? freshnessKey(row.freshness || 'fresh') : 'cnStocks.unavailable') }}
+          </a-tag>
+          <small v-if="row.asOf" class="quote-time">{{ formatTime(row.asOf) }}</small>
         </template>
         <template slot="action" slot-scope="value, row">
           <a-button type="link" size="small" @click.stop="toggleWatchlist(row)">
@@ -105,7 +131,6 @@ import { Empty, message } from 'ant-design-vue'
 import { getCNMarketOverview, getCNStocks } from '@/api/cnStocks'
 import { addWatchlist, removeWatchlist } from '@/api/market'
 import {
-  CN_STOCK_REFRESH_INTERVAL,
   cnChangeTone,
   formatCNSigned,
   freshnessKey,
@@ -123,7 +148,8 @@ export default {
       stocks: [],
       filters: normalizeCNStockQuery(this.$route.query),
       pagination: { page: 1, pageSize: 20, total: 0 },
-      timer: null,
+      catalogCoverage: {},
+      refreshRun: {},
       simpleImage: Empty.PRESENTED_IMAGE_SIMPLE
     }
   },
@@ -143,12 +169,6 @@ export default {
   },
   mounted () {
     this.refreshAll()
-    this.timer = window.setInterval(this.refreshWhenVisible, CN_STOCK_REFRESH_INTERVAL)
-    document.addEventListener('visibilitychange', this.refreshWhenVisible)
-  },
-  beforeDestroy () {
-    if (this.timer) window.clearInterval(this.timer)
-    document.removeEventListener('visibilitychange', this.refreshWhenVisible)
   },
   methods: {
     cnChangeTone,
@@ -168,6 +188,8 @@ export default {
         const catalog = stocks.data || {}
         this.stocks = catalog.items || []
         this.pagination = catalog.pagination || this.pagination
+        this.catalogCoverage = catalog.coverage || {}
+        this.refreshRun = catalog.refreshRun || {}
         if (!this.snapshot.asOf && catalog.snapshot) this.snapshot = catalog.snapshot
       } catch (error) {
         message.error(error.backendMessage || this.$t('cnStocks.loadFailed'))
@@ -175,10 +197,12 @@ export default {
         this.loading = false
       }
     },
-    refreshWhenVisible () {
-      if (document.visibilityState === 'visible') this.refreshAll()
-    },
     applyFilters () {
+      this.filters.page = 1
+      this.syncRoute()
+      this.refreshAll()
+    },
+    applySort () {
       this.filters.page = 1
       this.syncRoute()
       this.refreshAll()
@@ -253,6 +277,7 @@ export default {
 .filters .ant-select { width: 150px; }
 .stock-link { display: flex; flex-direction: column; }
 .stock-link span { color: #94a3b8; font-size: 12px; }
+.quote-time { display: block; margin-top: 4px; color: #94a3b8; white-space: nowrap; }
 .pagination { margin-top: 20px; text-align: right; }
 .rise { color: #cf1322 !important; }
 .fall { color: #389e0d !important; }

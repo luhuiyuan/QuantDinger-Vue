@@ -88,7 +88,6 @@ import { message } from 'ant-design-vue'
 import { getCNStock, getCNStockHistory } from '@/api/cnStocks'
 import { addWatchlist, removeWatchlist } from '@/api/market'
 import {
-  CN_STOCK_REFRESH_INTERVAL,
   cnChangeTone,
   cnStockBacktestLocation,
   formatCNSigned,
@@ -105,8 +104,7 @@ export default {
       bars: [],
       indicators: { values: {}, availability: {}, parameters: {} },
       provenance: {},
-      chart: null,
-      timer: null
+      chart: null
     }
   },
   computed: {
@@ -148,11 +146,9 @@ export default {
   },
   mounted () {
     this.loadAll()
-    this.timer = window.setInterval(this.refreshQuoteWhenVisible, CN_STOCK_REFRESH_INTERVAL)
     window.addEventListener('resize', this.resizeChart)
   },
   beforeDestroy () {
-    if (this.timer) window.clearInterval(this.timer)
     window.removeEventListener('resize', this.resizeChart)
     if (this.chart) this.chart.dispose()
   },
@@ -179,13 +175,6 @@ export default {
       } finally {
         this.loading = false
       }
-    },
-    async refreshQuoteWhenVisible () {
-      if (document.visibilityState !== 'visible') return
-      try {
-        const response = await getCNStock(this.$route.params.symbol)
-        this.detail = response.data || this.detail
-      } catch (error) {}
     },
     renderChart () {
       if (!this.$refs.chart || !this.bars.length) return

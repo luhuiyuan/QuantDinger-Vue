@@ -4,7 +4,6 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import {
-  CN_STOCK_REFRESH_INTERVAL,
   cnChangeTone,
   cnStockBacktestLocation,
   formatCNSigned,
@@ -26,8 +25,17 @@ test('catalog query is bounded and canonicalized', () => {
   assert.deepEqual(normalizeCNStockQuery({
     keyword: '  茅台 ', exchange: 'SH', changeState: 'up', page: -4, pageSize: 1000
   }), {
-    keyword: '茅台', exchange: 'SH', changeState: 'up', page: 1, pageSize: 100
+    keyword: '茅台', exchange: 'SH', changeState: 'up', page: 1, pageSize: 100,
+    sortBy: 'symbol', sortOrder: 'asc'
   })
+})
+
+test('catalog sort query only accepts supported fields and directions', () => {
+  assert.deepEqual(normalizeCNStockQuery({ sortBy: 'amount', sortOrder: 'desc' }), {
+    keyword: '', exchange: '', changeState: '', page: 1, pageSize: 20,
+    sortBy: 'amount', sortOrder: 'desc'
+  })
+  assert.equal(normalizeCNStockQuery({ sortBy: 'latest;DROP', sortOrder: 'sideways' }).sortBy, 'symbol')
 })
 
 test('detail navigation carries a context but never requests auto-run', () => {
@@ -39,13 +47,12 @@ test('detail navigation carries a context but never requests auto-run', () => {
   })
 })
 
-test('freshness mapping and polling lifecycle stay explicit', () => {
+test('freshness mapping stays explicit and market pages do not poll', () => {
   assert.equal(freshnessKey('stale'), 'cnStocks.freshness.stale')
-  assert.equal(CN_STOCK_REFRESH_INTERVAL, 30000)
   const list = read('../../src/views/cn-stocks/index.vue')
   const detail = read('../../src/views/cn-stocks/detail.vue')
-  assert.match(list, /document\.visibilityState === 'visible'/)
-  assert.match(list, /window\.clearInterval\(this\.timer\)/)
+  assert.doesNotMatch(list, /setInterval|visibilitychange/)
+  assert.doesNotMatch(detail, /setInterval|refreshQuoteWhenVisible/)
   assert.match(detail, /backtestEligible/)
   assert.match(detail, /display_fallback|displayHistory/)
 })
