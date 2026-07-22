@@ -22,6 +22,15 @@
       </div>
     </section>
 
+    <a-alert
+      v-if="entryContext"
+      class="entry-context-alert"
+      type="info"
+      show-icon
+      :message="$t('cnStocks.backtestContextTitle')"
+      :description="$t('cnStocks.backtestContextDesc', { instrument: entryContext.instrument || `${entryContext.market}:${entryContext.symbol}` })"
+    />
+
     <div class="workspace-grid">
       <section class="panel config-panel">
         <div class="config-scroll">
@@ -345,6 +354,7 @@ export default {
       historyDetailRunId: null,
       equityChart: null,
       chartResizeObserver: null,
+      entryContext: null,
       form: {
         sourceId: null,
         startDate: moment().subtract(1, 'year'),
@@ -568,6 +578,13 @@ export default {
     }
   },
   async mounted () {
+    if (this.$route.query.market === 'CNStock' && this.$route.query.symbol) {
+      this.entryContext = {
+        market: 'CNStock',
+        symbol: String(this.$route.query.symbol),
+        instrument: String(this.$route.query.instrument || '')
+      }
+    }
     await this.refreshPage()
     const routeSourceId = Number(this.$route.query.sourceId)
     const sourceId = routeSourceId || (this.sources[0] && Number(this.sources[0].id))

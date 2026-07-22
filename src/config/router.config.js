@@ -49,6 +49,19 @@ export const asyncRouterMap = [
         meta: { title: 'menu.dashboard.backtestCenter', keepAlive: true, icon: 'bar-chart', permission: ['dashboard'] }
       },
       {
+        path: '/cn-stocks',
+        name: 'CNStocks',
+        component: () => import('@/views/cn-stocks'),
+        meta: { title: 'menu.dashboard.cnStocks', keepAlive: true, icon: 'stock', permission: ['dashboard'] }
+      },
+      {
+        path: '/cn-stocks/:symbol',
+        name: 'CNStockDetail',
+        component: () => import('@/views/cn-stocks/detail'),
+        hidden: true,
+        meta: { title: 'cnStocks.detailTitle', keepAlive: false, icon: 'stock', permission: ['dashboard'] }
+      },
+      {
         path: '/indicator-ide',
         name: 'IndicatorIDE',
         component: () => import('@/views/indicator-ide'),
