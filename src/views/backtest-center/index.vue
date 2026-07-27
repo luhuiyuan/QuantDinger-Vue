@@ -312,6 +312,8 @@ import * as echarts from 'echarts'
 import moment from 'moment'
 import { mapState } from 'vuex'
 import { calculateTradeValueUsd } from '@/utils/tradeReview'
+import { timestampMillisecondsUtc } from '@/utils/utcInstant'
+import { formatBacktestTime } from '@/utils/userTime'
 import {
   compileScriptSource,
   getScriptSourceDetail,
@@ -613,8 +615,8 @@ export default {
           this.chartResizeObserver.observe(this.$refs.equityChart)
         }
       }
-      const strategyData = this.equityPoints.map(item => [moment(item.time).valueOf(), Number(item.value)])
-      const benchmarkData = ((this.result && this.result.benchmarkCurve) || []).map(item => [moment(item.time).valueOf(), Number(item.value)])
+      const strategyData = this.equityPoints.map(item => [timestampMillisecondsUtc(item.time), Number(item.value)])
+      const benchmarkData = ((this.result && this.result.benchmarkCurve) || []).map(item => [timestampMillisecondsUtc(item.time), Number(item.value)])
       const textColor = this.isDarkTheme ? '#a3a3a3' : '#64748b'
       const gridColor = this.isDarkTheme ? '#292929' : '#e9eef4'
       const strategyName = this.$t('strategyV2.backtest.strategyEquity')
@@ -659,7 +661,7 @@ export default {
             if (!params || !params.length) return ''
             const timestamp = params[0].value[0]
             const rows = params.map(item => `${item.marker}${item.seriesName}<b>${this.formatNumber(item.value[1])}</b>`).join('<br>')
-            return `<div class="backtest-tooltip"><strong>${moment(timestamp).format('YYYY-MM-DD HH:mm')}</strong><span>${valueLabel}</span><br>${rows}</div>`
+            return `<div class="backtest-tooltip"><strong>${formatBacktestTime(timestamp, { locale: this.$i18n.locale })}</strong><span>${valueLabel}</span><br>${rows}</div>`
           }
         },
         axisPointer: { link: [{ xAxisIndex: 'all' }] },
@@ -833,6 +835,10 @@ export default {
         this.result = response.data
         this.coverageFailure = null
         this.selectedRun = { id: response.data && response.data.runId }
+        const billing = response.data && response.data.billing
+        if (billing && typeof billing.remaining !== 'undefined') {
+          this.$root.$emit('credits-updated', billing.remaining)
+        }
         await this.loadHistory()
       } catch (error) {
         this.coverageFailure = extractCoverageFailure(error)
@@ -887,6 +893,25 @@ export default {
         const run = response.data || {}
         this.selectedRun = run
         this.result = run.result || null
+        const assumptions = (run.result && run.result.executionAssumptions) || {}
+        const initialCapital = run.initial_capital !== undefined && run.initial_capital !== null
+          ? run.initial_capital
+          : assumptions.initialCapital
+        const leverage = run.leverage !== undefined && run.leverage !== null
+          ? run.leverage
+          : assumptions.leverage
+        if (initialCapital !== undefined && initialCapital !== null) this.form.initialCapital = Number(initialCapital)
+        if (run.commission !== undefined && run.commission !== null) this.form.commission = Number(run.commission)
+        else if (assumptions.commission !== undefined) this.form.commission = Number(assumptions.commission)
+        if (run.slippage !== undefined && run.slippage !== null) this.form.slippage = Number(run.slippage)
+        else if (assumptions.slippage !== undefined) this.form.slippage = Number(assumptions.slippage)
+        this.form.leverage = Math.max(1, Number(leverage || 1))
+        this.form.leverageEnabled = assumptions.leverageEnabled !== undefined
+          ? Boolean(assumptions.leverageEnabled)
+          : this.form.leverage > 1
+        if (run.start_date || assumptions.startDate) this.form.startDate = moment(run.start_date || assumptions.startDate)
+        if (run.end_date || assumptions.endDate) this.form.endDate = moment(run.end_date || assumptions.endDate)
+        this.params = run.params || {}
         if (run.source_id && Number(this.form.sourceId) !== Number(run.source_id)) {
           this.form.sourceId = Number(run.source_id)
           const detail = await getScriptSourceDetail(run.source_id)
@@ -894,7 +919,6 @@ export default {
           const compiled = await compileScriptSource({ sourceId: run.source_id })
           this.manifest = compiled.data && compiled.data.manifest
           this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
-          this.params = run.params || {}
         }
         this.historyVisible = false
       } catch (error) {
@@ -977,7 +1001,7 @@ export default {
       return 'neutral'
     },
     formatDate (value) {
-      return value ? moment(value).format('YYYY-MM-DD HH:mm') : '-'
+      return formatBacktestTime(value, { locale: this.$i18n.locale, fallback: '-' })
     },
     historyStatusLabel (item) {
       return this.$t(`strategyV2.backtest.status.${item.result_status || 'unknown'}`)

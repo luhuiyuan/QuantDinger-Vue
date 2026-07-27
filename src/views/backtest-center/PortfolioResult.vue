@@ -7,16 +7,37 @@
         <span>{{ statusHint }}</span>
       </div>
       <div>
-        <a-tag :color="auditPassed ? 'green' : 'red'">{{ auditPassed ? $t('strategyV2.backtest.auditPassed') : $t('strategyV2.backtest.auditFailed') }}</a-tag>
-        <a-tag color="blue">{{ $t('strategyV2.backtest.marketData') }}</a-tag>
+        <a-tag
+          :color="auditPassed ? 'green' : 'red'"
+          class="trust-tag"
+          :class="auditPassed ? 'trust-tag--success' : 'trust-tag--error'">
+          {{ auditPassed ? $t('strategyV2.backtest.auditPassed') : $t('strategyV2.backtest.auditFailed') }}
+        </a-tag>
+        <a-tag color="blue" class="trust-tag trust-tag--info">{{ $t('strategyV2.backtest.marketData') }}</a-tag>
         <a-tag
           v-if="legacyBackfilled"
           color="orange"
+          class="trust-tag trust-tag--warning"
           :title="$t('strategyV2.backtest.legacyBackfillHint')">
           {{ $t('strategyV2.backtest.legacyBackfill') }}
         </a-tag>
       </div>
     </div>
+
+    <a-alert
+      v-if="result.liquidated"
+      type="error"
+      show-icon
+      class="liquidation-alert"
+      :message="$t('strategyV2.backtest.liquidatedTitle')"
+      :description="$t('strategyV2.backtest.liquidatedHint')" />
+    <a-alert
+      v-else-if="result.legacyInsolventContinuation"
+      type="error"
+      show-icon
+      class="liquidation-alert"
+      :message="$t('strategyV2.backtest.legacyInsolventTitle')"
+      :description="$t('strategyV2.backtest.legacyInsolventHint')" />
 
     <div class="metrics-grid">
       <div v-for="item in metrics" :key="item.key" class="metric-card">
@@ -44,12 +65,16 @@
     <div v-if="result.executionAssumptions" class="assumption-strip">
       <div><span>{{ $t('strategyV2.backtest.engine') }}</span><strong>{{ $t('strategyV2.backtest.engineV2') }}</strong></div>
       <div><span>{{ $t('strategyV2.backtest.fillRule') }}</span><strong>{{ $t('strategyV2.backtest.fillRuleNextOpen') }}</strong></div>
+      <div><span>{{ $t('strategyV2.backtest.dateRange') }}</span><strong>{{ formatDateRange(result.executionAssumptions) }}</strong></div>
+      <div><span>{{ $t('backtest-center.initialCapital') }}</span><strong>{{ formatNumber(result.executionAssumptions.initialCapital) }}</strong></div>
+      <div><span>{{ $t('backtest-center.leverage') }}</span><strong>{{ formatLeverage(result.executionAssumptions) }}</strong></div>
       <div><span>{{ $t('backtest-center.commission') }}</span><strong>{{ formatRate(result.executionAssumptions.commission) }}</strong></div>
       <div><span>{{ $t('backtest-center.slippage') }}</span><strong>{{ formatRate(result.executionAssumptions.slippage) }}</strong></div>
       <div v-if="isCNResult"><span>{{ text('strategyV2.cnHistory.ruleVersion', 'Market rules') }}</span><strong>{{ result.executionAssumptions.marketRuleVersion || '-' }}</strong></div>
       <div v-if="isCNResult"><span>{{ text('strategyV2.cnHistory.settlement', 'Settlement') }}</span><strong>{{ result.executionAssumptions.settlement || '-' }}</strong></div>
       <div v-if="isCNResult"><span>{{ text('strategyV2.cnHistory.lotSize', 'Buy lot') }}</span><strong>{{ result.executionAssumptions.buyLotSize || '-' }}</strong></div>
       <div v-if="isCNResult"><span>{{ text('strategyV2.cnHistory.minimumCommission', 'Minimum commission') }}</span><strong>{{ formatNumber(result.executionAssumptions.minimumCommission, 2) }}</strong></div>
+      <div><span>{{ $t('trading-assistant.costs.funding') }}</span><strong>{{ $t('backtest-center.fundingNotModeled') }}</strong></div>
     </div>
 
     <section v-if="provenanceRows.length" class="provenance-card">
@@ -220,6 +245,8 @@ import {
   findNearestBarIndex,
   resolveTradeReviewTimeframe
 } from '@/utils/tradeReview'
+import { timestampMillisecondsUtc } from '@/utils/utcInstant'
+import { formatBacktestTime } from '@/utils/userTime'
 
 export default {
   name: 'PortfolioResult',
@@ -273,6 +300,7 @@ export default {
       return { ...source, feeDrag, orderStatus }
     },
     trustTone () {
+      if (this.result.liquidated || this.result.legacyInsolventContinuation) return 'is-error'
       if (!this.auditPassed) return 'is-error'
       return this.result.resultStatus === 'completed_trades' ? 'is-success' : 'is-warning'
     },
@@ -355,6 +383,8 @@ export default {
         { title: this.$t('backtest-center.tradeColumns.valueUsd'), key: 'value_usd', customRender: (value, row) => this.formatNullableNumber(calculateTradeValueUsd(row)) },
         { title: this.$t('backtest-center.tradeColumns.entryPrice'), dataIndex: 'entry_price', customRender: value => this.formatNumber(value, 4) },
         { title: this.$t('backtest-center.tradeColumns.exitPrice'), dataIndex: 'exit_price', customRender: value => this.formatNumber(value, 4) },
+        { title: this.$t('trading-assistant.costs.openingCommission'), dataIndex: 'entry_commission', customRender: value => this.formatNumber(value, 4) },
+        { title: this.$t('trading-assistant.costs.closingCommission'), dataIndex: 'exit_commission', customRender: value => this.formatNumber(value, 4) },
         { title: this.$t('backtest-center.tradeColumns.profit'), dataIndex: 'profit', customRender: value => this.$createElement('span', { class: ['trade-profit', this.profitTone(value)] }, this.formatSignedNumber(value)) },
         { title: this.$t('backtest-center.tradeColumns.balance'), dataIndex: 'balance', customRender: value => this.formatNumber(value) },
         { title: this.$t('backtest-center.tradeColumns.closeReason'), dataIndex: 'close_reason', width: 150 }
@@ -368,6 +398,7 @@ export default {
         { title: this.$t('strategyV2.backtest.side'), dataIndex: 'side', width: 70 },
         { title: this.$t('backtest-center.quantity'), dataIndex: 'quantity', customRender: value => this.formatNumber(value, 6) },
         { title: this.$t('backtest-center.price'), dataIndex: 'price', customRender: value => this.formatNumber(value, 4) },
+        { title: this.$t('strategyV2.backtest.filledNotional'), dataIndex: 'notional', customRender: (value, row) => this.formatNumber(value !== undefined && value !== null ? value : Number(row.quantity || 0) * Number(row.price || 0)) },
         { title: this.$t('backtest-center.commission'), dataIndex: 'commission', customRender: value => this.formatNumber(value, 4) },
         { title: this.$t('strategyV2.backtest.orderStatusLabel'), dataIndex: 'status' },
         { title: this.$t('strategyV2.backtest.reason'), dataIndex: 'reason', width: 145 }
@@ -388,10 +419,11 @@ export default {
         { title: this.$t('strategyV2.backtest.time'), dataIndex: 'eventTime', width: 165, customRender: this.formatDate },
         { title: this.$t('backtest-center.symbol'), dataIndex: 'symbol', width: 165 },
         { title: this.$t('strategyV2.backtest.orderStatusLabel'), dataIndex: 'status', width: 90, customRender: value => this.$createElement('a-tag', { props: { color: this.statusColor(value) } }, this.$t(`strategyV2.backtest.orderStatus.${value}`)) },
-        { title: this.$t('strategyV2.backtest.statusReason'), dataIndex: 'statusReason', width: 180 },
+        { title: this.$t('strategyV2.backtest.statusReason'), dataIndex: 'statusReason', width: 180, customRender: this.formatStatusReason },
         { title: this.$t('strategyV2.backtest.requestedQuantity'), dataIndex: 'requestedQuantity', customRender: value => this.formatNumber(value, 6) },
         { title: this.$t('strategyV2.backtest.filledQuantity'), dataIndex: 'filledQuantity', customRender: value => this.formatNumber(value, 6) },
         { title: this.$t('backtest-center.price'), dataIndex: 'price', customRender: value => this.formatNumber(value, 4) },
+        { title: this.$t('strategyV2.backtest.filledNotional'), key: 'filledNotional', customRender: (value, row) => this.formatNumber(Number(row.filledQuantity || 0) * Number(row.price || 0)) },
         { title: this.$t('strategyV2.backtest.attempt'), dataIndex: 'attempt' }
       ]
     }
@@ -423,7 +455,7 @@ export default {
       const firstValue = Number(curve[0].value || 0)
       const base = this.initialCapital > 0 ? this.initialCapital : (firstValue > 0 ? firstValue : 1)
       let peak = base
-      const normalized = curve.map(item => [moment(item.time).valueOf(), Number(item.value) / base * 100])
+      const normalized = curve.map(item => [timestampMillisecondsUtc(item.time), Number(item.value) / base * 100])
       const drawdown = curve.map(item => {
         const value = Number(item.value)
         peak = Math.max(peak, value)
@@ -431,14 +463,14 @@ export default {
         const pointDrawdown = item.drawdown !== undefined && item.drawdown !== null && Number.isFinite(savedDrawdown)
           ? savedDrawdown
           : ((value / peak - 1) * 100)
-        return [moment(item.time).valueOf(), pointDrawdown]
+        return [timestampMillisecondsUtc(item.time), pointDrawdown]
       })
       const benchmarkRaw = this.result.benchmarkCurve || []
       const benchmarkBase = benchmarkRaw.length ? Number(benchmarkRaw[0].value || 1) : 1
-      const benchmark = benchmarkRaw.map(item => [moment(item.time).valueOf(), Number(item.value) / benchmarkBase * 100])
-      const cash = curve.map(item => [moment(item.time).valueOf(), Number(item.cash || 0)])
-      const gross = curve.map(item => [moment(item.time).valueOf(), Number(item.grossExposure || 0) * 100])
-      const net = curve.map(item => [moment(item.time).valueOf(), Number(item.netExposure || 0) * 100])
+      const benchmark = benchmarkRaw.map(item => [timestampMillisecondsUtc(item.time), Number(item.value) / benchmarkBase * 100])
+      const cash = curve.map(item => [timestampMillisecondsUtc(item.time), Number(item.cash || 0)])
+      const gross = curve.map(item => [timestampMillisecondsUtc(item.time), Number(item.grossExposure || 0) * 100])
+      const net = curve.map(item => [timestampMillisecondsUtc(item.time), Number(item.netExposure || 0) * 100])
       const text = this.isDark ? '#8c8c8c' : '#64748b'
       const grid = this.isDark ? '#242424' : '#e8edf3'
       const strategyName = this.$t('strategyV2.backtest.strategyNormalized')
@@ -539,7 +571,25 @@ export default {
         chart.scrollToTimestamp(Math.round((entryTime + exitTime) / 2), 0)
       }
     },
-    formatDate (value) { return value ? moment(value).format('YYYY-MM-DD HH:mm') : '-' },
+    formatDate (value) {
+      return formatBacktestTime(value, { locale: this.$i18n.locale, fallback: '-' })
+    },
+    formatDateRange (assumptions) {
+      const start = assumptions && assumptions.startDate
+      const end = assumptions && assumptions.endDate
+      return start && end ? `${moment(start).format('YYYY-MM-DD')} ~ ${moment(end).format('YYYY-MM-DD')}` : '-'
+    },
+    formatLeverage (assumptions) {
+      const enabled = assumptions && assumptions.leverageEnabled
+      const leverage = enabled === false ? 1 : Number((assumptions && assumptions.leverage) || 1)
+      return `${Number.isFinite(leverage) ? leverage : 1}×`
+    },
+    formatStatusReason (value) {
+      if (!value) return '-'
+      const key = `strategyV2.backtest.statusReasonValue.${value}`
+      const translated = this.$t(key)
+      return translated === key ? String(value) : translated
+    },
     formatPercent (value, signed = true) { const number = Number(value || 0); return `${signed && number > 0 ? '+' : ''}${number.toFixed(2)}%` },
     formatRate (value) { return `${(Number(value || 0) * 100).toFixed(2)}%` },
     formatNumber (value, digits = 2) { const number = Number(value || 0); return Number.isFinite(number) ? number.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits }) : '-' },
@@ -578,7 +628,7 @@ export default {
 .chart-heading span, .chart-legend-note { color: #7c8ca1; font-size: 11px; }
 .portfolio-chart { width: 100%; height: 590px; }
 .assumption-strip, .overview-grid, .status-grid { display: grid; gap: 8px; margin-top: 12px; }
-.assumption-strip { grid-template-columns: 1fr 1.8fr .8fr .8fr; }
+.assumption-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .assumption-strip div { padding: 9px 10px; border-radius: 8px; background: #f8fafc; }
 .assumption-strip span { display: block; color: #7c8ca1; font-size: 11px; }
 .assumption-strip strong { display: block; color: #334155; font-size: 11px; }
@@ -613,11 +663,17 @@ export default {
 .portfolio-result.theme-dark .provenance-card, .portfolio-result.theme-dark .provenance-row { border-color: rgba(255,255,255,.1); }
 .portfolio-result.theme-dark .provenance-heading h3, .portfolio-result.theme-dark .provenance-row strong { color: #e5e7eb; }
 .portfolio-result.theme-dark .metric-card strong, .portfolio-result.theme-dark .overview-card strong, .portfolio-result.theme-dark .status-card strong, .portfolio-result.theme-dark .chart-heading h3, .portfolio-result.theme-dark .assumption-strip strong { color: #e5e7eb; }
+.liquidation-alert { margin-top: 12px; }
 .portfolio-result.theme-dark .chart-card { border-color: rgba(255,255,255,.1); }
 .portfolio-result.theme-dark .result-trustbar.is-success { border-color: #315d22; background: #13200f; color: #73d13d; }
 .portfolio-result.theme-dark .result-trustbar.is-warning { border-color: #664d03; background: #211b08; color: #ffc53d; }
 .portfolio-result.theme-dark .result-trustbar.is-error { border-color: #6b2525; background: #251111; color: #ff7875; }
 .portfolio-result.theme-dark .result-trustbar span { color: rgba(255, 255, 255, .56); }
+.portfolio-result.theme-dark .result-trustbar /deep/ .trust-tag { font-weight: 500; }
+.portfolio-result.theme-dark .result-trustbar /deep/ .trust-tag--success { border-color: #315d22; background: rgba(82, 196, 26, .18); color: #b7eb8f; }
+.portfolio-result.theme-dark .result-trustbar /deep/ .trust-tag--error { border-color: #6b2525; background: rgba(255, 77, 79, .18); color: #ffa39e; }
+.portfolio-result.theme-dark .result-trustbar /deep/ .trust-tag--info { border-color: #164c7e; background: rgba(24, 144, 255, .18); color: #91d5ff; }
+.portfolio-result.theme-dark .result-trustbar /deep/ .trust-tag--warning { border-color: #664d03; background: rgba(250, 173, 20, .18); color: #ffe58f; }
 @media (max-width: 1500px) { .metrics-grid { grid-template-columns: repeat(4, 1fr); } }
 @media (max-width: 1100px) { .provenance-row { grid-template-columns: minmax(150px, 1fr) auto repeat(2, minmax(120px, 1fr)); } }
 @media (max-width: 900px) { .metrics-grid, .overview-grid, .status-grid, .assumption-strip { grid-template-columns: repeat(2, 1fr); } .provenance-heading { align-items: flex-start; flex-direction: column; } }
