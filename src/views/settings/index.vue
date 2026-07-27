@@ -23,6 +23,8 @@
       </h2>
       <p class="page-desc">{{ $t('settings.description') }}</p>
     </div>
+    <a-alert v-if="externalLogCapabilityUnavailable" type="info" show-icon message="Data request log settings require a newer backend." />
+    <a-alert v-else-if="externalLogStatus && activeGroupKey === 'external_data_request_logs'" type="info" show-icon class="external-log-status" :message="`Latest cleanup: ${formatCleanupStatus(externalLogStatus.latest_cleanup)}`" />
 
     <a-spin :spinning="loading">
       <div class="settings-layout">
@@ -719,6 +721,7 @@
 
 <script>
 import { getSettingsSchema, getSettingsValues, saveSettings, getOpenRouterBalance, getMarketCatalogOverview, syncMarketCatalog } from '@/api/settings'
+import { getExternalDataRequestLogSettings } from '@/api/externalDataRequestLogs'
 import { getMarketModules } from '@/api/marketModules'
 import { getSystemUniverseOverview, syncSystemUniverses } from '@/api/universe'
 import { baseMixin } from '@/store/app-mixin'
@@ -754,6 +757,8 @@ export default {
       universeOverview: null,
       selectedUniverseCodes: [],
       selectedLlmProvider: '',
+      externalLogStatus: null,
+      externalLogCapabilityUnavailable: false,
       settingsInputNonce: Math.random().toString(36).slice(2, 10)
     }
   },
@@ -960,6 +965,7 @@ export default {
   },
   mounted () {
     this.loadSettings()
+    this.loadExternalLogStatus()
     this.refreshCatalogOverview()
     this.refreshUniverseOverview()
   },
@@ -975,6 +981,18 @@ export default {
     }
   },
   methods: {
+    async loadExternalLogStatus () {
+      try {
+        const response = await getExternalDataRequestLogSettings()
+        this.externalLogStatus = response.data || response
+      } catch (error) {
+        if (error && error.response && error.response.status === 503) this.externalLogCapabilityUnavailable = true
+      }
+    },
+    formatCleanupStatus (cleanup) {
+      if (!cleanup) return 'not run yet'
+      return `${cleanup.status || 'unknown'}; deleted ${cleanup.deleted_count || 0}`
+    },
     universeAdminLabel (item) {
       const key = item && item.name_i18n_key
       const translated = key ? this.$t(key) : ''

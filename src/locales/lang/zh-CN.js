@@ -7179,5 +7179,8 @@ export default {
   "cnStocks.indicatorHint": "所有指标均基于上方同一组日线计算。",
   "cnStocks.insufficientHistory": "历史不足：当前 {actual} 根，需要 {required} 根",
   "cnStocks.backtestContextTitle": "已从A股详情带入标的上下文",
-  "cnStocks.backtestContextDesc": "目标标的是 {instrument}。请选择包含该标的的策略并确认参数，系统不会自动运行回测。"
+  "cnStocks.backtestContextDesc": "目标标的是 {instrument}。请选择包含该标的的策略并确认参数，系统不会自动运行回测。",
+  "externalRequestLogs.title": "数据请求日志",
+  "externalRequestLogs.description": "面向外部数据提供方的只读健康与排障记录。",
+  "externalRequestLogs.unavailable": "当前后端尚未启用数据请求日志能力。"
 }

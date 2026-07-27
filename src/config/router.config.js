@@ -147,6 +147,12 @@ export const asyncRouterMap = [
         component: () => import('@/views/ai-skills'),
         meta: { title: 'menu.aiSkills', keepAlive: false, icon: 'experiment', permission: ['admin'] }
       },
+      {
+        path: '/external-data-request-logs',
+        name: 'ExternalDataRequestLogs',
+        component: () => import('@/views/external-data-request-logs'),
+        meta: { title: 'externalRequestLogs.title', keepAlive: false, icon: 'file-search', permission: ['admin'] }
+      },
       // System settings. Keep it last in the admin menu.
       {
         path: '/settings',

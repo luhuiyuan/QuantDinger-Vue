@@ -7391,5 +7391,8 @@ export default {
   "cnStocks.indicatorHint": "Every indicator uses the same daily-bar version shown above.",
   "cnStocks.insufficientHistory": "Insufficient history: {actual} available, {required} required",
   "cnStocks.backtestContextTitle": "Stock context carried from A-share detail",
-  "cnStocks.backtestContextDesc": "Target instrument: {instrument}. Select a strategy containing it and confirm parameters; the backtest will not start automatically."
+  "cnStocks.backtestContextDesc": "Target instrument: {instrument}. Select a strategy containing it and confirm parameters; the backtest will not start automatically.",
+  "externalRequestLogs.title": "Data Request Logs",
+  "externalRequestLogs.description": "Read-only health and diagnostic records for external data providers.",
+  "externalRequestLogs.unavailable": "This backend has not enabled data request logs yet."
 }
