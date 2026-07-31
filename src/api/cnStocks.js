@@ -15,3 +15,7 @@ export function getCNStock (symbol) {
 export function getCNStockHistory (symbol, params) {
   return request({ url: `/api/market/cn/stocks/${encodeURIComponent(symbol)}/history`, method: 'get', params })
 }
+
+export function getCNStockFundamentals (symbol) {
+  return request({ url: `/api/market/cn/stocks/${encodeURIComponent(symbol)}/fundamentals`, method: 'get' })
+}

@@ -24,6 +24,8 @@
         <a-table :columns="columns" :data-source="items" :loading="loading" :row-key="row => row.id" :pagination="pagination" @change="onTableChange">
           <template slot="result" slot-scope="value"><a-tag :color="value === 'success' ? 'green' : 'red'">{{ value }}</a-tag></template>
           <template slot="duration" slot-scope="value">{{ value }} ms</template>
+          <template slot="logId" slot-scope="value">#{{ value }}</template>
+          <template slot="callingFeature" slot-scope="value">{{ formatCallingFeature(value) }}</template>
           <template slot="action" slot-scope="_, row"><a-button type="link" size="small" @click="showDetail(row)">Details</a-button></template>
         </a-table>
       </a-card>
@@ -42,12 +44,31 @@ import { getExternalDataRequestLog, getExternalDataRequestOverview, listExternal
 export default {
   name: 'ExternalDataRequestLogs',
   data () {
-    return { loading: false, capabilityUnavailable: false, overview: null, items: [], detail: null, filters: { provider: '', data_domain: '', result: '' }, results: ['success', 'timeout', 'rate_limited', 'provider_error', 'network_error', 'invalid_response', 'disabled', 'skipped'], pagination: { current: 1, pageSize: 20, total: 0 }, detailKeys: ['occurred_at', 'provider', 'data_domain', 'operation', 'call_source', 'subject_summary', 'fallback_index', 'retry_count', 'duration_ms', 'result', 'http_status', 'error_summary', 'request_id'], columns: [
-      { title: 'Time', dataIndex: 'occurred_at' }, { title: 'Provider', dataIndex: 'provider' }, { title: 'Domain', dataIndex: 'data_domain' }, { title: 'Operation', dataIndex: 'operation' }, { title: 'Result', dataIndex: 'result', scopedSlots: { customRender: 'result' } }, { title: 'Duration', dataIndex: 'duration_ms', scopedSlots: { customRender: 'duration' } }, { title: '', scopedSlots: { customRender: 'action' } }
-    ] }
+    return { loading: false, capabilityUnavailable: false, overview: null, items: [], detail: null, filters: { provider: '', data_domain: '', result: '' }, results: ['success', 'timeout', 'rate_limited', 'provider_error', 'network_error', 'invalid_response', 'disabled', 'skipped'], pagination: { current: 1, pageSize: 20, total: 0 }, detailKeys: ['id', 'occurred_at', 'provider', 'data_domain', 'operation', 'call_source', 'subject_summary', 'fallback_index', 'retry_count', 'duration_ms', 'result', 'http_status', 'error_summary', 'request_id'] }
+  },
+  computed: {
+    columns () {
+      return [
+        { title: this.$t('externalRequestLogs.logId'), dataIndex: 'id', scopedSlots: { customRender: 'logId' } },
+        { title: this.$t('externalRequestLogs.time'), dataIndex: 'occurred_at' },
+        { title: this.$t('externalRequestLogs.provider'), dataIndex: 'provider' },
+        { title: this.$t('externalRequestLogs.domain'), dataIndex: 'data_domain' },
+        { title: this.$t('externalRequestLogs.operation'), dataIndex: 'operation' },
+        { title: this.$t('externalRequestLogs.callingFeature'), dataIndex: 'call_source', scopedSlots: { customRender: 'callingFeature' } },
+        { title: this.$t('externalRequestLogs.requestId'), dataIndex: 'request_id' },
+        { title: this.$t('externalRequestLogs.result'), dataIndex: 'result', scopedSlots: { customRender: 'result' } },
+        { title: this.$t('externalRequestLogs.duration'), dataIndex: 'duration_ms', scopedSlots: { customRender: 'duration' } },
+        { title: '', scopedSlots: { customRender: 'action' } }
+      ]
+    }
   },
   created () { this.reload() },
   methods: {
+    formatCallingFeature (featureCode) {
+      const key = `externalRequestLogs.features.${featureCode || 'notRecorded'}`
+      const translated = this.$t(key)
+      return translated === key ? this.$t('externalRequestLogs.features.notRecorded') : translated
+    },
     async reload () {
       this.loading = true
       try {

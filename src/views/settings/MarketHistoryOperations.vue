@@ -121,6 +121,34 @@
           </a-collapse-panel>
         </a-collapse>
       </template>
+
+      <div class="ops-section-title ops-title-row">
+        <span>{{ t('fundamentalTitle', 'Annual fundamental data quality') }}</span>
+        <a-button type="link" icon="reload" @click="loadFundamentals">{{ t('refresh', 'Refresh') }}</a-button>
+      </div>
+      <a-alert show-icon type="info" :message="t('fundamentalHint', 'Backfills are serialized and resumable. Start with a small instrument list before a full-market run.')" />
+      <div class="fundamental-form">
+        <a-textarea v-model="fundamentalForm.instruments" :rows="2" :placeholder="t('instrumentPlaceholder', 'CNStock:600519.SH, CNStock:000001.SZ')" />
+        <a-button type="primary" icon="database" :loading="fundamentalSubmitting" :disabled="!fundamentalInstruments.length" @click="startFundamentalBackfill">
+          {{ t('startFundamentalBackfill', 'Start annual backfill') }}
+        </a-button>
+      </div>
+      <a-table :columns="fundamentalRunColumns" :data-source="fundamentalRuns" :row-key="row => row.runId" size="small" :pagination="{ pageSize: 6 }" :scroll="{ x: 900 }">
+        <template slot="fundamentalStatus" slot-scope="value, row"><a-tag :color="statusColor(row.status)">{{ row.status }}</a-tag></template>
+        <template slot="fundamentalActions" slot-scope="value, row">
+          <a-button v-if="row.status === 'running'" type="link" size="small" @click="controlFundamental(row, 'pause')">{{ t('pause', 'Pause') }}</a-button>
+          <a-button v-if="row.status === 'paused'" type="link" size="small" @click="controlFundamental(row, 'resume')">{{ t('resume', 'Resume') }}</a-button>
+          <a-button v-if="['failed', 'partial'].includes(row.status)" type="link" size="small" @click="controlFundamental(row, 'retry')">{{ t('retry', 'Retry') }}</a-button>
+          <a-button v-if="['pending', 'running', 'paused'].includes(row.status)" type="link" size="small" @click="controlFundamental(row, 'cancel')">{{ t('cancel', 'Cancel') }}</a-button>
+        </template>
+      </a-table>
+      <div class="fundamental-summary-grid">
+        <a-card size="small" :title="t('annualCoverage', 'Annual coverage')"><a-table :columns="fundamentalCoverageColumns" :data-source="fundamentalCoverage" :row-key="row => row.instrument" size="small" :pagination="{ pageSize: 5 }" /></a-card>
+        <a-card size="small" :title="t('pendingVerification', 'Pending verification')"><a-table :columns="verificationColumns" :data-source="verificationTargets" :row-key="row => row.id" size="small" :pagination="{ pageSize: 5 }" /></a-card>
+      </div>
+      <a-card size="small" :title="t('blockingDifferences', 'Quality issues and blocking differences')" class="quality-card">
+        <a-table :columns="qualityIssueColumns" :data-source="qualityIssues" :row-key="row => row.id" size="small" :pagination="{ pageSize: 5 }" />
+      </a-card>
     </template>
   </section>
 </template>
@@ -135,7 +163,16 @@ import {
   getMarketHistoryDiskStatus,
   getMarketHistoryProviderHealth,
   listMarketHistorySyncRuns,
-  retryMarketHistorySyncRun
+  retryMarketHistorySyncRun,
+  cancelFundamentalSyncRun,
+  createFundamentalSyncRun,
+  listFundamentalCoverage,
+  listFundamentalQualityIssues,
+  listFundamentalSyncRuns,
+  listFundamentalVerificationTargets,
+  pauseFundamentalSyncRun,
+  resumeFundamentalSyncRun,
+  retryFundamentalSyncRun
 } from '@/api/marketHistory'
 import { marketHistoryUnavailableReason } from '@/utils/marketHistory'
 
@@ -152,6 +189,12 @@ export default {
       disk: {},
       runs: [],
       coverage: null,
+      fundamentalSubmitting: false,
+      fundamentalRuns: [],
+      fundamentalCoverage: [],
+      qualityIssues: [],
+      verificationTargets: [],
+      fundamentalForm: { instruments: '' },
       syncForm: { instruments: '', range: [moment().subtract(1, 'year').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD')] },
       coverageForm: { instrument: '', range: [moment().subtract(1, 'year').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD')] }
     }
@@ -180,6 +223,19 @@ export default {
     parsedInstruments () {
       return this.syncForm.instruments.split(/[\s,;]+/).map(item => item.trim()).filter(Boolean)
     },
+    fundamentalInstruments () { return this.fundamentalForm.instruments.split(/[\s,;]+/).map(item => item.trim()).filter(Boolean) },
+    fundamentalRunColumns () {
+      return [
+        { title: 'Run ID', dataIndex: 'runId', customRender: value => String(value || '').slice(0, 12) },
+        { title: this.t('status', 'Status'), key: 'status', scopedSlots: { customRender: 'fundamentalStatus' } },
+        { title: this.t('progress', 'Progress'), customRender: (value, row) => `${Number(row.succeededSymbols || 0)}/${Number(row.totalSymbols || 0)}` },
+        { title: this.t('lastError', 'Last error'), dataIndex: 'lastError', ellipsis: true },
+        { title: this.t('actions', 'Actions'), key: 'actions', scopedSlots: { customRender: 'fundamentalActions' } }
+      ]
+    },
+    fundamentalCoverageColumns () { return [{ title: this.t('instrument', 'Instrument'), dataIndex: 'instrument' }, { title: this.t('range', 'Range'), customRender: (v, row) => `${row.firstPeriodEnd || '-'} - ${row.lastPeriodEnd || '-'}` }, { title: this.t('years', 'Years'), dataIndex: 'completeYearCount' }] },
+    verificationColumns () { return [{ title: this.t('instrument', 'Instrument'), dataIndex: 'instrument' }, { title: this.t('period', 'Period'), dataIndex: 'periodEnd' }, { title: this.t('rule', 'Rule'), dataIndex: 'triggerMetric' }, { title: this.t('status', 'Status'), dataIndex: 'status' }] },
+    qualityIssueColumns () { return [{ title: this.t('instrument', 'Instrument'), dataIndex: 'instrument' }, { title: this.t('period', 'Period'), dataIndex: 'periodEnd' }, { title: this.t('severity', 'Severity'), dataIndex: 'severity' }, { title: this.t('issue', 'Issue'), dataIndex: 'issueCode' }, { title: this.t('source', 'Source'), dataIndex: 'source' }] },
     providerColumns () {
       return [
         { title: this.t('node', 'Node'), dataIndex: 'host' },
@@ -245,6 +301,7 @@ export default {
         if (results[0].status === 'fulfilled') this.provider = results[0].value
         if (results[1].status === 'fulfilled') this.disk = results[1].value
         if (results[2].status === 'fulfilled') this.runs = results[2].value || []
+        await this.loadFundamentals()
       } catch (error) {
         this.availability = marketHistoryUnavailableReason(error) || 'error'
       } finally {
@@ -279,6 +336,21 @@ export default {
         this.coverage = null
         this.$message.error(error.backendMessage || this.t('coverageFailed', 'Could not load instrument coverage.'))
       } finally { this.coverageLoading = false }
+    },
+    async loadFundamentals () {
+      const results = await Promise.allSettled([listFundamentalSyncRuns(), listFundamentalCoverage(), listFundamentalQualityIssues(), listFundamentalVerificationTargets()])
+      if (results[0].status === 'fulfilled') this.fundamentalRuns = results[0].value || []
+      if (results[1].status === 'fulfilled') this.fundamentalCoverage = results[1].value || []
+      if (results[2].status === 'fulfilled') this.qualityIssues = results[2].value || []
+      if (results[3].status === 'fulfilled') this.verificationTargets = results[3].value || []
+    },
+    async startFundamentalBackfill () {
+      this.fundamentalSubmitting = true
+      try { await createFundamentalSyncRun(this.fundamentalInstruments); this.$message.success(this.t('syncCreated', 'Sync run created')); await this.loadFundamentals() } catch (error) { this.$message.error(error.backendMessage || this.t('syncFailed', 'Could not create the sync run.')) } finally { this.fundamentalSubmitting = false }
+    },
+    async controlFundamental (row, action) {
+      const actions = { pause: pauseFundamentalSyncRun, resume: resumeFundamentalSyncRun, cancel: cancelFundamentalSyncRun, retry: retryFundamentalSyncRun }
+      try { await actions[action](row.runId); await this.loadFundamentals() } catch (error) { this.$message.error(error.backendMessage || this.t('operationFailed', 'Operation failed.')) }
     },
     yesNo (value) { return value ? this.t('enabled', 'Enabled') : this.t('disabled', 'Disabled') },
     formatBytes (value) {
@@ -321,10 +393,13 @@ export default {
 .adjustment-row small { color: #8c8c8c; }
 .coverage-issues { margin-top: 10px; }
 .issue-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.fundamental-form { display: grid; grid-template-columns: minmax(260px, 1fr) auto; align-items: start; gap: 10px; margin: 10px 0; }
+.fundamental-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.quality-card { margin-top: 12px; }
 .theme-dark .history-ops { border-top-color: #303030; }
 .theme-dark .ops-heading h4, .theme-dark .ops-section-title, .theme-dark .ops-status strong { color: #f0f0f0; }
 .theme-dark .ops-heading p { color: rgba(255, 255, 255, .52); }
 .theme-dark .ops-status-grid, .theme-dark .ops-status, .theme-dark .adjustment-row { border-color: #303030; }
-@media (max-width: 1000px) { .ops-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .adjustment-grid { grid-template-columns: 1fr; } }
-@media (max-width: 720px) { .ops-heading { align-items: flex-start; flex-direction: column; } .sync-form, .coverage-form { grid-template-columns: 1fr; } .ops-status-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .ops-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .adjustment-grid, .fundamental-summary-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .ops-heading { align-items: flex-start; flex-direction: column; } .sync-form, .coverage-form, .fundamental-form { grid-template-columns: 1fr; } .ops-status-grid { grid-template-columns: 1fr; } }
 </style>

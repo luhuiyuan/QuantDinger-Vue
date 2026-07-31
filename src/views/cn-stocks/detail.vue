@@ -38,6 +38,15 @@
         <div v-for="item in quoteMetrics" :key="item.key"><span>{{ item.label }}</span><strong>{{ item.value }}</strong></div>
       </section>
 
+      <section class="fundamental-section">
+        <div class="panel-heading"><div><h2>基本面</h2><p>年度原始报表重算指标；仅使用公告日已公开数据。</p></div></div>
+        <a-alert v-if="!fundamentals.available" type="info" show-icon message="基本面历史尚未回填" description="该股票的年度基本面数据尚不可用，回填完成后将在此展示。" />
+        <template v-else>
+          <div class="fundamental-grid"><div v-for="item in fundamentalCards" :key="item.key"><span>{{ item.label }}</span><strong>{{ item.value }}</strong><a-tag :color="item.status === 'available' ? 'green' : 'orange'">{{ item.status }}</a-tag></div></div>
+          <a-table :columns="fundamentalColumns" :data-source="fundamentals.observations || []" row-key="period_end" size="small" :pagination="{ pageSize: 5 }" :scroll="{ x: 900 }" />
+        </template>
+      </section>
+
       <section class="chart-panel">
         <div class="panel-heading">
           <div><h2>{{ $t('cnStocks.dailyChart') }}</h2><p>{{ $t('cnStocks.dailyChartHint') }}</p></div>
@@ -85,7 +94,7 @@
 <script>
 import * as echarts from 'echarts'
 import { message } from 'ant-design-vue'
-import { getCNStock, getCNStockHistory } from '@/api/cnStocks'
+import { getCNStock, getCNStockHistory, getCNStockFundamentals } from '@/api/cnStocks'
 import { addWatchlist, removeWatchlist } from '@/api/market'
 import {
   cnChangeTone,
@@ -104,6 +113,7 @@ export default {
       bars: [],
       indicators: { values: {}, availability: {}, parameters: {} },
       provenance: {},
+      fundamentals: { available: false, observations: [], metrics: {} },
       chart: null
     }
   },
@@ -119,6 +129,11 @@ export default {
         { key: 'amount', label: this.$t('cnStocks.amount'), value: this.formatAmount(this.quote.amount) }
       ]
     },
+    fundamentalCards () {
+      const labels = { roe_10y_average: '十年平均 ROE', fcf_5y_cumulative: '五年累计 FCF', interest_coverage: '利息覆盖', gross_margin_5y_average: '五年平均毛利率', ocf_to_parent_net_income_5y_average: '五年 OCF/归母净利', net_margin_5y_average: '五年平均净利率', share_count_growth_5y: '五年股本变化' }
+      return Object.keys(labels).map(key => { const metric = (this.fundamentals.metrics || {})[key] || {}; const percent = /roe|margin|growth|ocf/.test(key); return { key, label: labels[key], status: metric.status || 'insufficient', value: metric.value == null ? '-' : (percent ? `${(Number(metric.value) * 100).toFixed(2)}%` : this.formatNumber(metric.value, 2)) } })
+    },
+    fundamentalColumns () { return [{ title: '报告期', dataIndex: 'period_end', width: 120 }, { title: '公告日', dataIndex: 'available_at', width: 120 }, { title: '营收', dataIndex: 'revenue', customRender: v => this.formatAmount(v) }, { title: '归母净利', dataIndex: 'parent_net_income', customRender: v => this.formatAmount(v) }, { title: '经营现金流', dataIndex: 'operating_cash_flow', customRender: v => this.formatAmount(v) }, { title: '总股本', dataIndex: 'total_shares', customRender: v => this.formatNumber(v, 0) }] },
     indicatorCards () {
       const values = this.indicators.values || {}
       const availability = this.indicators.availability || {}
@@ -160,12 +175,14 @@ export default {
       this.loading = true
       try {
         const symbol = this.$route.params.symbol
-        const [detail, history] = await Promise.all([
+        const [detail, history, fundamental] = await Promise.all([
           getCNStock(symbol),
-          getCNStockHistory(symbol, { limit: 260, adjustment: 'forward' })
+          getCNStockHistory(symbol, { limit: 260, adjustment: 'forward' }),
+          getCNStockFundamentals(symbol)
         ])
         this.detail = detail.data || {}
         const data = history.data || {}
+        this.fundamentals = fundamental.data || { available: false, observations: [], metrics: {} }
         this.bars = data.bars || []
         this.indicators = data.indicators || { values: {}, availability: {}, parameters: {} }
         this.provenance = data.provenance || {}
@@ -240,14 +257,14 @@ export default {
 .stock-detail-page { padding: 24px; min-height: 100%; background: var(--page-bg, #f3f6fa); }
 .top-actions { display: flex; justify-content: space-between; margin-bottom: 16px; }
 .top-actions > div { display: flex; gap: 10px; }
-.quote-hero, .chart-panel, .indicator-section { background: var(--component-background, #fff); border-radius: 16px; padding: 24px; box-shadow: 0 8px 28px rgba(15, 23, 42, .06); }
+.quote-hero, .chart-panel, .indicator-section, .fundamental-section { background: var(--component-background, #fff); border-radius: 16px; padding: 24px; box-shadow: 0 8px 28px rgba(15, 23, 42, .06); }
 .quote-hero { display: flex; justify-content: space-between; align-items: flex-start; }
 .quote-hero h1 { margin: 8px 0; font-size: 28px; }.quote-hero h1 small { color: #94a3b8; font-size: 14px; }
 .exchange-badge { background: #e6f4ff; color: #1677ff; border-radius: 6px; padding: 3px 8px; font-weight: 700; }
 .quote-price { font-size: 36px; font-weight: 800; }.quote-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; color: #64748b; }
 .quote-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin: 16px 0; }
 .quote-grid > div { background: var(--component-background, #fff); padding: 16px; border-radius: 12px; display: flex; flex-direction: column; gap: 5px; }.quote-grid span { color: #64748b; }
-.chart-panel { margin-bottom: 16px; }.panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }.panel-heading h2 { margin-bottom: 4px; }.panel-heading p { color: #64748b; }
+.chart-panel, .fundamental-section { margin-bottom: 16px; }.fundamental-section { background: var(--component-background, #fff); border-radius: 16px; padding: 24px; box-shadow: 0 8px 28px rgba(15, 23, 42, .06); }.fundamental-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:12px 0; }.fundamental-grid > div { padding:12px; border-radius:12px; background:var(--page-bg,#f8fafc); display:grid; gap:5px; }.fundamental-grid span{color:#64748b}.fundamental-grid strong{font-size:18px;}.panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }.panel-heading h2 { margin-bottom: 4px; }.panel-heading p { color: #64748b; }
 .provenance-tags { display: flex; gap: 6px; }.history-warning { margin: 12px 0; }.kline-chart { height: 520px; width: 100%; }
 .data-caption { display: flex; flex-wrap: wrap; gap: 18px; color: #64748b; font-size: 12px; margin-top: 10px; }
 .indicator-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }.indicator-card { border-radius: 12px; background: var(--page-bg, #f8fafc); }.indicator-title { display: flex; justify-content: space-between; }.indicator-value { font-size: 18px; font-weight: 700; margin-top: 16px; }.indicator-signal, .indicator-unavailable { color: #64748b; margin-top: 6px; }
