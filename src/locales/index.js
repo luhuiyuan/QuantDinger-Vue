@@ -10,6 +10,7 @@ import strategyV2Messages from './lang/strategy-v2'
 import strategyLiveRiskMessages from './lang/strategy-live-risk'
 import robotBuilderMessages from './lang/robot-builder-overrides'
 import strategyTradeRecordMessages from './lang/strategy-trade-records'
+import taskManagementMessages from './lang/task-management'
 
 Vue.use(VueI18n)
 
@@ -24,7 +25,8 @@ const messages = {
     ...(strategyV2Messages[defaultLang] || {}),
     ...(strategyLiveRiskMessages[defaultLang] || {}),
     ...(robotBuilderMessages[defaultLang] || {}),
-    ...(strategyTradeRecordMessages[defaultLang] || {})
+    ...(strategyTradeRecordMessages[defaultLang] || {}),
+    ...(taskManagementMessages[defaultLang] || {})
   }
 }
 
@@ -98,7 +100,8 @@ function mergeLocaleOverrides (lang) {
     ...(strategyV2Messages[lang] || {}),
     ...(strategyLiveRiskMessages[lang] || {}),
     ...(robotBuilderMessages[lang] || {}),
-    ...(strategyTradeRecordMessages[lang] || {})
+    ...(strategyTradeRecordMessages[lang] || {}),
+    ...(taskManagementMessages[lang] || taskManagementMessages[defaultLang] || {})
   }
   i18n.setLocaleMessage(lang, {
     ...(i18n.getLocaleMessage(lang) || {}),

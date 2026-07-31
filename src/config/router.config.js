@@ -153,6 +153,12 @@ export const asyncRouterMap = [
         component: () => import('@/views/external-data-request-logs'),
         meta: { title: 'externalRequestLogs.title', keepAlive: false, icon: 'file-search', permission: ['admin'] }
       },
+      {
+        path: '/task-management',
+        name: 'TaskManagement',
+        component: () => import('@/views/task-management'),
+        meta: { title: 'menu.taskManagement', keepAlive: false, icon: 'schedule', permission: ['dashboard'] }
+      },
       // System settings. Keep it last in the admin menu.
       {
         path: '/settings',

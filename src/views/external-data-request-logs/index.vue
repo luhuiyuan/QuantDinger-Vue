@@ -14,8 +14,11 @@
       </a-row>
       <a-card :bordered="false" class="log-card">
         <div class="filters">
-          <a-input v-model="filters.provider" placeholder="Provider" allow-clear @pressEnter="reload" />
+          <a-select v-model="filters.provider" allow-clear placeholder="Provider" style="width: 180px">
+            <a-select-option v-for="value in providers" :key="value" :value="value">{{ value }}</a-select-option>
+          </a-select>
           <a-input v-model="filters.data_domain" placeholder="Data domain" allow-clear @pressEnter="reload" />
+          <a-input v-model="filters.request_id" placeholder="Request ID" allow-clear @pressEnter="reload" />
           <a-select v-model="filters.result" allow-clear placeholder="Result" style="width: 160px">
             <a-select-option v-for="value in results" :key="value" :value="value">{{ value }}</a-select-option>
           </a-select>
@@ -44,7 +47,7 @@ import { getExternalDataRequestLog, getExternalDataRequestOverview, listExternal
 export default {
   name: 'ExternalDataRequestLogs',
   data () {
-    return { loading: false, capabilityUnavailable: false, overview: null, items: [], detail: null, filters: { provider: '', data_domain: '', result: '' }, results: ['success', 'timeout', 'rate_limited', 'provider_error', 'network_error', 'invalid_response', 'disabled', 'skipped'], pagination: { current: 1, pageSize: 20, total: 0 }, detailKeys: ['id', 'occurred_at', 'provider', 'data_domain', 'operation', 'call_source', 'subject_summary', 'fallback_index', 'retry_count', 'duration_ms', 'result', 'http_status', 'error_summary', 'request_id'] }
+    return { loading: false, capabilityUnavailable: false, overview: null, items: [], detail: null, filters: { provider: '', data_domain: '', result: '', request_id: this.$route.query.request_id || '' }, providers: ['eastmoney', 'tencent', 'akshare_wallstreetcn', 'finnhub', 'fred', 'tradingeconomics', 'yfinance', 'bybit', 'binance', 'gate', 'okx', 'bitget', 'htx'], results: ['success', 'timeout', 'rate_limited', 'provider_error', 'network_error', 'invalid_response', 'disabled', 'skipped'], pagination: { current: 1, pageSize: 20, total: 0 }, detailKeys: ['id', 'occurred_at', 'provider', 'data_domain', 'operation', 'call_source', 'subject_summary', 'fallback_index', 'retry_count', 'duration_ms', 'result', 'http_status', 'error_summary', 'request_id'] }
   },
   computed: {
     columns () {
