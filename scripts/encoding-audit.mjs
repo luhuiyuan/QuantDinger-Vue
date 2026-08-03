@@ -184,6 +184,14 @@ function localeKeys(filePath) {
   return new Set(Object.keys(locale))
 }
 
+function isMultiLocaleExtension(source) {
+  return (
+    !source.includes('const locale =') &&
+    /export default\s*\{/.test(source) &&
+    /['"]en-US['"]\s*:/.test(source)
+  )
+}
+
 const failures = []
 const files = scanRoots.flatMap((entry) => walk(entry)).sort()
 
@@ -210,6 +218,8 @@ const localeFiles = readdirSync(langDir)
   .map((name) => join(langDir, name))
   .sort()
 
+const localeCatalogFiles = []
+
 for (const filePath of localeFiles) {
   try {
     checkLocaleSyntax(filePath)
@@ -229,6 +239,8 @@ for (const filePath of localeFiles) {
   } catch {
     continue
   }
+  if (isMultiLocaleExtension(text)) continue
+  localeCatalogFiles.push(filePath)
   let keys = new Set()
   try {
     keys = localeKeys(filePath)
@@ -256,5 +268,8 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-console.log(`Encoding audit passed: ${files.length} text files, ${localeFiles.length} locale files.`)
+console.log(
+  `Encoding audit passed: ${files.length} text files, ` +
+  `${localeCatalogFiles.length} locale catalogs, ${localeFiles.length} locale modules checked.`
+)
 console.table(localeCoverage)
