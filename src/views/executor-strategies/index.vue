@@ -148,21 +148,6 @@
               :description="t('trading-assistant.noCredentialForLive.desc')" />
           </div>
 
-          <div class="section-title">{{ t('executorStrategies.section.capitalRisk') }}</div>
-          <div class="field-grid">
-            <div class="field-block">
-              <label>{{ t('executorStrategies.initialCapital') }}</label>
-              <a-input-number
-                v-model="form.initial_capital"
-                :min="10"
-                :max="1000000"
-                :step="100"
-                :precision="2"
-                style="width: 100%" />
-              <small class="field-hint">{{ t('executorStrategies.initialCapitalHint') }}</small>
-            </div>
-          </div>
-
           <div v-if="supportsTrailingTakeProfit" class="risk-scope-label">
             {{ t('executorStrategies.cycleRiskTitle') }}
             <small>{{ t('executorStrategies.cycleRiskHint') }}</small>
@@ -1241,6 +1226,7 @@ export default {
         templateConfig.market_type = 'spot'
         templateConfig.timeframe = '1H'
       }
+      delete templateConfig.initial_capital
       delete templateConfig.leverage
       return {
         ...templateConfig,
