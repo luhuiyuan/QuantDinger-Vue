@@ -767,8 +767,12 @@ export default {
       return this.navTheme === 'dark' || this.navTheme === 'realdark'
     },
     sortedSchema () {
+      const sourceSchema = Object.fromEntries(Object.entries(this.schema).map(([key, group]) => {
+        if (!['data_source', 'search'].includes(key)) return [key, group]
+        return [key, { ...group, items: (group.items || []).filter(item => this.isSharedDataSourceTransport(item)) }]
+      }))
       const entries = Object.entries({
-        ...this.schema,
+        ...sourceSchema,
         market_catalog: {
           title: this.$t('settings.group.market_catalog'),
           icon: 'database',
@@ -1122,6 +1126,12 @@ export default {
       return key.startsWith('SEARCH_') ||
         key === 'TAVILY_API_KEYS' ||
         key === 'SERPAPI_KEYS'
+    },
+    isSharedDataSourceTransport (item) {
+      const key = String(item && item.key ? item.key : '').toUpperCase()
+      if (!key || item.type === 'password') return false
+      if (/(^|_)(API_KEY|API_KEYS|KEY|SECRET|TOKEN|CLIENT|CLIENT_ID|CX)(_|$)/.test(key)) return false
+      return /(_BASE_URL|_TIMEOUT|_MAX_RESULTS|_ENGINES|_CATEGORIES|_LANGUAGE|_NEWS_LIMIT)$/.test(key)
     },
     isAutofillSensitiveSetting (item) {
       const key = String(item && item.key ? item.key : '').toUpperCase()

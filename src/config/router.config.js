@@ -154,6 +154,12 @@ export const asyncRouterMap = [
         meta: { title: 'externalRequestLogs.title', keepAlive: false, icon: 'file-search', permission: ['admin'] }
       },
       {
+        path: '/data-source-operations',
+        name: 'DataSourceOperations',
+        component: () => import('@/views/data-source-operations'),
+        meta: { title: 'menu.dataSourceOperations', keepAlive: false, icon: 'deployment-unit', permission: ['data_sources:view'] }
+      },
+      {
         path: '/task-management',
         name: 'TaskManagement',
         component: () => import('@/views/task-management'),

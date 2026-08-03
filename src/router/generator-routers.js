@@ -10,7 +10,7 @@ import { USER_INFO, USER_ROLES } from '@/store/mutation-types'
  * @param {boolean} isAdmin - Whether current user is admin
  * @returns {Array} Filtered routes
  */
-function filterRoutesByPermission (routes, isAdmin) {
+function filterRoutesByPermission (routes, isAdmin, grantedPermissions = new Set()) {
   const filtered = []
 
   for (const route of routes) {
@@ -20,21 +20,34 @@ function filterRoutesByPermission (routes, isAdmin) {
     // Check if route requires admin permission
     const permissions = clonedRoute.meta?.permission || []
     const requiresAdmin = permissions.includes('admin')
+    const requiresPermission = permissions.filter(permission => permission !== 'admin')
 
     // If requires admin but user is not admin, skip this route
     if (requiresAdmin && !isAdmin) {
       continue
     }
+    if (!requiresAdmin && requiresPermission.length > 0 && !requiresPermission.some(permission => grantedPermissions.has(permission))) {
+      continue
+    }
 
     // Recursively filter children
     if (clonedRoute.children && clonedRoute.children.length > 0) {
-      clonedRoute.children = filterRoutesByPermission(clonedRoute.children, isAdmin)
+      clonedRoute.children = filterRoutesByPermission(clonedRoute.children, isAdmin, grantedPermissions)
     }
 
     filtered.push(clonedRoute)
   }
 
   return filtered
+}
+
+function getGrantedPermissions () {
+  const roles = storage.get(USER_ROLES) || []
+  const granted = new Set()
+  for (const role of (Array.isArray(roles) ? roles : [roles])) {
+    for (const permission of ((role && role.permissionList) || [])) granted.add(permission)
+  }
+  return granted
 }
 
 /**
@@ -76,9 +89,10 @@ function checkIsAdmin () {
 export const generatorDynamicRouter = token => {
   return new Promise((resolve) => {
     const isAdmin = checkIsAdmin()
+    const grantedPermissions = getGrantedPermissions()
 
     // Filter routes based on permissions
-    const filteredRoutes = filterRoutesByPermission(asyncRouterMap, isAdmin)
+    const filteredRoutes = filterRoutesByPermission(asyncRouterMap, isAdmin, grantedPermissions)
 
     resolve(filteredRoutes)
   })

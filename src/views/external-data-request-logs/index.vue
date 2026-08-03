@@ -19,16 +19,25 @@
           </a-select>
           <a-input v-model="filters.data_domain" placeholder="Data domain" allow-clear @pressEnter="reload" />
           <a-input v-model="filters.request_id" placeholder="Request ID" allow-clear @pressEnter="reload" />
+          <a-input v-model="filters.routed_request_id" placeholder="Routed ID" allow-clear @pressEnter="reload" />
           <a-select v-model="filters.result" allow-clear placeholder="Result" style="width: 160px">
             <a-select-option v-for="value in results" :key="value" :value="value">{{ value }}</a-select-option>
           </a-select>
           <a-button type="primary" @click="reload"><a-icon type="search" /> Filter</a-button>
         </div>
-        <a-table :columns="columns" :data-source="items" :loading="loading" :row-key="row => row.id" :pagination="pagination" @change="onTableChange">
+        <a-table
+          :columns="columns"
+          :data-source="items"
+          :loading="loading"
+          :row-key="row => row.id"
+          :pagination="pagination"
+          @change="onTableChange"
+        >
           <template slot="result" slot-scope="value"><a-tag :color="value === 'success' ? 'green' : 'red'">{{ value }}</a-tag></template>
           <template slot="duration" slot-scope="value">{{ value }} ms</template>
           <template slot="logId" slot-scope="value">#{{ value }}</template>
           <template slot="callingFeature" slot-scope="value">{{ formatCallingFeature(value) }}</template>
+          <template slot="routedId" slot-scope="value"><router-link v-if="value" :to="{ path: '/data-source-operations', query: { routed_request_id: value } }">{{ value }}</router-link><span v-else>-</span></template>
           <template slot="action" slot-scope="_, row"><a-button type="link" size="small" @click="showDetail(row)">Details</a-button></template>
         </a-table>
       </a-card>
@@ -47,7 +56,7 @@ import { getExternalDataRequestLog, getExternalDataRequestOverview, listExternal
 export default {
   name: 'ExternalDataRequestLogs',
   data () {
-    return { loading: false, capabilityUnavailable: false, overview: null, items: [], detail: null, filters: { provider: '', data_domain: '', result: '', request_id: this.$route.query.request_id || '' }, providers: ['eastmoney', 'tencent', 'akshare_wallstreetcn', 'finnhub', 'fred', 'tradingeconomics', 'yfinance', 'bybit', 'binance', 'gate', 'okx', 'bitget', 'htx'], results: ['success', 'timeout', 'rate_limited', 'provider_error', 'network_error', 'invalid_response', 'disabled', 'skipped'], pagination: { current: 1, pageSize: 20, total: 0 }, detailKeys: ['id', 'occurred_at', 'provider', 'data_domain', 'operation', 'call_source', 'subject_summary', 'fallback_index', 'retry_count', 'duration_ms', 'result', 'http_status', 'error_summary', 'request_id'] }
+    return { loading: false, capabilityUnavailable: false, overview: null, items: [], detail: null, filters: { provider: '', data_domain: '', result: '', request_id: this.$route.query.request_id || '', routed_request_id: this.$route.query.routed_request_id || '' }, providers: ['eastmoney', 'tencent', 'akshare_wallstreetcn', 'finnhub', 'fred', 'tradingeconomics', 'yfinance', 'bybit', 'binance', 'gate', 'okx', 'bitget', 'htx'], results: ['success', 'timeout', 'rate_limited', 'provider_error', 'network_error', 'invalid_response', 'disabled', 'skipped'], pagination: { current: 1, pageSize: 20, total: 0 }, detailKeys: ['id', 'routed_request_id', 'provider_instance_id', 'policy_revision_id', 'attempt_order', 'occurred_at', 'provider', 'data_domain', 'operation', 'call_source', 'subject_summary', 'fallback_index', 'retry_count', 'duration_ms', 'result', 'skip_reason', 'quality_outcome', 'http_status', 'error_summary', 'request_id'] }
   },
   computed: {
     columns () {
@@ -59,6 +68,7 @@ export default {
         { title: this.$t('externalRequestLogs.operation'), dataIndex: 'operation' },
         { title: this.$t('externalRequestLogs.callingFeature'), dataIndex: 'call_source', scopedSlots: { customRender: 'callingFeature' } },
         { title: this.$t('externalRequestLogs.requestId'), dataIndex: 'request_id' },
+        { title: 'Routed ID', dataIndex: 'routed_request_id', scopedSlots: { customRender: 'routedId' } },
         { title: this.$t('externalRequestLogs.result'), dataIndex: 'result', scopedSlots: { customRender: 'result' } },
         { title: this.$t('externalRequestLogs.duration'), dataIndex: 'duration_ms', scopedSlots: { customRender: 'duration' } },
         { title: '', scopedSlots: { customRender: 'action' } }
