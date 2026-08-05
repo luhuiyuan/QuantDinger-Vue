@@ -20,7 +20,7 @@ const app = {
   state: {
     sideCollapsed: false,
     isMobile: false,
-    theme: storage.get(TOGGLE_NAV_THEME, 'realdark'), // 从 localStorage 读取主题，默认 'realdark'
+    theme: storage.get(TOGGLE_NAV_THEME, 'light'), // 从 localStorage 读取主题，默认亮色菜单
     layout: '',
     contentWidth: '',
     fixedHeader: false,
@@ -29,7 +29,7 @@ const app = {
     color: storage.get(TOGGLE_COLOR, '#52C41A'), // 从 localStorage 读取主题色，默认 '#52C41A'
     weak: false,
     multiTab: true,
-    lang: 'en-US',
+    lang: 'zh-CN',
     _antLocale: {}
   },
   mutations: {

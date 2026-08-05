@@ -4,7 +4,7 @@
       <div>
         <h2><a-icon type="deployment-unit" /> {{ $t('dataSources.title') }}</h2>
         <div class="status-line">
-          <a-badge :status="ready ? 'success' : 'error'" :text="ready ? 'Ready' : 'Not ready'" />
+          <a-badge :status="ready ? 'success' : 'error'" :text="ready ? $t('dataSources.ready') : $t('dataSources.notReadyStatus')" />
           <span v-if="lastUpdated">{{ formatTime(lastUpdated) }}</span>
         </div>
       </div>
@@ -34,43 +34,43 @@
           </section>
           <section class="overview-grid">
             <div>
-              <h3>Routing outcomes · 24h</h3>
+              <h3>{{ $t('dataSources.routingOutcomes24h') }}</h3>
               <a-list size="small" bordered :data-source="routingOutcomes">
-                <a-list-item slot="renderItem" slot-scope="item"><span>{{ item.key }}</span><strong>{{ item.value }}</strong></a-list-item>
+                <a-list-item slot="renderItem" slot-scope="item"><span>{{ item.label }}</span><strong>{{ item.value }}</strong></a-list-item>
               </a-list>
             </div>
             <div>
-              <h3>Pending operations</h3>
+              <h3>{{ $t('dataSources.pendingOperations') }}</h3>
               <a-descriptions bordered size="small" :column="1">
-                <a-descriptions-item label="Pending credentials">{{ overview.pending_credentials || 0 }}</a-descriptions-item>
-                <a-descriptions-item label="Capability issues">{{ overview.capability_issues || 0 }}</a-descriptions-item>
-                <a-descriptions-item label="Quarantined">{{ overview.quarantined || 0 }}</a-descriptions-item>
-                <a-descriptions-item label="Disabled policies">{{ overview.disabled_policies || 0 }}</a-descriptions-item>
+                <a-descriptions-item :label="$t('dataSources.pendingCredentials')">{{ overview.pending_credentials || 0 }}</a-descriptions-item>
+                <a-descriptions-item :label="$t('dataSources.capabilityIssues')">{{ overview.capability_issues || 0 }}</a-descriptions-item>
+                <a-descriptions-item :label="$t('dataSources.quarantined')">{{ overview.quarantined || 0 }}</a-descriptions-item>
+                <a-descriptions-item :label="$t('dataSources.disabledPolicies')">{{ overview.disabled_policies || 0 }}</a-descriptions-item>
               </a-descriptions>
             </div>
           </section>
           <section class="overview-grid secondary-overview">
             <div>
-              <h3>Active incidents</h3>
+              <h3>{{ $t('dataSources.activeIncidents') }}</h3>
               <a-table size="small" :data-source="overview.active_incidents || []" :row-key="row => row.state_id" :pagination="false">
-                <a-table-column title="Instance" data-index="instance_id" />
-                <a-table-column title="Capability" data-index="capability_key" />
-                <a-table-column title="Health" data-index="health_status" />
-                <a-table-column title="Circuit" data-index="circuit_state" />
+                <a-table-column :title="$t('dataSources.instance')" data-index="instance_id" />
+                <a-table-column :title="$t('dataSources.capability')" :custom-render="capabilityLabel" />
+                <a-table-column :title="$t('dataSources.health')" :custom-render="value => statusLabel(value)" />
+                <a-table-column :title="$t('dataSources.circuit')" :custom-render="value => statusLabel(value)" />
               </a-table>
             </div>
             <div>
-              <h3>Quota pressure</h3>
+              <h3>{{ $t('dataSources.quotaPressure') }}</h3>
               <a-table size="small" :data-source="overview.quota_pressure || []" :row-key="row => `${row.instance_id}:${row.bucket_key}`" :pagination="false">
-                <a-table-column title="Instance" data-index="instance_id" />
-                <a-table-column title="Bucket" data-index="bucket_key" />
-                <a-table-column title="Used + held" :custom-render="(_, row) => Number(row.consumed || 0) + Number(row.reserved || 0)" />
-                <a-table-column title="Limit" data-index="effective_limit" />
+                <a-table-column :title="$t('dataSources.instance')" data-index="instance_id" />
+                <a-table-column :title="$t('dataSources.bucket')" :custom-render="bucketLabel" />
+                <a-table-column :title="$t('dataSources.usedAndHeld')" :custom-render="(_, row) => Number(row.consumed || 0) + Number(row.reserved || 0)" />
+                <a-table-column :title="$t('dataSources.limit')" data-index="effective_limit" />
               </a-table>
             </div>
           </section>
           <section class="fallback-band">
-            <h3>Fallback trend · 24h</h3>
+            <h3>{{ $t('dataSources.fallbackTrend24h') }}</h3>
             <div class="trend-strip">
               <div v-for="bucket in (overview.fallback_trend_24h || [])" :key="bucket.bucket" class="trend-cell" :title="formatTime(bucket.bucket)">
                 <span :style="{ height: `${Math.max(3, Math.min(48, Number(bucket.fallback_attempts || 0) * 4))}px` }" />
@@ -82,11 +82,11 @@
           <section class="fallback-band">
             <h3>{{ $t('dataSources.legacyImports') }}</h3>
             <a-table size="small" :data-source="legacyImports" row-key="adapter_key" :pagination="false">
-              <a-table-column title="Adapter" data-index="adapter_key" />
-              <a-table-column title="Detected" :custom-render="(_, row) => row.detected ? 'Yes' : 'No'" />
-              <a-table-column title="Source" :custom-render="(_, row) => (row.source_names || []).join(', ') || '-'" />
-              <a-table-column title="Status" data-index="import_status" />
-              <a-table-column title="Instance" data-index="instance_id" />
+                <a-table-column :title="$t('dataSources.adapter')" :custom-render="(_, row) => adapterLabel(row.adapter_key)" />
+              <a-table-column :title="$t('dataSources.detected')" :custom-render="(_, row) => row.detected ? $t('dataSources.yes') : $t('dataSources.no')" />
+              <a-table-column :title="$t('dataSources.source')" :custom-render="(_, row) => (row.source_names || []).join(', ') || '-'" />
+                <a-table-column :title="$t('dataSources.status')" :custom-render="value => statusLabel(value)" />
+              <a-table-column :title="$t('dataSources.instance')" data-index="instance_id" />
               <a-table-column title="" :custom-render="(_, row) => can('data_sources:credentials') && row.detected && row.import_status !== 'imported' ? $createElement('a-button', { props: { type: 'link', size: 'small' }, on: { click: () => openLegacyImport(row) } }, [$t('dataSources.import')]) : null" />
             </a-table>
           </section>
@@ -94,7 +94,7 @@
 
         <a-tab-pane key="instances" :tab="$t('dataSources.instances')">
           <div class="table-toolbar">
-            <a-input-search v-model="instanceSearch" placeholder="Instance / Adapter" allow-clear />
+            <a-input-search v-model="instanceSearch" :placeholder="$t('dataSources.instanceSearch')" allow-clear />
             <a-button v-if="can('data_sources:instances')" type="primary" @click="openCreate"><a-icon type="plus" /> {{ $t('dataSources.createInstance') }}</a-button>
           </div>
           <a-table
@@ -105,88 +105,89 @@
             :pagination="instancePagination"
             @change="onInstancePage"
           >
-            <template slot="status" slot-scope="value"><a-tag :color="statusColor(value)">{{ value }}</a-tag></template>
+            <template slot="status" slot-scope="value"><a-tag :color="statusColor(value)">{{ statusLabel(value) }}</a-tag></template>
             <template slot="credential" slot-scope="value"><a-icon :type="value ? 'check-circle' : 'minus-circle'" :class="value ? 'ok' : 'muted'" /></template>
-            <template slot="actions" slot-scope="_, row"><a-button type="link" size="small" @click="openInstance(row.id)"><a-icon type="eye" /> Details</a-button></template>
+            <template slot="actions" slot-scope="_, row"><a-button type="link" size="small" @click="openInstance(row.id)"><a-icon type="eye" /> {{ $t('dataSources.details') }}</a-button></template>
           </a-table>
         </a-tab-pane>
 
         <a-tab-pane key="policies" :tab="$t('dataSources.policies')">
           <a-table :columns="policyColumns" :data-source="policies" :loading="loading" row-key="capability_key" :pagination="false">
-            <template slot="enabled" slot-scope="value"><a-badge :status="value ? 'success' : 'default'" :text="value ? 'Enabled' : 'Disabled'" /></template>
-            <template slot="route" slot-scope="entries"><span v-if="entries && entries.length">{{ entries.map(item => item.display_name).join(' → ') }}</span><span v-else class="muted">No active route</span></template>
-            <template slot="actions" slot-scope="_, row"><a-button type="link" size="small" @click="openPolicy(row)"><a-icon type="ordered-list" /> Manage</a-button></template>
+            <template slot="enabled" slot-scope="value"><a-badge :status="value ? 'success' : 'default'" :text="value ? $t('dataSources.enabled') : $t('dataSources.disabled')" /></template>
+            <template slot="route" slot-scope="entries"><span v-if="entries && entries.length">{{ entries.map(item => item.display_name).join(' → ') }}</span><span v-else class="muted">{{ $t('dataSources.noActiveRoute') }}</span></template>
+            <template slot="actions" slot-scope="_, row"><a-button type="link" size="small" @click="openPolicy(row)"><a-icon type="ordered-list" /> {{ $t('dataSources.manage') }}</a-button></template>
           </a-table>
         </a-tab-pane>
       </a-tabs>
     </template>
 
-    <a-drawer title="Provider Instance" :visible="!!selectedInstance" width="720" @close="selectedInstance = null">
+    <a-drawer :title="$t('dataSources.providerInstance')" :visible="!!selectedInstance" width="720" @close="selectedInstance = null">
       <template v-if="selectedInstance">
         <div class="drawer-actions">
           <a-button v-if="can('data_sources:credentials')" @click="openCredentials"><a-icon type="key" /> {{ $t('dataSources.credentials') }}</a-button>
-          <a-button v-if="can('data_sources:instances') && ['draft', 'validation_failed'].includes(selectedInstance.lifecycle_status)" @click="openAction('activate')"><a-icon type="check" /> Activate</a-button>
-          <a-button v-if="can('data_sources:instances') && selectedInstance.lifecycle_status === 'active'" @click="openAction('disable')"><a-icon type="stop" /> Disable</a-button>
-          <a-button v-if="can('data_sources:instances') && selectedInstance.lifecycle_status === 'disabled'" danger @click="openAction('retire')"><a-icon type="delete" /> Retire</a-button>
+          <a-button v-if="can('data_sources:instances') && ['draft', 'validation_failed'].includes(selectedInstance.lifecycle_status)" @click="openAction('activate')"><a-icon type="check" /> {{ $t('dataSources.activate') }}</a-button>
+          <a-button v-if="can('data_sources:instances') && selectedInstance.lifecycle_status === 'active'" @click="openAction('disable')"><a-icon type="stop" /> {{ $t('dataSources.disable') }}</a-button>
+          <a-button v-if="can('data_sources:instances') && selectedInstance.lifecycle_status === 'disabled'" danger @click="openAction('retire')"><a-icon type="delete" /> {{ $t('dataSources.retire') }}</a-button>
         </div>
-        <a-alert v-if="(selectedInstance.retirement_blockers || []).length" type="warning" show-icon message="Retirement blocked by active routing policies" :description="selectedInstance.retirement_blockers.map(item => item.capability_key).join(', ')" />
+        <a-alert v-if="(selectedInstance.retirement_blockers || []).length" type="warning" show-icon :message="$t('dataSources.retirementBlocked')" :description="selectedInstance.retirement_blockers.map(item => capabilityLabel(item.capability_key)).join(', ')" />
         <a-descriptions bordered size="small" :column="2">
-          <a-descriptions-item label="Name">{{ selectedInstance.display_name }}</a-descriptions-item>
-          <a-descriptions-item label="Status"><a-tag :color="statusColor(selectedInstance.lifecycle_status)">{{ selectedInstance.lifecycle_status }}</a-tag></a-descriptions-item>
-          <a-descriptions-item label="Adapter">{{ selectedInstance.adapter_key }}</a-descriptions-item>
-          <a-descriptions-item label="Account">{{ selectedInstance.provider_account_identity || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="Credential">{{ selectedInstance.credential && selectedInstance.credential.configured ? `Configured · key ${selectedInstance.credential.encryption_key_id}` : 'Not configured' }}</a-descriptions-item>
-          <a-descriptions-item label="Config version">{{ selectedInstance.config_version }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.name')">{{ instanceName(selectedInstance) }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.status')"><a-tag :color="statusColor(selectedInstance.lifecycle_status)">{{ statusLabel(selectedInstance.lifecycle_status) }}</a-tag></a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.adapter')">{{ adapterLabel(selectedInstance.adapter_key) }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.account')">{{ selectedInstance.provider_account_identity || '-' }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.credential')">{{ selectedInstance.credential && selectedInstance.credential.configured ? `${this.$t('dataSources.configured')} · ${this.$t('dataSources.key')} ${selectedInstance.credential.encryption_key_id}` : $t('dataSources.notConfigured') }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.configVersion')">{{ selectedInstance.config_version }}</a-descriptions-item>
         </a-descriptions>
-        <h3 class="section-title">Capabilities</h3>
+        <h3 class="section-title">{{ $t('dataSources.capabilities') }}</h3>
         <a-table size="small" :columns="capabilityColumns" :data-source="selectedInstance.capabilities || []" row-key="capability_key" :pagination="false">
-          <template slot="eligibility" slot-scope="value"><a-tag :color="statusColor(value)">{{ value }}</a-tag></template>
+          <template slot="eligibility" slot-scope="value"><a-tag :color="statusColor(value)">{{ statusLabel(value) }}</a-tag></template>
+          <template slot="verification" slot-scope="value"><span>{{ formatVerificationEvidence(value) }}</span></template>
           <template slot="capActions" slot-scope="_, row"><a-button v-if="can('data_sources:diagnostics')" type="link" size="small" @click="runDiagnostic(row.capability_key)"><a-icon type="experiment" /> Test</a-button></template>
         </a-table>
-        <h3 class="section-title">Health & circuits</h3>
+        <h3 class="section-title">{{ $t('dataSources.healthAndCircuits') }}</h3>
         <a-table size="small" :columns="healthColumns" :data-source="selectedInstance.health || []" :row-key="row => row.state_id" :pagination="false">
-          <template slot="health" slot-scope="value"><a-tag :color="statusColor(value)">{{ value }}</a-tag></template>
+          <template slot="health" slot-scope="value"><a-tag :color="statusColor(value)">{{ statusLabel(value) }}</a-tag></template>
           <template slot="healthActions" slot-scope="_, row">
             <a-dropdown v-if="can('data_sources:diagnostics')">
-              <a-button type="link" size="small">Actions <a-icon type="down" /></a-button>
+              <a-button type="link" size="small">{{ $t('dataSources.actions') }} <a-icon type="down" /></a-button>
               <a-menu slot="overlay" @click="event => openHealthAction(event.key, row)">
-                <a-menu-item key="quarantine">Quarantine</a-menu-item>
-                <a-menu-item key="extend-circuit">Extend circuit</a-menu-item>
-                <a-menu-item key="recovery-probe">Recovery probe</a-menu-item>
+                <a-menu-item key="quarantine">{{ $t('dataSources.quarantine') }}</a-menu-item>
+                <a-menu-item key="extend-circuit">{{ $t('dataSources.extendCircuit') }}</a-menu-item>
+                <a-menu-item key="recovery-probe">{{ $t('dataSources.recoveryProbe') }}</a-menu-item>
               </a-menu>
             </a-dropdown>
           </template>
         </a-table>
-        <h3 class="section-title">Quota</h3>
+        <h3 class="section-title">{{ $t('dataSources.quota') }}</h3>
         <a-table size="small" :columns="quotaColumns" :data-source="selectedInstance.quota || []" :row-key="row => `${row.capability_key || 'instance'}:${row.bucket_key}`" :pagination="false" />
-        <h3 class="section-title">Recent health evidence</h3>
+        <h3 class="section-title">{{ $t('dataSources.recentHealthEvidence') }}</h3>
         <a-table size="small" :data-source="selectedInstance.health_evidence || []" :row-key="row => `${row.health_state_id}:${row.occurred_at}:${row.evidence_kind}`" :pagination="false">
-          <a-table-column title="Time" data-index="occurred_at" />
-          <a-table-column title="Capability" data-index="capability_key" />
-          <a-table-column title="Evidence" data-index="evidence_kind" />
-          <a-table-column title="Scope" data-index="permanence" />
-          <a-table-column title="Summary" data-index="sanitized_summary" />
+          <a-table-column :title="$t('dataSources.time')" data-index="occurred_at" />
+          <a-table-column :title="$t('dataSources.capability')" :custom-render="capabilityLabel" />
+          <a-table-column :title="$t('dataSources.evidence')" data-index="evidence_kind" />
+          <a-table-column :title="$t('dataSources.scope')" data-index="permanence" />
+          <a-table-column :title="$t('dataSources.summary')" data-index="sanitized_summary" />
         </a-table>
       </template>
     </a-drawer>
 
-    <a-drawer title="Routing Policy" :visible="!!selectedPolicy" width="680" @close="selectedPolicy = null">
+    <a-drawer :title="$t('dataSources.routingPolicy')" :visible="!!selectedPolicy" width="680" @close="selectedPolicy = null">
       <template v-if="selectedPolicy">
         <a-descriptions bordered size="small" :column="2">
-          <a-descriptions-item label="Capability">{{ selectedPolicy.capability_key }}</a-descriptions-item>
-          <a-descriptions-item label="Version">{{ selectedPolicy.policy_version }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.capability')">{{ capabilityLabel(selectedPolicy.capability_key) }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.version')">{{ selectedPolicy.policy_version }}</a-descriptions-item>
         </a-descriptions>
         <div class="policy-editor">
           <div v-for="(entry, index) in policyEntries" :key="`${entry.instance_id}:${index}`" class="policy-entry">
             <span class="policy-rank">{{ index + 1 }}</span>
             <a-select v-model="entry.instance_id" show-search option-filter-prop="children">
-              <a-select-option v-for="item in eligibleInstances" :key="item.id" :value="item.id">{{ item.display_name }} · {{ item.adapter_key }}</a-select-option>
+              <a-select-option v-for="item in eligibleInstancesForPolicy" :key="item.id" :value="item.id">{{ item.display_name }} · {{ adapterLabel(item.adapter_key) }}</a-select-option>
             </a-select>
-            <a-button icon="arrow-up" :disabled="index === 0" title="Move up" @click="movePolicyEntry(index, -1)" />
-            <a-button icon="arrow-down" :disabled="index === policyEntries.length - 1" title="Move down" @click="movePolicyEntry(index, 1)" />
-            <a-button icon="delete" title="Remove" @click="policyEntries.splice(index, 1)" />
+            <a-button icon="arrow-up" :disabled="index === 0" :title="$t('dataSources.moveUp')" @click="movePolicyEntry(index, -1)" />
+            <a-button icon="arrow-down" :disabled="index === policyEntries.length - 1" :title="$t('dataSources.moveDown')" @click="movePolicyEntry(index, 1)" />
+            <a-button icon="delete" :title="$t('dataSources.remove')" @click="policyEntries.splice(index, 1)" />
           </div>
-          <a-button block type="dashed" @click="policyEntries.push({ instance_id: null })"><a-icon type="plus" /> Add fallback</a-button>
+          <a-button block type="dashed" @click="policyEntries.push({ instance_id: null })"><a-icon type="plus" /> {{ $t('dataSources.addFallback') }}</a-button>
         </div>
         <a-alert v-if="policyPreview" type="info" show-icon :message="policyPreviewSummary" />
         <div class="drawer-actions policy-actions">
@@ -196,61 +197,61 @@
           <a-button v-if="can('data_sources:routing')" @click="openAction('disable-policy')"><a-icon type="stop" /> {{ $t('dataSources.disable') }}</a-button>
           <a-button v-if="can('data_sources:routing')" @click="openAction('restore-policy')"><a-icon type="history" /> {{ $t('dataSources.restore') }}</a-button>
         </div>
-        <h3 class="section-title">Revision history</h3>
+        <h3 class="section-title">{{ $t('dataSources.revisionHistory') }}</h3>
         <a-table size="small" :data-source="selectedPolicy.revisions || []" row-key="id" :pagination="false">
-          <a-table-column title="Revision" data-index="revision_number" />
-          <a-table-column title="Status" data-index="revision_status" />
-          <a-table-column title="Published" data-index="published_at" />
-          <a-table-column title="Route" :custom-render="(_, row) => (row.entries || []).map(item => item.display_name).join(' → ')" />
-          <a-table-column title="" :custom-render="(_, row) => can('data_sources:routing') ? $createElement('a-button', { props: { type: 'link', size: 'small' }, on: { click: () => openAction('restore-policy', row) } }, ['Restore']) : null" />
+          <a-table-column :title="$t('dataSources.revision')" data-index="revision_number" />
+          <a-table-column :title="$t('dataSources.status')" :custom-render="value => statusLabel(value)" />
+          <a-table-column :title="$t('dataSources.published')" data-index="published_at" />
+          <a-table-column :title="$t('dataSources.route')" :custom-render="(_, row) => (row.entries || []).map(item => item.display_name).join(' → ')" />
+          <a-table-column title="" :custom-render="(_, row) => can('data_sources:routing') ? $createElement('a-button', { props: { type: 'link', size: 'small' }, on: { click: () => openAction('restore-policy', row) } }, [$t('dataSources.restore')]) : null" />
         </a-table>
       </template>
     </a-drawer>
 
-    <a-drawer title="Routed Data Request" :visible="!!selectedRoutedRequest" width="720" @close="selectedRoutedRequest = null">
+    <a-drawer :title="$t('dataSources.routedDataRequest')" :visible="!!selectedRoutedRequest" width="720" @close="selectedRoutedRequest = null">
       <template v-if="selectedRoutedRequest">
         <a-descriptions bordered size="small" :column="1">
-          <a-descriptions-item label="Routed ID">{{ selectedRoutedRequest.routed_request_id }}</a-descriptions-item>
-          <a-descriptions-item label="Capability">{{ selectedRoutedRequest.capability_key }}</a-descriptions-item>
-          <a-descriptions-item label="Calling feature">{{ selectedRoutedRequest.calling_feature }}</a-descriptions-item>
-          <a-descriptions-item label="Outcome">{{ selectedRoutedRequest.final_outcome }}</a-descriptions-item>
-          <a-descriptions-item label="Policy revision">{{ selectedRoutedRequest.policy_revision_id }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.routedId')">{{ selectedRoutedRequest.routed_request_id }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.capability')">{{ capabilityLabel(selectedRoutedRequest.capability_key) }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.callingFeature')">{{ selectedRoutedRequest.calling_feature }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.outcome')">{{ selectedRoutedRequest.final_outcome }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.policyRevision')">{{ selectedRoutedRequest.policy_revision_id }}</a-descriptions-item>
         </a-descriptions>
-        <h3 class="section-title">Attempt chain</h3>
+        <h3 class="section-title">{{ $t('dataSources.attemptChain') }}</h3>
         <a-table size="small" :data-source="selectedRoutedRequest.attempts || []" :row-key="row => `${row.attempt_order}:${row.provider_instance_id || row.provider}`" :pagination="false">
           <a-table-column title="#" data-index="attempt_order" />
-          <a-table-column title="Provider" data-index="provider" />
-          <a-table-column title="Result" data-index="result" />
-          <a-table-column title="Skip reason" data-index="skip_reason" />
-          <a-table-column title="Quality" data-index="quality_outcome" />
+          <a-table-column :title="$t('dataSources.provider')" :custom-render="(_, row) => adapterLabel(row.provider)" />
+          <a-table-column :title="$t('dataSources.result')" :custom-render="value => statusLabel(value)" />
+          <a-table-column :title="$t('dataSources.skipReason')" data-index="skip_reason" />
+          <a-table-column :title="$t('dataSources.quality')" data-index="quality_outcome" />
         </a-table>
       </template>
     </a-drawer>
 
-    <a-modal title="New Provider Instance" :visible="createVisible" :confirm-loading="actionLoading" @ok="createInstance" @cancel="createVisible = false">
+    <a-modal :title="$t('dataSources.newProviderInstance')" :visible="createVisible" :confirm-loading="actionLoading" @ok="createInstance" @cancel="createVisible = false">
       <a-form layout="vertical">
-        <a-form-item label="Instance key"><a-input v-model="createForm.instanceKey" /></a-form-item>
-        <a-form-item label="Adapter key"><a-input v-model="createForm.adapterKey" /></a-form-item>
-        <a-form-item label="Display name"><a-input v-model="createForm.displayName" /></a-form-item>
-        <a-form-item label="Non-secret config (JSON)"><a-textarea v-model="createForm.config" :rows="4" /></a-form-item>
+        <a-form-item :label="$t('dataSources.instanceKey')"><a-input v-model="createForm.instanceKey" /></a-form-item>
+        <a-form-item :label="$t('dataSources.adapterKey')"><a-input v-model="createForm.adapterKey" /></a-form-item>
+        <a-form-item :label="$t('dataSources.displayName')"><a-input v-model="createForm.displayName" /></a-form-item>
+        <a-form-item :label="$t('dataSources.nonSecretConfig')"><a-textarea v-model="createForm.config" :rows="4" /></a-form-item>
       </a-form>
     </a-modal>
 
     <a-modal :title="actionTitle" :visible="actionVisible" :confirm-loading="actionLoading" @ok="submitAction" @cancel="actionVisible = false">
       <a-form layout="vertical">
         <a-form-item :label="$t('dataSources.reason')"><a-textarea v-model="actionForm.reason" :rows="3" /></a-form-item>
-        <a-form-item v-if="actionForm.kind === 'restore-policy'" label="Revision ID"><a-input-number v-model="actionForm.revisionId" :min="1" /></a-form-item>
-        <a-form-item v-if="actionForm.kind === 'extend-circuit'" label="Circuit open until"><a-date-picker v-model="actionForm.until" show-time /></a-form-item>
+        <a-form-item v-if="actionForm.kind === 'restore-policy'" :label="$t('dataSources.revisionId')"><a-input-number v-model="actionForm.revisionId" :min="1" /></a-form-item>
+        <a-form-item v-if="actionForm.kind === 'extend-circuit'" :label="$t('dataSources.circuitOpenUntil')"><a-date-picker v-model="actionForm.until" show-time /></a-form-item>
       </a-form>
     </a-modal>
 
     <a-modal :title="credentialForm.importAdapter ? $t('dataSources.legacyImport') : $t('dataSources.credentials')" :visible="credentialVisible" :confirm-loading="actionLoading" @ok="submitCredentials" @cancel="closeCredentials">
-      <a-alert type="warning" show-icon :message="credentialForm.importAdapter ? $t('dataSources.legacyImportWarning') : 'Credentials are write-only and will not be shown again.'" />
+      <a-alert type="warning" show-icon :message="credentialForm.importAdapter ? $t('dataSources.legacyImportWarning') : $t('dataSources.credentialsWriteOnly')" />
       <a-form layout="vertical">
-        <a-form-item v-if="!credentialForm.importAdapter" label="Credentials (JSON)"><a-textarea v-model="credentialForm.credentials" :rows="5" autocomplete="new-password" /></a-form-item>
+        <a-form-item v-if="!credentialForm.importAdapter" :label="$t('dataSources.credentialsJson')"><a-textarea v-model="credentialForm.credentials" :rows="5" autocomplete="new-password" /></a-form-item>
         <a-form-item :label="$t('dataSources.reason')"><a-input v-model="credentialForm.reason" /></a-form-item>
-        <a-form-item label="Password"><a-input-password v-model="credentialForm.password" autocomplete="current-password" /></a-form-item>
-        <a-form-item label="MFA code (instead of password)"><a-input v-model="credentialForm.mfaCode" /></a-form-item>
+        <a-form-item :label="$t('dataSources.password')"><a-input-password v-model="credentialForm.password" autocomplete="current-password" /></a-form-item>
+        <a-form-item :label="$t('dataSources.mfaCode')"><a-input v-model="credentialForm.mfaCode" /></a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -259,6 +260,7 @@
 <script>
 import moment from 'moment'
 import { Empty } from 'ant-design-vue'
+import { validateProviderInstanceDraft, validateRoutingPolicyEntries } from '@/utils/dataSourceOperationsValidation'
 import {
   createProviderInstance, extendProviderCircuit, getDataSourceOverview, getProviderInstance, getRoutedDataRequest,
   getRoutingPolicy, importLegacyCredential, issueDataSourceStepUp, listLegacyCredentialImports, listProviderInstances, listRoutingPolicies, previewRoutingPolicyDraft,
@@ -306,39 +308,40 @@ export default {
     readinessReason () { return (this.overview.readiness && (this.overview.readiness.reason || (this.overview.readiness.blockers || []).join(', '))) || '' },
     metrics () {
       return [
-        { key: 'instances', title: 'Provider instances', value: this.overview.instances || 0 },
-        { key: 'active', title: 'Active instances', value: this.overview.active_instances || 0 },
-        { key: 'circuits', title: 'Open circuits', value: this.overview.open_circuits || 0 },
-        { key: 'policies', title: 'Enabled policies', value: this.overview.enabled_policies || 0 }
+        { key: 'instances', title: this.$t('dataSources.metric.instances'), value: this.overview.instances || 0 },
+        { key: 'active', title: this.$t('dataSources.metric.active'), value: this.overview.active_instances || 0 },
+        { key: 'circuits', title: this.$t('dataSources.metric.circuits'), value: this.overview.open_circuits || 0 },
+        { key: 'policies', title: this.$t('dataSources.metric.policies'), value: this.overview.enabled_policies || 0 }
       ]
     },
-    routingOutcomes () { return Object.entries(this.overview.routing_outcomes_24h || {}).map(([key, value]) => ({ key, value })) },
+    routingOutcomes () { return Object.entries(this.overview.routing_outcomes_24h || {}).map(([key, value]) => ({ key, label: this.statusLabel(key), value })) },
     filteredInstances () {
       const needle = this.instanceSearch.trim().toLowerCase()
       if (!needle) return this.instances
       return this.instances.filter(item => `${item.display_name} ${item.instance_key} ${item.adapter_key}`.toLowerCase().includes(needle))
     },
     eligibleInstances () { return this.instances.filter(item => item.lifecycle_status === 'active') },
-    policyPreviewSummary () { return `Valid: ${this.policyPreview.valid ? 'yes' : 'no'} · ${JSON.stringify(this.policyPreview.changes || this.policyPreview)}` },
-    actionTitle () { return (this.actionForm.kind || 'Management action').replace(/-/g, ' ') },
+    eligibleInstancesForPolicy () { return this.eligibleInstances.filter(item => (item.capabilities || {})[this.selectedPolicy.capability_key] === 'eligible') },
+    policyPreviewSummary () { return `${this.$t('dataSources.valid')}: ${this.policyPreview.valid ? this.$t('dataSources.yes') : this.$t('dataSources.no')} · ${JSON.stringify(this.policyPreview.changes || this.policyPreview)}` },
+    actionTitle () { return this.$t(`dataSources.action.${this.actionForm.kind || 'management'}`) },
     instanceColumns () {
       return [
-        { title: 'Name', dataIndex: 'display_name' }, { title: 'Adapter', dataIndex: 'adapter_key' },
-        { title: 'Status', dataIndex: 'lifecycle_status', scopedSlots: { customRender: 'status' } },
-        { title: 'Credential', dataIndex: 'credential_configured', scopedSlots: { customRender: 'credential' } },
-        { title: 'Account', dataIndex: 'provider_account_identity' }, { title: '', scopedSlots: { customRender: 'actions' }, width: 100 }
+        { title: this.$t('dataSources.name'), dataIndex: 'display_name', customRender: (_, row) => this.instanceName(row) }, { title: this.$t('dataSources.adapter'), dataIndex: 'adapter_key', customRender: this.adapterLabel },
+        { title: this.$t('dataSources.status'), dataIndex: 'lifecycle_status', scopedSlots: { customRender: 'status' } },
+        { title: this.$t('dataSources.credential'), dataIndex: 'credential_configured', scopedSlots: { customRender: 'credential' } },
+        { title: this.$t('dataSources.account'), dataIndex: 'provider_account_identity' }, { title: '', scopedSlots: { customRender: 'actions' }, width: 100 }
       ]
     },
     policyColumns () {
       return [
-        { title: 'Capability', dataIndex: 'capability_key' }, { title: 'Status', dataIndex: 'enabled', scopedSlots: { customRender: 'enabled' } },
-        { title: 'Effective route', dataIndex: 'entries', scopedSlots: { customRender: 'route' } },
-        { title: 'Version', dataIndex: 'policy_version', width: 90 }, { title: '', scopedSlots: { customRender: 'actions' }, width: 110 }
+        { title: this.$t('dataSources.capability'), dataIndex: 'capability_key', customRender: this.capabilityLabel }, { title: this.$t('dataSources.status'), dataIndex: 'enabled', scopedSlots: { customRender: 'enabled' } },
+        { title: this.$t('dataSources.effectiveRoute'), dataIndex: 'entries', scopedSlots: { customRender: 'route' } },
+        { title: this.$t('dataSources.version'), dataIndex: 'policy_version', width: 90 }, { title: '', scopedSlots: { customRender: 'actions' }, width: 110 }
       ]
     },
-    capabilityColumns () { return [{ title: 'Capability', dataIndex: 'capability_key' }, { title: 'Eligibility', dataIndex: 'eligibility_status', scopedSlots: { customRender: 'eligibility' } }, { title: 'Last verified', dataIndex: 'last_verified_at' }, { title: '', scopedSlots: { customRender: 'capActions' } }] },
-    healthColumns () { return [{ title: 'Capability', dataIndex: 'capability_key', customRender: value => value || 'Instance' }, { title: 'Health', dataIndex: 'health_status', scopedSlots: { customRender: 'health' } }, { title: 'Circuit', dataIndex: 'circuit_state' }, { title: 'Reason', dataIndex: 'circuit_reason' }, { title: '', scopedSlots: { customRender: 'healthActions' }, width: 100 }] },
-    quotaColumns () { return [{ title: 'Capability', dataIndex: 'capability_key' }, { title: 'Bucket', dataIndex: 'bucket_key' }, { title: 'Consumed', dataIndex: 'consumed' }, { title: 'Reserved', dataIndex: 'reserved' }, { title: 'Limit', dataIndex: 'configured_limit' }, { title: 'Reset', dataIndex: 'reset_at' }] }
+    capabilityColumns () { return [{ title: this.$t('dataSources.capability'), dataIndex: 'capability_key', customRender: this.capabilityLabel }, { title: this.$t('dataSources.eligibility'), dataIndex: 'eligibility_status', scopedSlots: { customRender: 'eligibility' } }, { title: this.$t('dataSources.verification'), dataIndex: 'verification_evidence', scopedSlots: { customRender: 'verification' } }, { title: this.$t('dataSources.lastVerified'), dataIndex: 'last_verified_at' }, { title: '', scopedSlots: { customRender: 'capActions' } }] },
+    healthColumns () { return [{ title: this.$t('dataSources.capability'), dataIndex: 'capability_key', customRender: value => value ? this.capabilityLabel(value) : this.$t('dataSources.instance') }, { title: this.$t('dataSources.health'), dataIndex: 'health_status', scopedSlots: { customRender: 'health' } }, { title: this.$t('dataSources.circuit'), dataIndex: 'circuit_state', customRender: value => this.statusLabel(value) }, { title: this.$t('dataSources.reason'), dataIndex: 'circuit_reason' }, { title: '', scopedSlots: { customRender: 'healthActions' }, width: 100 }] },
+    quotaColumns () { return [{ title: this.$t('dataSources.capability'), dataIndex: 'capability_key', customRender: this.capabilityLabel }, { title: this.$t('dataSources.bucket'), dataIndex: 'bucket_key', customRender: this.bucketLabel }, { title: this.$t('dataSources.consumed'), dataIndex: 'consumed' }, { title: this.$t('dataSources.reserved'), dataIndex: 'reserved' }, { title: this.$t('dataSources.limit'), dataIndex: 'configured_limit' }, { title: this.$t('dataSources.reset'), dataIndex: 'reset_at' }] }
   },
   watch: {
     activeTab (tab) { this.$router.replace({ query: { ...this.$route.query, tab } }).catch(() => {}) }
@@ -350,9 +353,38 @@ export default {
   },
   beforeDestroy () { window.clearInterval(this.pollTimer) },
   methods: {
+    localizedLabel (prefix, value) {
+      const raw = String(value || '')
+      const key = `dataSources.${prefix}.${raw}`
+      return raw && this.$te && this.$te(key) ? this.$t(key) : (raw || '-')
+    },
+    capabilityLabel (capabilityKey) {
+      const key = `dataSources.capabilityName.${String(capabilityKey || '')}`
+      return capabilityKey && this.$te && this.$te(key) ? this.$t(key) : (capabilityKey || '-')
+    },
+    adapterLabel (adapterKey) { return this.localizedLabel('adapterName', adapterKey) },
+    statusLabel (status) { return this.localizedLabel('statusName', status) },
+    bucketLabel (bucketKey) { return this.localizedLabel('bucketName', bucketKey) },
+    instanceName (instance) {
+      const adapterKey = instance && instance.adapter_key
+      const defaultName = `Default ${adapterKey ? adapterKey.charAt(0).toUpperCase() + adapterKey.slice(1).replace(/_/g, ' ') : ''}`
+      if (instance && instance.display_name === defaultName) {
+        const key = `dataSources.defaultInstanceName.${adapterKey}`
+        if (this.$te && this.$te(key)) return this.$t(key)
+      }
+      return (instance && instance.display_name) || '-'
+    },
     can (permission) { return this.permissions.has(permission) },
     unwrap (response) { return response && response.code !== undefined ? response.data : ((response && response.data) || response || {}) },
     formatTime (value) { return value ? moment(value).format('YYYY-MM-DD HH:mm:ss') : '-' },
+    formatVerificationEvidence (value) {
+      if (!value || typeof value !== 'object') return '-'
+      const code = value.code || value.status
+      if (!code) return '-'
+      if (code === 'upstream_http_403') return this.$t('dataSources.evidenceName.upstream_http_403')
+      if (code === 'transport_error') return this.$t('dataSources.evidenceName.transport_error')
+      return this.localizedLabel('evidenceName', code)
+    },
     statusColor (value) { return ({ active: 'green', healthy: 'green', eligible: 'green', draft: 'blue', disabled: 'orange', quarantined: 'red', unhealthy: 'red', validation_failed: 'red', migration_required: 'purple' })[value] || 'default' },
     async reload (foreground = true) {
       if (foreground) this.loading = true
@@ -366,25 +398,35 @@ export default {
       } catch (error) {
         const status = error && error.response && error.response.status
         this.unavailable = status === 404 || status === 501
-        if (!this.unavailable && foreground) this.$message.error(error.backendMessage || 'Failed to load data source operations')
+        if (!this.unavailable && foreground) this.$message.error(error.backendMessage || this.$t('dataSources.loadFailed'))
       } finally { if (foreground) this.loading = false }
     },
     onInstancePage (pagination) { this.instancePagination.current = pagination.current; this.instancePagination.pageSize = pagination.pageSize; this.reload() },
     openCreate () { this.createForm = { instanceKey: '', adapterKey: '', displayName: '', config: '{}' }; this.createVisible = true },
     async createInstance () {
+      let config
+      try { config = JSON.parse(this.createForm.config || '{}') } catch (_) { return this.$message.warning(this.$t('dataSources.validation.configJsonInvalid')) }
+      const validation = validateProviderInstanceDraft({ ...this.createForm, config })
+      if (validation) return this.$message.warning(this.$t(`dataSources.validation.${validation}`))
       this.actionLoading = true
       try {
-        await createProviderInstance({ ...this.createForm, config: JSON.parse(this.createForm.config || '{}') })
-        this.createVisible = false; await this.reload(); this.$message.success('Provider Instance created')
+        await createProviderInstance({ ...this.createForm, config })
+        this.createVisible = false; await this.reload(); this.$message.success(this.$t('dataSources.instanceCreated'))
       } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.actionLoading = false }
     },
     async openInstance (id) { this.selectedInstance = this.unwrap(await getProviderInstance(id)) },
     async openRoutedRequest (id) {
-      try { this.selectedRoutedRequest = this.unwrap(await getRoutedDataRequest(id)) } catch (error) { this.$message.error(error.backendMessage || 'Routed Data Request is unavailable') }
+      try { this.selectedRoutedRequest = this.unwrap(await getRoutedDataRequest(id)) } catch (error) { this.$message.error(error.backendMessage || this.$t('dataSources.routedRequestUnavailable')) }
     },
-    openAction (kind, target = null) { this.actionForm = { kind, reason: '', target, revisionId: kind === 'restore-policy' && target ? target.id : null, until: null }; this.actionVisible = true },
+    openAction (kind, target = null) {
+      if (kind === 'publish-policy') {
+        const validation = validateRoutingPolicyEntries(this.policyEntries, this.instances, this.selectedPolicy.capability_key)
+        if (validation) return this.$message.warning(this.$t(`dataSources.validation.${validation}`))
+      }
+      this.actionForm = { kind, reason: '', target, revisionId: kind === 'restore-policy' && target ? target.id : null, until: null }; this.actionVisible = true
+    },
     async submitAction () {
-      if (!this.actionForm.reason.trim()) return this.$message.warning('Reason is required')
+      if (!this.actionForm.reason.trim()) return this.$message.warning(this.$t('dataSources.validation.reasonRequired'))
       this.actionLoading = true
       try {
         const kind = this.actionForm.kind
@@ -403,7 +445,7 @@ export default {
           if (kind === 'recovery-probe') await requestRecoveryProbe(row.state_id, body)
           await this.openInstance(this.selectedInstance.id)
         }
-        this.actionVisible = false; await this.reload(false); this.$message.success('Management change applied')
+        this.actionVisible = false; await this.reload(false); this.$message.success(this.$t('dataSources.managementApplied'))
       } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.actionLoading = false }
     },
     openHealthAction (kind, row) { this.openAction(kind, row) },
@@ -420,11 +462,11 @@ export default {
         this.closeCredentials()
         if (!importingLegacy) await this.openInstance(this.selectedInstance.id)
         await this.reload(false)
-        this.$message.success('Credentials validated and stored')
+        this.$message.success(this.$t('dataSources.credentialsStored'))
       } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.actionLoading = false }
     },
     async runDiagnostic (capability) {
-      try { const result = this.unwrap(await runProviderDiagnostic(this.selectedInstance.id, capability)); this.$message[result.succeeded ? 'success' : 'warning'](result.succeeded ? 'Capability test passed' : 'Capability test failed') } catch (error) { this.$message.error(error.backendMessage || error.message) }
+      try { const result = this.unwrap(await runProviderDiagnostic(this.selectedInstance.id, capability)); this.$message[result.succeeded ? 'success' : 'warning'](result.succeeded ? this.$t('dataSources.capabilityTestPassed') : this.$t('dataSources.capabilityTestFailed')) } catch (error) { this.$message.error(error.backendMessage || error.message) }
     },
     async openPolicy (policy) {
       const detail = this.unwrap(await getRoutingPolicy(policy.capability_key))
@@ -434,10 +476,12 @@ export default {
     },
     movePolicyEntry (index, delta) { const next = index + delta; const entries = [...this.policyEntries]; [entries[index], entries[next]] = [entries[next], entries[index]]; this.policyEntries = entries },
     async savePolicyDraft () {
+      const validation = validateRoutingPolicyEntries(this.policyEntries, this.instances, this.selectedPolicy.capability_key)
+      if (validation) return this.$message.warning(this.$t(`dataSources.validation.${validation}`))
       this.actionLoading = true
       try {
         const response = await saveRoutingPolicyDraft(this.selectedPolicy.capability_key, { entries: this.policyEntries.map((item, index) => ({ instance_id: item.instance_id, position: index + 1 })), policyVersion: this.selectedPolicy.policy_version })
-        this.selectedPolicy = { ...this.selectedPolicy, ...this.unwrap(response) }; this.$message.success('Draft saved')
+        this.selectedPolicy = { ...this.selectedPolicy, ...this.unwrap(response) }; this.$message.success(this.$t('dataSources.draftSaved'))
       } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.actionLoading = false }
     },
     async previewPolicy () { try { this.policyPreview = this.unwrap(await previewRoutingPolicyDraft(this.selectedPolicy.capability_key)) } catch (error) { this.$message.error(error.backendMessage || error.message) } }

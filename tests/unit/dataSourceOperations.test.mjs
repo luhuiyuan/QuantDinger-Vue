@@ -24,7 +24,7 @@ test('console keeps the required three tabs and bounded visibility-aware polling
 test('credentials are write-only and Data Source Settings filters legacy secrets', () => {
   const consoleView = read('src/views/data-source-operations/index.vue')
   const settings = read('src/views/settings/index.vue')
-  assert.match(consoleView, /Credentials are write-only/)
+  assert.match(consoleView, /dataSources\.credentialsWriteOnly/)
   assert.match(consoleView, /X-Step-Up-Proof|issueDataSourceStepUp/)
   assert.match(settings, /isSharedDataSourceTransport/)
   assert.match(settings, /item\.type === 'password'/)
@@ -50,4 +50,14 @@ test('legacy credential import never renders a secret value and requires step-up
   assert.match(view, /importLegacyCredential/)
   assert.match(view, /issueDataSourceStepUp/)
   assert.doesNotMatch(view, /legacy.*secret.*value/)
+})
+
+test('provider instances and routing policies are validated before their API calls', () => {
+  const view = read('src/views/data-source-operations/index.vue')
+  const validation = read('src/utils/dataSourceOperationsValidation.js')
+  assert.match(view, /validateProviderInstanceDraft/)
+  assert.match(view, /validateRoutingPolicyEntries/)
+  assert.match(validation, /\^\[a-z\]\[a-z0-9_\]\{1,119\}/)
+  assert.match(validation, /routeDuplicateInstance/)
+  assert.match(validation, /routeInstanceIneligible/)
 })

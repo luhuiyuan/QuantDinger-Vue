@@ -23,7 +23,9 @@ export default function Initializer () {
   const savedTheme = storage.get(TOGGLE_NAV_THEME)
   const savedColor = storage.get(TOGGLE_COLOR)
   const validThemes = ['light', 'dark', 'realdark']
-  const nextTheme = validThemes.includes(savedTheme) ? savedTheme : defaultSettings.navTheme
+  // realdark was the historical default; migrate that implicit value to the
+  // new light-menu default while preserving an explicit dark-menu selection.
+  const nextTheme = savedTheme === 'realdark' || !validThemes.includes(savedTheme) ? defaultSettings.navTheme : savedTheme
   const nextColor = !savedColor || String(savedColor).toUpperCase() === legacyDefaultColor ? defaultSettings.primaryColor : savedColor
   store.commit(TOGGLE_LAYOUT, nextLayout)
   store.commit(TOGGLE_FIXED_HEADER, storage.get(TOGGLE_FIXED_HEADER, defaultSettings.fixedHeader))
@@ -42,7 +44,9 @@ export default function Initializer () {
   token = typeof token === 'string' ? token : null
   store.commit('SET_TOKEN', token)
 
-  store.dispatch('setLang', storage.get(APP_LANGUAGE, 'en-US'))
+  // en-US was the historical default; migrate it to Simplified Chinese.
+  const savedLanguage = storage.get(APP_LANGUAGE)
+  store.dispatch('setLang', !savedLanguage || savedLanguage === 'en-US' ? 'zh-CN' : savedLanguage)
 
   // Fire-and-forget: pull brand / legal / contact config from backend so the
   // sidebar footer, login page, version label and legal modals reflect the

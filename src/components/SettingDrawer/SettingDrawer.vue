@@ -195,7 +195,7 @@ export default {
       return this.settings.fixSiderbar !== undefined ? this.settings.fixSiderbar : (this.fixedSidebar || false)
     },
     currentNavTheme () {
-      return this.settings.theme || this.navTheme || config.navTheme || 'realdark'
+      return this.settings.theme || this.navTheme || config.navTheme || 'light'
     },
     currentPrimaryColor () {
       return this.settings.primaryColor || this.primaryColor || config.primaryColor || '#1890ff'

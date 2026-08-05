@@ -1,12 +1,14 @@
 import storage from 'store'
 import expirePlugin from 'store/plugins/expire'
 import { login, logout, getUserInfo } from '@/api/login'
-import { ACCESS_TOKEN, USER_INFO, USER_ROLES } from '@/store/mutation-types'
+import { ACCESS_TOKEN, USER_INFO, USER_ROLES, AUTH_ROUTING_CACHE_VERSION } from '@/store/mutation-types'
 import { welcome } from '@/utils/util'
 
 storage.addPlugin(expirePlugin)
 
 const DEFAULT_ROLE = { id: 'default', permissionList: [] }
+const AUTH_ROUTING_CACHE_SCHEMA_VERSION = '2026-08-05.1'
+const AUTH_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 function normalizeRoles (roles) {
   if (!roles) return []
@@ -30,12 +32,16 @@ function getStoredToken () {
 }
 
 const initialInfo = getStoredInfo()
-// If is_demo is missing (legacy cache), force roles to empty to trigger GetInfo in permission.js
-let initialRoles = getStoredRoles()
+const initialToken = getStoredToken() || ''
+const needsAuthRoutingRefresh = Boolean(initialToken) && (
+  storage.get(AUTH_ROUTING_CACHE_VERSION) !== AUTH_ROUTING_CACHE_SCHEMA_VERSION
+)
+// Do not trust persisted roles across route/permission schema changes. Keep
+// the token so the guard can refresh the current identity without logging out.
+let initialRoles = needsAuthRoutingRefresh ? [] : getStoredRoles()
 if (initialInfo && typeof initialInfo.is_demo === 'undefined') {
   initialRoles = []
 }
-const initialToken = getStoredToken() || ''
 const initialName = initialInfo.nickname || initialInfo.username || ''
 const initialAvatar = initialInfo.avatar || ''
 const initialWelcome = initialName ? welcome() : ''
@@ -46,7 +52,8 @@ const user = {
     welcome: initialWelcome,
     avatar: initialAvatar,
     roles: initialRoles,
-    info: initialInfo
+    info: initialInfo,
+    needsAuthRoutingRefresh
   },
 
   mutations: {
@@ -65,6 +72,14 @@ const user = {
     },
     SET_INFO: (state, info) => {
       state.info = info
+    },
+    SET_AUTH_ROUTING_CACHE_FRESH: (state) => {
+      state.needsAuthRoutingRefresh = false
+      storage.set(
+        AUTH_ROUTING_CACHE_VERSION,
+        AUTH_ROUTING_CACHE_SCHEMA_VERSION,
+        new Date().getTime() + AUTH_CACHE_TTL_MS
+      )
     }
   },
 
@@ -81,7 +96,7 @@ const user = {
             const token = result.token
             const info = result.userinfo || {}
 
-            const expiresAt = new Date().getTime() + 7 * 24 * 60 * 60 * 1000
+            const expiresAt = new Date().getTime() + AUTH_CACHE_TTL_MS
             storage.set(ACCESS_TOKEN, token, expiresAt)
             commit('SET_TOKEN', token)
             commit('SET_INFO', info)
@@ -103,6 +118,7 @@ const user = {
             }
             commit('SET_ROLES', roles)
             storage.set(USER_ROLES, roles, expiresAt)
+            commit('SET_AUTH_ROUTING_CACHE_FRESH')
 
             dispatch('ResetRoutes')
 
@@ -124,7 +140,7 @@ const user = {
             reject(new Error('登录数据异常'))
             return
           }
-          const expiresAt = new Date().getTime() + 7 * 24 * 60 * 60 * 1000
+          const expiresAt = new Date().getTime() + AUTH_CACHE_TTL_MS
           storage.set(ACCESS_TOKEN, token, expiresAt)
           commit('SET_TOKEN', token)
           commit('SET_INFO', userInfo)
@@ -141,12 +157,18 @@ const user = {
           }
 
           if (userInfo.role) {
-            commit('SET_ROLES', userInfo.role)
+            const roles = normalizeRoles(userInfo.role)
+            commit('SET_ROLES', roles)
+            storage.set(USER_ROLES, roles, expiresAt)
           } else if (userInfo.roles) {
-            commit('SET_ROLES', userInfo.roles)
+            const roles = normalizeRoles(userInfo.roles)
+            commit('SET_ROLES', roles)
+            storage.set(USER_ROLES, roles, expiresAt)
           } else {
-            commit('SET_ROLES', [{ id: 'default', permissionList: [] }])
+            commit('SET_ROLES', [DEFAULT_ROLE])
+            storage.set(USER_ROLES, [DEFAULT_ROLE], expiresAt)
           }
+          commit('SET_AUTH_ROUTING_CACHE_FRESH')
 
           resolve()
         } catch (e) {
@@ -182,6 +204,7 @@ const user = {
     GetInfo ({ commit, state }) {
       return new Promise((resolve, reject) => {
         if (
+          !state.needsAuthRoutingRefresh &&
           state.info &&
           Object.keys(state.info).length > 0 &&
           typeof state.info.is_demo !== 'undefined' &&
@@ -191,14 +214,14 @@ const user = {
           if (info.role) {
             const roles = normalizeRoles(info.role)
             commit('SET_ROLES', roles)
-            storage.set(USER_ROLES, roles, new Date().getTime() + 7 * 24 * 60 * 60 * 1000)
+            storage.set(USER_ROLES, roles, new Date().getTime() + AUTH_CACHE_TTL_MS)
           } else if (info.roles) {
             const roles = normalizeRoles(info.roles)
             commit('SET_ROLES', roles)
-            storage.set(USER_ROLES, roles, new Date().getTime() + 7 * 24 * 60 * 60 * 1000)
+            storage.set(USER_ROLES, roles, new Date().getTime() + AUTH_CACHE_TTL_MS)
           } else {
             commit('SET_ROLES', [DEFAULT_ROLE])
-            storage.set(USER_ROLES, [DEFAULT_ROLE], new Date().getTime() + 7 * 24 * 60 * 60 * 1000)
+            storage.set(USER_ROLES, [DEFAULT_ROLE], new Date().getTime() + AUTH_CACHE_TTL_MS)
           }
           resolve(state.info)
         } else {
@@ -206,7 +229,7 @@ const user = {
             if (res && res.code === 1 && res.data) {
               const info = res.data
               commit('SET_INFO', info)
-              storage.set(USER_INFO, info, new Date().getTime() + 7 * 24 * 60 * 60 * 1000)
+              storage.set(USER_INFO, info, new Date().getTime() + AUTH_CACHE_TTL_MS)
               if (info.nickname) {
                 commit('SET_NAME', { name: info.nickname, welcome: welcome() })
               } else if (info.username) {
@@ -218,15 +241,16 @@ const user = {
               if (info.role) {
                 const roles = normalizeRoles(info.role)
                 commit('SET_ROLES', roles)
-                storage.set(USER_ROLES, roles, new Date().getTime() + 7 * 24 * 60 * 60 * 1000)
+                storage.set(USER_ROLES, roles, new Date().getTime() + AUTH_CACHE_TTL_MS)
               } else if (info.roles) {
                 const roles = normalizeRoles(info.roles)
                 commit('SET_ROLES', roles)
-                storage.set(USER_ROLES, roles, new Date().getTime() + 7 * 24 * 60 * 60 * 1000)
+                storage.set(USER_ROLES, roles, new Date().getTime() + AUTH_CACHE_TTL_MS)
               } else {
                 commit('SET_ROLES', [DEFAULT_ROLE])
-                storage.set(USER_ROLES, [DEFAULT_ROLE], new Date().getTime() + 7 * 24 * 60 * 60 * 1000)
+                storage.set(USER_ROLES, [DEFAULT_ROLE], new Date().getTime() + AUTH_CACHE_TTL_MS)
               }
+              commit('SET_AUTH_ROUTING_CACHE_FRESH')
               resolve(info)
             } else {
               reject(new Error((res && res.msg) || '用户信息不存在'))
@@ -247,12 +271,14 @@ const user = {
           storage.remove(ACCESS_TOKEN)
           storage.remove(USER_INFO)
           storage.remove(USER_ROLES)
+          storage.remove(AUTH_ROUTING_CACHE_VERSION)
           dispatch('ResetRoutes')
           resolve()
         }).catch(() => {
           storage.remove(ACCESS_TOKEN)
           storage.remove(USER_INFO)
           storage.remove(USER_ROLES)
+          storage.remove(AUTH_ROUTING_CACHE_VERSION)
           dispatch('ResetRoutes')
           resolve()
         }).finally(() => {

@@ -1,6 +1,7 @@
 export const ACCESS_TOKEN = 'Access-Token'
 export const USER_INFO = 'User-Info'
 export const USER_ROLES = 'User-Roles'
+export const AUTH_ROUTING_CACHE_VERSION = 'Auth-Routing-Cache-Version'
 
 export const SIDEBAR_TYPE = 'sidebar_type'
 export const TOGGLE_MOBILE_TYPE = 'is_mobile'
