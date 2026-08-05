@@ -82,10 +82,10 @@
           <section class="fallback-band">
             <h3>{{ $t('dataSources.legacyImports') }}</h3>
             <a-table size="small" :data-source="legacyImports" row-key="adapter_key" :pagination="false">
-                <a-table-column :title="$t('dataSources.adapter')" :custom-render="(_, row) => adapterLabel(row.adapter_key)" />
+              <a-table-column :title="$t('dataSources.adapter')" :custom-render="(_, row) => adapterLabel(row.adapter_key)" />
               <a-table-column :title="$t('dataSources.detected')" :custom-render="(_, row) => row.detected ? $t('dataSources.yes') : $t('dataSources.no')" />
               <a-table-column :title="$t('dataSources.source')" :custom-render="(_, row) => (row.source_names || []).join(', ') || '-'" />
-                <a-table-column :title="$t('dataSources.status')" :custom-render="value => statusLabel(value)" />
+              <a-table-column :title="$t('dataSources.status')" :custom-render="value => statusLabel(value)" />
               <a-table-column :title="$t('dataSources.instance')" data-index="instance_id" />
               <a-table-column title="" :custom-render="(_, row) => can('data_sources:credentials') && row.detected && row.import_status !== 'imported' ? $createElement('a-button', { props: { type: 'link', size: 'small' }, on: { click: () => openLegacyImport(row) } }, [$t('dataSources.import')]) : null" />
             </a-table>
@@ -121,7 +121,7 @@
       </a-tabs>
     </template>
 
-    <a-drawer :title="$t('dataSources.providerInstance')" :visible="!!selectedInstance" width="720" @close="selectedInstance = null">
+    <a-drawer :title="$t('dataSources.providerInstance')" :visible="!!selectedInstance" width="720" @close="closeInstance">
       <template v-if="selectedInstance">
         <div class="drawer-actions">
           <a-button v-if="can('data_sources:credentials')" @click="openCredentials"><a-icon type="key" /> {{ $t('dataSources.credentials') }}</a-button>
@@ -142,7 +142,10 @@
         <a-table size="small" :columns="capabilityColumns" :data-source="selectedInstance.capabilities || []" row-key="capability_key" :pagination="false">
           <template slot="eligibility" slot-scope="value"><a-tag :color="statusColor(value)">{{ statusLabel(value) }}</a-tag></template>
           <template slot="verification" slot-scope="value"><span>{{ formatVerificationEvidence(value) }}</span></template>
-          <template slot="capActions" slot-scope="_, row"><a-button v-if="can('data_sources:diagnostics')" type="link" size="small" @click="runDiagnostic(row.capability_key)"><a-icon type="experiment" /> Test</a-button></template>
+          <template slot="capActions" slot-scope="_, row">
+            <a-button v-if="can('data_sources:diagnostics')" type="link" size="small" :loading="diagnosticLoadingCapability === row.capability_key" @click="runDiagnostic(row.capability_key)"><a-icon type="experiment" /> {{ $t('dataSources.test') }}</a-button>
+            <a-button v-if="diagnosticResults[row.capability_key]" type="link" size="small" @click="openDiagnostic(row.capability_key)"><a-icon type="eye" /> {{ $t('dataSources.viewTestResult') }}</a-button>
+          </template>
         </a-table>
         <h3 class="section-title">{{ $t('dataSources.healthAndCircuits') }}</h3>
         <a-table size="small" :columns="healthColumns" :data-source="selectedInstance.health || []" :row-key="row => row.state_id" :pagination="false">
@@ -254,6 +257,45 @@
         <a-form-item :label="$t('dataSources.mfaCode')"><a-input v-model="credentialForm.mfaCode" /></a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal :title="$t('dataSources.diagnosticResult')" :visible="diagnosticVisible" width="900px" :footer="null" @cancel="diagnosticVisible = false">
+      <template v-if="diagnosticResult">
+        <a-alert :type="diagnosticResult.succeeded ? 'success' : 'warning'" show-icon :message="diagnosticResult.succeeded ? $t('dataSources.capabilityTestPassed') : $t('dataSources.capabilityTestFailed')" />
+        <a-descriptions bordered size="small" :column="2" class="diagnostic-summary">
+          <a-descriptions-item :label="$t('dataSources.capability')">{{ capabilityLabel(diagnosticResult.capability_key) }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.result')"><a-tag :color="diagnosticResult.succeeded ? 'green' : 'red'">{{ diagnosticResult.succeeded ? $t('dataSources.passed') : $t('dataSources.failed') }}</a-tag></a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.testTime')">{{ formatTime(diagnosticResult.acquired_at) }}</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.duration')">{{ diagnosticResult.duration_ms || 0 }} ms</a-descriptions-item>
+          <a-descriptions-item :label="$t('dataSources.diagnosticId')" :span="2">{{ diagnosticResult.diagnostic_id }}</a-descriptions-item>
+          <a-descriptions-item v-if="diagnosticResult.error_category" :label="$t('dataSources.errorCategory')" :span="2">{{ diagnosticResult.error_category }}</a-descriptions-item>
+        </a-descriptions>
+        <h3 class="section-title">{{ $t('dataSources.testRequest') }}</h3>
+        <pre class="diagnostic-json">{{ JSON.stringify(diagnosticResult.request_summary || {}, null, 2) }}</pre>
+        <div class="diagnostic-sample-heading">
+          <h3 class="section-title">{{ $t('dataSources.sampleData') }}</h3>
+          <a-button v-if="diagnosticResult.sample" size="small" @click="copyDiagnosticSample"><a-icon type="copy" /> {{ $t('dataSources.copyJson') }}</a-button>
+        </div>
+        <a-table
+          v-if="diagnosticResult.sample && diagnosticResult.sample.rows && diagnosticResult.sample.rows.length"
+          size="small"
+          :columns="diagnosticSampleColumns"
+          :data-source="diagnosticResult.sample.rows"
+          :pagination="false"
+          :scroll="{ x: true }"
+          row-key="__sampleRow">
+          <template slot="sampleValue" slot-scope="value"><span>{{ formatDiagnosticValue(value) }}</span></template>
+        </a-table>
+        <a-empty v-else :description="$t('dataSources.noSampleData')" :image="simpleEmptyImage" />
+        <a-alert v-if="diagnosticResult.sample && diagnosticResult.sample.truncated" class="diagnostic-truncated" type="info" show-icon :message="$t('dataSources.sampleTruncated')" />
+        <a-alert
+          v-if="(diagnosticResult.quality_failures || []).length || (diagnosticResult.warnings || []).length"
+          class="diagnostic-truncated"
+          type="warning"
+          show-icon
+          :message="$t('dataSources.diagnosticWarnings')"
+          :description="[...(diagnosticResult.quality_failures || []), ...(diagnosticResult.warnings || []).map(item => item.message || item.code)].join(' · ')" />
+      </template>
+    </a-modal>
   </div>
 </template>
 
@@ -263,7 +305,7 @@ import { Empty } from 'ant-design-vue'
 import { validateProviderInstanceDraft, validateRoutingPolicyEntries } from '@/utils/dataSourceOperationsValidation'
 import {
   createProviderInstance, extendProviderCircuit, getDataSourceOverview, getProviderInstance, getRoutedDataRequest,
-  getRoutingPolicy, importLegacyCredential, issueDataSourceStepUp, listLegacyCredentialImports, listProviderInstances, listRoutingPolicies, previewRoutingPolicyDraft,
+  getRoutingPolicy, importLegacyCredential, issueDataSourceStepUp, listLatestProviderDiagnostics, listLegacyCredentialImports, listProviderInstances, listRoutingPolicies, previewRoutingPolicyDraft,
   quarantineProviderHealth, requestRecoveryProbe, runProviderDiagnostic, runProviderInstanceAction,
   runRoutingPolicyAction, saveRoutingPolicyDraft, submitProviderCredentials
 } from '@/api/dataSourceOperations'
@@ -294,7 +336,11 @@ export default {
       actionVisible: false,
       actionForm: { kind: '', reason: '', target: null, revisionId: null, until: null },
       credentialVisible: false,
-      credentialForm: { credentials: '{}', reason: '', password: '', mfaCode: '', importAdapter: '' }
+      credentialForm: { credentials: '{}', reason: '', password: '', mfaCode: '', importAdapter: '' },
+      diagnosticVisible: false,
+      diagnosticResult: null,
+      diagnosticLoadingCapability: '',
+      diagnosticResults: {}
     }
   },
   computed: {
@@ -341,7 +387,10 @@ export default {
     },
     capabilityColumns () { return [{ title: this.$t('dataSources.capability'), dataIndex: 'capability_key', customRender: this.capabilityLabel }, { title: this.$t('dataSources.eligibility'), dataIndex: 'eligibility_status', scopedSlots: { customRender: 'eligibility' } }, { title: this.$t('dataSources.verification'), dataIndex: 'verification_evidence', scopedSlots: { customRender: 'verification' } }, { title: this.$t('dataSources.lastVerified'), dataIndex: 'last_verified_at' }, { title: '', scopedSlots: { customRender: 'capActions' } }] },
     healthColumns () { return [{ title: this.$t('dataSources.capability'), dataIndex: 'capability_key', customRender: value => value ? this.capabilityLabel(value) : this.$t('dataSources.instance') }, { title: this.$t('dataSources.health'), dataIndex: 'health_status', scopedSlots: { customRender: 'health' } }, { title: this.$t('dataSources.circuit'), dataIndex: 'circuit_state', customRender: value => this.statusLabel(value) }, { title: this.$t('dataSources.reason'), dataIndex: 'circuit_reason' }, { title: '', scopedSlots: { customRender: 'healthActions' }, width: 100 }] },
-    quotaColumns () { return [{ title: this.$t('dataSources.capability'), dataIndex: 'capability_key', customRender: this.capabilityLabel }, { title: this.$t('dataSources.bucket'), dataIndex: 'bucket_key', customRender: this.bucketLabel }, { title: this.$t('dataSources.consumed'), dataIndex: 'consumed' }, { title: this.$t('dataSources.reserved'), dataIndex: 'reserved' }, { title: this.$t('dataSources.limit'), dataIndex: 'configured_limit' }, { title: this.$t('dataSources.reset'), dataIndex: 'reset_at' }] }
+    quotaColumns () { return [{ title: this.$t('dataSources.capability'), dataIndex: 'capability_key', customRender: this.capabilityLabel }, { title: this.$t('dataSources.bucket'), dataIndex: 'bucket_key', customRender: this.bucketLabel }, { title: this.$t('dataSources.consumed'), dataIndex: 'consumed' }, { title: this.$t('dataSources.reserved'), dataIndex: 'reserved' }, { title: this.$t('dataSources.limit'), dataIndex: 'configured_limit' }, { title: this.$t('dataSources.reset'), dataIndex: 'reset_at' }] },
+    diagnosticSampleColumns () {
+      return ((this.diagnosticResult && this.diagnosticResult.sample && this.diagnosticResult.sample.columns) || []).map(column => ({ title: column, dataIndex: column, scopedSlots: { customRender: 'sampleValue' }, ellipsis: true }))
+    }
   },
   watch: {
     activeTab (tab) { this.$router.replace({ query: { ...this.$route.query, tab } }).catch(() => {}) }
@@ -385,6 +434,17 @@ export default {
       if (code === 'transport_error') return this.$t('dataSources.evidenceName.transport_error')
       return this.localizedLabel('evidenceName', code)
     },
+    formatDiagnosticValue (value) { return value && typeof value === 'object' ? JSON.stringify(value) : (value === null || value === undefined ? '-' : String(value)) },
+    async copyDiagnosticSample () {
+      const value = JSON.stringify(this.diagnosticResult.sample, null, 2)
+      try {
+        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(value)
+        else {
+          const textarea = document.createElement('textarea'); textarea.value = value; document.body.appendChild(textarea); textarea.select(); document.execCommand('copy'); textarea.remove()
+        }
+        this.$message.success(this.$t('dataSources.copied'))
+      } catch (_) { this.$message.error(this.$t('dataSources.copyFailed')) }
+    },
     statusColor (value) { return ({ active: 'green', healthy: 'green', eligible: 'green', draft: 'blue', disabled: 'orange', quarantined: 'red', unhealthy: 'red', validation_failed: 'red', migration_required: 'purple' })[value] || 'default' },
     async reload (foreground = true) {
       if (foreground) this.loading = true
@@ -414,7 +474,20 @@ export default {
         this.createVisible = false; await this.reload(); this.$message.success(this.$t('dataSources.instanceCreated'))
       } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.actionLoading = false }
     },
-    async openInstance (id) { this.selectedInstance = this.unwrap(await getProviderInstance(id)) },
+    async openInstance (id) {
+      const changingInstance = !this.selectedInstance || this.selectedInstance.id !== id
+      this.selectedInstance = this.unwrap(await getProviderInstance(id))
+      if (changingInstance) { this.diagnosticResults = {}; this.diagnosticResult = null; this.diagnosticVisible = false }
+      if (!this.can('data_sources:diagnostics')) return
+      try {
+        const diagnostics = this.unwrap(await listLatestProviderDiagnostics(id))
+        if (this.selectedInstance && this.selectedInstance.id === id) {
+          this.diagnosticResults = (diagnostics.items || []).reduce((results, item) => ({ ...results, [item.capability_key]: this.prepareDiagnosticResult(item) }), {})
+        }
+      } catch (error) { this.$message.error(error.backendMessage || error.message) }
+    },
+    closeInstance () { this.selectedInstance = null; this.diagnosticResults = {}; this.diagnosticResult = null; this.diagnosticVisible = false },
+    openDiagnostic (capability) { this.diagnosticResult = this.diagnosticResults[capability] || null; this.diagnosticVisible = !!this.diagnosticResult },
     async openRoutedRequest (id) {
       try { this.selectedRoutedRequest = this.unwrap(await getRoutedDataRequest(id)) } catch (error) { this.$message.error(error.backendMessage || this.$t('dataSources.routedRequestUnavailable')) }
     },
@@ -466,7 +539,17 @@ export default {
       } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.actionLoading = false }
     },
     async runDiagnostic (capability) {
-      try { const result = this.unwrap(await runProviderDiagnostic(this.selectedInstance.id, capability)); this.$message[result.succeeded ? 'success' : 'warning'](result.succeeded ? this.$t('dataSources.capabilityTestPassed') : this.$t('dataSources.capabilityTestFailed')) } catch (error) { this.$message.error(error.backendMessage || error.message) }
+      this.diagnosticLoadingCapability = capability
+      try {
+        const result = this.unwrap(await runProviderDiagnostic(this.selectedInstance.id, capability))
+        this.diagnosticResults = { ...this.diagnosticResults, [capability]: this.prepareDiagnosticResult(result) }
+        this.$message[result.succeeded ? 'success' : 'warning'](result.succeeded ? this.$t('dataSources.capabilityTestPassed') : this.$t('dataSources.capabilityTestFailed'))
+      } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.diagnosticLoadingCapability = '' }
+    },
+    prepareDiagnosticResult (result) {
+      const prepared = { ...result }
+      if (prepared.sample && Array.isArray(prepared.sample.rows)) prepared.sample = { ...prepared.sample, rows: prepared.sample.rows.map((row, index) => ({ ...row, __sampleRow: index })) }
+      return prepared
     },
     async openPolicy (policy) {
       const detail = this.unwrap(await getRoutingPolicy(policy.capability_key))
@@ -515,6 +598,10 @@ export default {
 .policy-entry .ant-select { width: 100%; }
 .policy-rank { color: rgba(0, 0, 0, .45); text-align: center; }
 .ok { color: #389e0d; }.muted { color: rgba(0, 0, 0, .35); }
+.diagnostic-summary { margin-top: 16px; }
+.diagnostic-json { max-height: 180px; margin: 0; padding: 10px; overflow: auto; border: 1px solid #e8e8e8; border-radius: 4px; background: #fafafa; font-size: 12px; }
+.diagnostic-sample-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.diagnostic-truncated { margin-top: 12px; }
 @media (max-width: 900px) {
   .operations-header { align-items: stretch; flex-direction: column; }
   .operations-header .ant-btn-group { display: flex; overflow-x: auto; }

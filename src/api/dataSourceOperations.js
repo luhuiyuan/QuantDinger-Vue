@@ -16,6 +16,7 @@ export const submitProviderCredentials = (id, data, proof) => request({
 })
 export const issueDataSourceStepUp = data => request({ url: `${base}/step-up`, method: 'post', data })
 export const runProviderDiagnostic = (id, capability, data = {}) => request({ url: `${base}/instances/${id}/diagnostics/${capability}`, method: 'post', data })
+export const listLatestProviderDiagnostics = id => request({ url: `${base}/instances/${id}/diagnostics`, method: 'get' })
 export const quarantineProviderHealth = (stateId, data) => request({ url: `${base}/health/${stateId}/quarantine`, method: 'post', data })
 export const extendProviderCircuit = (stateId, data) => request({ url: `${base}/health/${stateId}/extend-circuit`, method: 'post', data })
 export const requestRecoveryProbe = (stateId, data) => request({ url: `${base}/health/${stateId}/recovery-probes`, method: 'post', data })

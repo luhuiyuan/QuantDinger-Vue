@@ -39,9 +39,13 @@ test('request logs expose routed request grouping and a console deep link', () =
 
 test('API client includes lifecycle, credentials, diagnostics, health, policy, legacy import and cutover operations', () => {
   const api = read('src/api/dataSourceOperations.js')
+  const view = read('src/views/data-source-operations/index.vue')
   for (const fragment of ['/credentials', '/diagnostics/', '/quarantine', '/extend-circuit', '/recovery-probes', '/policies/', '/legacy-imports', '/cutovers']) {
     assert.ok(api.includes(fragment), `missing ${fragment}`)
   }
+  assert.match(api, /listLatestProviderDiagnostics/)
+  assert.match(view, /listLatestProviderDiagnostics\(id\)/)
+  assert.match(view, /diagnosticResults\[row\.capability_key\]/)
 })
 
 test('legacy credential import never renders a secret value and requires step-up', () => {
