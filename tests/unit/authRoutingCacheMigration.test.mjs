@@ -16,6 +16,17 @@ test('auth route cache migration invalidates stale roles but preserves the token
   assert.doesNotMatch(user, /storage\.remove\(ACCESS_TOKEN\).*AUTH_ROUTING_CACHE_SCHEMA_VERSION/s)
 })
 
+test('refresh uses the unified backend permissions field when rebuilding dynamic routes', () => {
+  const user = read('../../src/store/modules/user.js')
+  const generator = read('../../src/router/generator-routers.js')
+
+  assert.match(user, /role\.permissions/)
+  assert.match(user, /permissions: permissions/)
+  assert.match(generator, /role\.permissions/)
+  assert.doesNotMatch(user, /permissionList/)
+  assert.doesNotMatch(generator, /permissionList/)
+})
+
 test('stale auth route cache forces a backend user-info refresh before routes are generated', () => {
   const user = read('../../src/store/modules/user.js')
 

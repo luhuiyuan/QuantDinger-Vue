@@ -260,6 +260,9 @@
 
     <a-modal :title="$t('dataSources.diagnosticResult')" :visible="diagnosticVisible" width="900px" :footer="null" @cancel="diagnosticVisible = false">
       <template v-if="diagnosticResult">
+        <div class="diagnostic-actions">
+          <a-button size="small" @click="copyDiagnosticReport"><a-icon type="copy" /> {{ $t('dataSources.copyTestInfo') }}</a-button>
+        </div>
         <a-alert :type="diagnosticResult.succeeded ? 'success' : 'warning'" show-icon :message="diagnosticResult.succeeded ? $t('dataSources.capabilityTestPassed') : $t('dataSources.capabilityTestFailed')" />
         <a-descriptions bordered size="small" :column="2" class="diagnostic-summary">
           <a-descriptions-item :label="$t('dataSources.capability')">{{ capabilityLabel(diagnosticResult.capability_key) }}</a-descriptions-item>
@@ -346,7 +349,7 @@ export default {
   computed: {
     permissions () {
       const permissions = new Set()
-      for (const role of (this.$store.getters.roles || [])) for (const item of (role.permissionList || [])) permissions.add(item)
+      for (const role of (this.$store.getters.roles || [])) for (const item of (role.permissions || [])) permissions.add(item)
       return permissions
     },
     simpleEmptyImage () { return Empty.PRESENTED_IMAGE_SIMPLE },
@@ -435,6 +438,38 @@ export default {
       return this.localizedLabel('evidenceName', code)
     },
     formatDiagnosticValue (value) { return value && typeof value === 'object' ? JSON.stringify(value) : (value === null || value === undefined ? '-' : String(value)) },
+    diagnosticReport () {
+      const result = this.diagnosticResult || {}
+      const adapter = this.selectedInstance || {}
+      return [
+        `${this.$t('dataSources.adapter')}: ${this.adapterLabel(adapter.adapter_key)}`,
+        `${this.$t('dataSources.capability')}: ${this.capabilityLabel(result.capability_key)}`,
+        `${this.$t('dataSources.diagnosticId')}: ${result.diagnostic_id || '-'}`,
+        `${this.$t('dataSources.result')}: ${result.succeeded ? this.$t('dataSources.passed') : this.$t('dataSources.failed')}`,
+        `${this.$t('dataSources.testTime')}: ${this.formatTime(result.acquired_at)}`,
+        `${this.$t('dataSources.duration')}: ${result.duration_ms || 0} ms`,
+        `${this.$t('dataSources.errorCategory')}: ${result.error_category || '-'}`,
+        '',
+        `${this.$t('dataSources.testRequest')}:`,
+        JSON.stringify(result.request_summary || {}, null, 2),
+        '',
+        `${this.$t('dataSources.testResponse')}:`,
+        JSON.stringify(result.sample || {}, null, 2),
+        '',
+        `${this.$t('dataSources.diagnosticDetails')}:`,
+        JSON.stringify(result, null, 2)
+      ].join('\n')
+    },
+    async copyDiagnosticReport () {
+      const value = this.diagnosticReport()
+      try {
+        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(value)
+        else {
+          const textarea = document.createElement('textarea'); textarea.value = value; document.body.appendChild(textarea); textarea.select(); document.execCommand('copy'); textarea.remove()
+        }
+        this.$message.success(this.$t('dataSources.copied'))
+      } catch (_) { this.$message.error(this.$t('dataSources.copyFailed')) }
+    },
     async copyDiagnosticSample () {
       const value = JSON.stringify(this.diagnosticResult.sample, null, 2)
       try {
@@ -543,6 +578,10 @@ export default {
       try {
         const result = this.unwrap(await runProviderDiagnostic(this.selectedInstance.id, capability))
         this.diagnosticResults = { ...this.diagnosticResults, [capability]: this.prepareDiagnosticResult(result) }
+        // A successful diagnostic is also current capability verification
+        // evidence. Reload the drawer so eligibility and its message no longer
+        // show the stale pre-diagnostic result.
+        await this.openInstance(this.selectedInstance.id)
         this.$message[result.succeeded ? 'success' : 'warning'](result.succeeded ? this.$t('dataSources.capabilityTestPassed') : this.$t('dataSources.capabilityTestFailed'))
       } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.diagnosticLoadingCapability = '' }
     },
@@ -599,6 +638,7 @@ export default {
 .policy-rank { color: rgba(0, 0, 0, .45); text-align: center; }
 .ok { color: #389e0d; }.muted { color: rgba(0, 0, 0, .35); }
 .diagnostic-summary { margin-top: 16px; }
+.diagnostic-actions { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .diagnostic-json { max-height: 180px; margin: 0; padding: 10px; overflow: auto; border: 1px solid #e8e8e8; border-radius: 4px; background: #fafafa; font-size: 12px; }
 .diagnostic-sample-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .diagnostic-truncated { margin-top: 12px; }

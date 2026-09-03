@@ -72,7 +72,7 @@ router.beforeEach((to, from, next) => {
 
             // Do NOT hard-logout on transient failures (backend down, proxy issue, etc).
             // Instead, degrade gracefully with a default role and continue.
-            store.commit('SET_ROLES', [{ id: 'default', permissionList: [] }])
+            store.commit('SET_ROLES', [{ id: 'default', permissions: [] }])
             store.dispatch('GenerateRoutes', { token }).then(() => {
               resetRouter()
               store.getters.addRouters.forEach(r => router.addRoute(r))

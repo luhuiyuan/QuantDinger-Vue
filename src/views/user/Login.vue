@@ -1024,14 +1024,14 @@ export default {
         this.$store.commit('SET_NAME', { name, welcome: timeFix() })
         this.$store.commit('SET_AVATAR', userInfoData.avatar || '/avatar2.jpg')
 
-        let roles = [{ id: 'default', permissionList: [] }]
+        let roles = [{ id: 'default', permissions: [] }]
         if (userInfoData.role) {
           if (Array.isArray(userInfoData.role)) {
             roles = userInfoData.role
           } else if (typeof userInfoData.role === 'object') {
             roles = [userInfoData.role]
           } else {
-            roles = [{ id: userInfoData.role, permissionList: [] }]
+            roles = [{ id: userInfoData.role, permissions: [] }]
           }
         }
         storage.set(USER_ROLES, roles, expiresAt)
@@ -1138,10 +1138,10 @@ export default {
                 } else if (typeof userInfoData.role === 'object') {
                   roles = [userInfoData.role]
                 } else {
-                  roles = [{ id: userInfoData.role, permissionList: [] }]
+                  roles = [{ id: userInfoData.role, permissions: [] }]
                 }
               } else {
-                roles = [{ id: 'default', permissionList: [] }]
+                roles = [{ id: 'default', permissions: [] }]
               }
               this.$store.commit('SET_ROLES', roles)
               storage.set(USER_ROLES, roles, expiresAt)
@@ -1155,7 +1155,7 @@ export default {
             console.log('Roles after save:', currentRoles.length > 0 ? `has ${currentRoles.length} roles` : 'empty')
 
             if (currentRoles.length === 0) {
-              const defaultRoles = [{ id: 'default', permissionList: [] }]
+              const defaultRoles = [{ id: 'default', permissions: [] }]
               this.$store.commit('SET_ROLES', defaultRoles)
               storage.set(USER_ROLES, defaultRoles, expiresAt)
             }
@@ -1322,10 +1322,10 @@ export default {
                   } else if (typeof userInfoData.role === 'object') {
                     roles = [userInfoData.role]
                   } else {
-                    roles = [{ id: userInfoData.role, permissionList: [] }]
+                    roles = [{ id: userInfoData.role, permissions: [] }]
                   }
                 } else {
-                  roles = [{ id: 'default', permissionList: [] }]
+                  roles = [{ id: 'default', permissions: [] }]
                 }
               this.$store.commit('SET_ROLES', roles)
               storage.set(USER_ROLES, roles, expiresAt)
@@ -1339,7 +1339,7 @@ export default {
               console.log('Register - Roles after save:', currentRoles.length > 0 ? `has ${currentRoles.length} roles` : 'empty')
 
               if (currentRoles.length === 0) {
-                const defaultRoles = [{ id: 'default', permissionList: [] }]
+                const defaultRoles = [{ id: 'default', permissions: [] }]
                 this.$store.commit('SET_ROLES', defaultRoles)
                 storage.set(USER_ROLES, defaultRoles, expiresAt)
               }

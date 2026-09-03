@@ -45,7 +45,9 @@ function getGrantedPermissions () {
   const roles = storage.get(USER_ROLES) || []
   const granted = new Set()
   for (const role of (Array.isArray(roles) ? roles : [roles])) {
-    for (const permission of ((role && role.permissionList) || [])) granted.add(permission)
+    // Roles are persisted in the backend API shape.
+    const permissions = (role && role.permissions) || []
+    for (const permission of permissions) granted.add(permission)
   }
   return granted
 }

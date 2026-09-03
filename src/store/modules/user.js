@@ -6,14 +6,19 @@ import { welcome } from '@/utils/util'
 
 storage.addPlugin(expirePlugin)
 
-const DEFAULT_ROLE = { id: 'default', permissionList: [] }
-const AUTH_ROUTING_CACHE_SCHEMA_VERSION = '2026-08-05.1'
+const DEFAULT_ROLE = { id: 'default', permissions: [] }
+const AUTH_ROUTING_CACHE_SCHEMA_VERSION = '2026-08-10.2'
 const AUTH_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 function normalizeRoles (roles) {
   if (!roles) return []
-  if (Array.isArray(roles)) return roles
-  return [roles]
+  const values = Array.isArray(roles) ? roles : [roles]
+  return values.map(role => {
+    if (typeof role === 'string') return { id: role, permissions: [] }
+    if (!role || typeof role !== 'object') return DEFAULT_ROLE
+    const permissions = Array.isArray(role.permissions) ? role.permissions : []
+    return { ...role, id: role.id || role.role || 'default', permissions }
+  })
 }
 
 function getStoredInfo () {
@@ -113,7 +118,7 @@ const user = {
               const permissions = info.role.permissions || []
               roles = [{
                 id: roleId,
-                permissionList: permissions.length > 0 ? permissions : ['dashboard']
+                permissions: permissions.length > 0 ? permissions : ['dashboard']
               }]
             }
             commit('SET_ROLES', roles)

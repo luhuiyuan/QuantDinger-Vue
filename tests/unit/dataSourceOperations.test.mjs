@@ -48,6 +48,16 @@ test('API client includes lifecycle, credentials, diagnostics, health, policy, l
   assert.match(view, /diagnosticResults\[row\.capability_key\]/)
 })
 
+test('diagnostic modal can copy a complete, safe support report', () => {
+  const view = read('src/views/data-source-operations/index.vue')
+  assert.match(view, /copyDiagnosticReport/)
+  assert.match(view, /dataSources\.copyTestInfo/)
+  assert.match(view, /adapterLabel\(adapter\.adapter_key\)/)
+  assert.match(view, /request_summary/)
+  assert.match(view, /result\.sample/)
+  assert.match(view, /JSON\.stringify\(result, null, 2\)/)
+})
+
 test('legacy credential import never renders a secret value and requires step-up', () => {
   const view = read('src/views/data-source-operations/index.vue')
   assert.match(view, /source_names/)
